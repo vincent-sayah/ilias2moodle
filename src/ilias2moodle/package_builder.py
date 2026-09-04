@@ -210,7 +210,8 @@ class MigrationPackageBuilder:
 
     def _extract_question_pool(self, archive: zipfile.ZipFile, item: MigrationItem) -> None:
         migration_paths: list[str] = []
-        for index, source_path in enumerate(item.metadata.get("question_export_files", []), start=1):
+        question_exports = item.metadata.get("question_export_files", [])
+        for index, source_path in enumerate(question_exports, start=1):
             source_path = str(source_path)
             filename = Path(source_path).name or f"questions-{index}.xml"
             destination = PurePosixPath("question_pools", item.source_id, filename)
