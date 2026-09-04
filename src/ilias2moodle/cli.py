@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ilias2moodle.ilias.export_parser import IliasExportParser
 from ilias2moodle.model import MigrationDocument
+from ilias2moodle.package_builder import MigrationPackageBuilder
 from ilias2moodle.report import write_reports
 
 
@@ -35,27 +36,37 @@ def _build_parser() -> argparse.ArgumentParser:
         "analyse-export",
         help="Analyser un export natif XML/ZIP ILIAS sans connexion à l'instance source",
     )
+    _add_export_arguments(analyse_export)
     analyse_export.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Conservé pour cohérence CLI ; aucune écriture Moodle n'est faite par cette commande",
+    )
+
+    prepare_export = subparsers.add_parser(
+        "prepare-export",
+        help="Construire un package normalisé avec les ressources extraites de l'export ILIAS",
+    )
+    _add_export_arguments(prepare_export)
+    return parser
+
+
+def _add_export_arguments(command: argparse.ArgumentParser) -> None:
+    command.add_argument(
         "--zip",
         required=True,
         type=Path,
         dest="zip_path",
         help="Archive ZIP exportée depuis ILIAS",
     )
-    analyse_export.add_argument(
-        "--output", required=True, type=Path, help="Répertoire de sortie des rapports"
+    command.add_argument(
+        "--output", required=True, type=Path, help="Répertoire de sortie des rapports ou du package"
     )
-    analyse_export.add_argument(
+    command.add_argument(
         "--ilias-version",
         default="10",
         help="Version ILIAS source à inscrire dans migration.json (ex. 10.5)",
     )
-    analyse_export.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Conservé pour cohérence CLI ; aucune écriture Moodle n'est faite par cette commande",
-    )
-    return parser
 
 
 def _client_from_settings(settings):
@@ -90,31 +101,55 @@ def _analyse(course_id: str, output: Path, dry_run: bool) -> int:
     return 0
 
 
-def _analyse_export(
-    zip_path: Path, output: Path, ilias_version: str, dry_run: bool
-) -> int:
+def _parse_export_document(zip_path: Path, ilias_version: str) -> MigrationDocument:
     if not zip_path.is_file():
         raise FileNotFoundError(f"Archive ILIAS introuvable : {zip_path}")
 
     with IliasExportParser(zip_path) as export_parser:
         course = export_parser.parse_course()
 
-    document = MigrationDocument(
+    return MigrationDocument(
         course=course,
         source={"lms": "ILIAS", "version": ilias_version},
     )
+
+
+def _analyse_export(
+    zip_path: Path, output: Path, ilias_version: str, dry_run: bool
+) -> int:
+    document = _parse_export_document(zip_path, ilias_version)
     report = write_reports(document, output)
 
     summary = {
         "mode": "native_export",
         "dry_run": dry_run,
         "archive": str(zip_path),
-        "course": course.source_id,
-        "title": course.title,
+        "course": document.course.source_id,
+        "title": document.course.title,
         "output": str(output),
         "total_items": report["total_items"],
         "counts_by_type": report["counts_by_type"],
         "unsupported_count": report["unsupported_count"],
+    }
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _prepare_export(zip_path: Path, output: Path, ilias_version: str) -> int:
+    document = _parse_export_document(zip_path, ilias_version)
+    result = MigrationPackageBuilder(zip_path, output).build(document)
+    package = result["package"]
+    report = result["report"]
+
+    summary = {
+        "mode": "prepare_export",
+        "archive": str(zip_path),
+        "course": document.course.source_id,
+        "title": document.course.title,
+        "output": str(output),
+        "total_items": report["total_items"],
+        "extracted": package["extracted"],
+        "missing_count": package["missing_count"],
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
@@ -133,6 +168,8 @@ def main(argv: list[str] | None = None) -> int:
             args.ilias_version,
             args.dry_run,
         )
+    if args.command == "prepare-export":
+        return _prepare_export(args.zip_path, args.output, args.ilias_version)
 
     parser.error("Commande inconnue")
     return 2
