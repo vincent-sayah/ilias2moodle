@@ -4,6 +4,8 @@ import zipfile
 from pathlib import Path
 
 from ilias2moodle.ilias.export_parser import IliasExportParser
+from ilias2moodle.model import MigrationDocument
+from ilias2moodle.package_builder import MigrationPackageBuilder
 
 
 def _write_zip(path: Path) -> None:
@@ -79,3 +81,26 @@ def test_native_export_parser_rebuilds_tree(tmp_path: Path) -> None:
     assert file_item.metadata["mime_type"] == "application/pdf"
     assert file_item.metadata["size"] == 1234
     assert file_item.description == "PDF test"
+
+
+def test_package_builder_extracts_native_file(tmp_path: Path) -> None:
+    archive_path = tmp_path / "course.zip"
+    _write_zip(archive_path)
+
+    with IliasExportParser(archive_path) as parser:
+        course = parser.parse_course()
+
+    document = MigrationDocument(
+        course=course,
+        source={"lms": "ILIAS", "version": "10.5"},
+    )
+    output = tmp_path / "package"
+    result = MigrationPackageBuilder(archive_path, output).build(document)
+
+    extracted = output / "files" / "12" / "document.pdf"
+    assert extracted.read_bytes() == b"%PDF-test"
+    assert result["package"]["extracted"]["files"] == 1
+    assert result["package"]["missing_count"] == 0
+    assert course.items[0].items[0].metadata["migration_path"] == "files/12/document.pdf"
+    assert (output / "migration.json").is_file()
+    assert (output / "package.json").is_file()
