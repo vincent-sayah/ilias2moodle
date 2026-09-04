@@ -4,10 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from ilias2moodle.config import Settings
-from ilias2moodle.ilias.demo import DemoIliasClient
 from ilias2moodle.ilias.export_parser import IliasExportParser
-from ilias2moodle.ilias.soap import SoapIliasClient
 from ilias2moodle.model import MigrationDocument
 from ilias2moodle.report import write_reports
 
@@ -39,7 +36,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Analyser un export natif XML/ZIP ILIAS sans connexion à l'instance source",
     )
     analyse_export.add_argument(
-        "--zip", required=True, type=Path, dest="zip_path", help="Archive ZIP exportée depuis ILIAS"
+        "--zip",
+        required=True,
+        type=Path,
+        dest="zip_path",
+        help="Archive ZIP exportée depuis ILIAS",
     )
     analyse_export.add_argument(
         "--output", required=True, type=Path, help="Répertoire de sortie des rapports"
@@ -57,7 +58,10 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _client_from_settings(settings: Settings):
+def _client_from_settings(settings):
+    from ilias2moodle.ilias.demo import DemoIliasClient
+    from ilias2moodle.ilias.soap import SoapIliasClient
+
     if settings.ilias_mode == "demo":
         return DemoIliasClient()
     if settings.ilias_mode == "soap":
@@ -66,6 +70,8 @@ def _client_from_settings(settings: Settings):
 
 
 def _analyse(course_id: str, output: Path, dry_run: bool) -> int:
+    from ilias2moodle.config import Settings
+
     settings = Settings.from_env()
     client = _client_from_settings(settings)
     course = client.get_course(course_id)
