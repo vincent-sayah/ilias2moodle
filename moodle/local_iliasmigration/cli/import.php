@@ -1,6 +1,6 @@
 <?php
 
-// CLI dry-run entry point for ILIAS2Moodle Phase 2.
+// CLI entry point for ILIAS2Moodle Phase 2.
 define('CLI_SCRIPT', true);
 
 require(__DIR__ . '/../../../config.php');
@@ -11,6 +11,7 @@ require_once($CFG->libdir . '/clilib.php');
         'source' => '',
         'category' => 0,
         'dry-run' => false,
+        'apply' => false,
         'help' => false,
     ],
     [
@@ -24,19 +25,29 @@ if ($unrecognized) {
 }
 
 $help = <<<EOF
-ILIAS2Moodle - Phase 2 Moodle structure dry-run
+ILIAS2Moodle - Phase 2 Moodle structure import
 
-Usage:
+Usage (safe preview):
   php local/iliasmigration/cli/import.php \\
       --source=/path/to/migration.json \\
       --category=ID \\
       --dry-run
 
+Usage (real structure write):
+  php local/iliasmigration/cli/import.php \\
+      --source=/path/to/migration.json \\
+      --category=ID \\
+      --apply
+
 Options:
   --source      Absolute path to migration.json.
   --category    Existing Moodle course category id.
-  --dry-run     Required in the current alpha. Performs no Moodle content writes.
+  --dry-run     Build the import plan; performs no Moodle content writes.
+  --apply       Create/update only the course and first-level sections.
+                The course is created hidden. Resources remain deferred.
   -h, --help    Display this help.
+
+Exactly one of --dry-run or --apply is required.
 
 EOF;
 
@@ -54,12 +65,14 @@ if ($categoryid <= 0) {
     cli_error("Missing or invalid --category.\n\n" . $help);
 }
 
-if (!$options['dry-run']) {
-    cli_error('Phase 2 alpha refuses to run without --dry-run.');
+$dryrun = (bool) $options['dry-run'];
+$apply = (bool) $options['apply'];
+if ($dryrun === $apply) {
+    cli_error("Choose exactly one of --dry-run or --apply.\n\n" . $help);
 }
 
 $importer = new \local_iliasmigration\importer();
-$plan = $importer->import((string) $options['source'], $categoryid, true);
+$result = $importer->import((string) $options['source'], $categoryid, $dryrun);
 
-echo json_encode($plan, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 echo PHP_EOL;
