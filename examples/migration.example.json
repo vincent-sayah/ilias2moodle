@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "source": {
+    "lms": "ILIAS",
+    "version": "10"
+  },
+  "generated_at": "2026-09-04T00:00:00+00:00",
+  "course": {
+    "source_id": "1234",
+    "title": "Cours de démonstration",
+    "description": "Exemple du format intermédiaire.",
+    "metadata": {},
+    "items": [
+      {
+        "source_id": "1240",
+        "type": "folder",
+        "title": "Séquence 1",
+        "description": "",
+        "position": 1,
+        "metadata": {},
+        "items": [
+          {
+            "source_id": "1241",
+            "type": "file",
+            "title": "Guide.pdf",
+            "description": "",
+            "position": 1,
+            "metadata": {
+              "filename": "guide.pdf"
+            },
+            "items": []
+          }
+        ]
+      }
+    ]
+  }
+}
