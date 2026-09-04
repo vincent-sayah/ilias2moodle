@@ -11,20 +11,20 @@ defined('MOODLE_INTERNAL') || die();
  */
 final class structure_executor {
     /**
-     * Create or update the Moodle course and first-level sections.
+     * Create or update the Moodle course, first-level sections and second-level subsections.
      *
-     * Resource activities remain deferred. Subsections and deeper folders are
-     * deliberately rejected before any write until their Moodle 5 implementation
-     * is validated separately.
+     * Resource activities remain deferred. Folder depth greater than two is
+     * deliberately rejected before any write.
      *
      * @param array $document Validated migration document.
      * @param int $categoryid Moodle target category id.
      * @return array Execution report.
      */
     public function execute(array $document, int $categoryid): array {
-        global $CFG, $DB;
+        global $CFG, $DB, $USER;
 
         require_once($CFG->dirroot . '/course/lib.php');
+        require_once($CFG->dirroot . '/course/modlib.php');
 
         $planner = new plan_builder($categoryid);
         $plan = $planner->build($document);
@@ -32,38 +32,75 @@ final class structure_executor {
 
         $sourcecourseid = (string) $document['course']['source_id'];
         $sourceversion = (string) ($document['source']['version'] ?? '');
-        $transaction = $DB->start_delegated_transaction();
+        $originaluser = $USER;
+
+        // create_module()/update_module() perform capability checks. A CLI migration
+        // is an administrative operation, so execute it as Moodle's primary admin.
+        \core\session\manager::set_user(get_admin());
 
         try {
-            $operations = $plan['operations'];
-            $courseoperation = array_shift($operations);
-            $courseresult = $this->apply_course($courseoperation, $sourceversion);
-            $course = $courseresult['course'];
+            $transaction = $DB->start_delegated_transaction();
 
-            $results = [$courseresult['operation']];
-            $moodlesectionposition = 0;
-            foreach ($operations as $operation) {
-                if ($operation['kind'] === 'section') {
-                    // ILIAS item positions include non-folder resources. Moodle section
-                    // positions must instead be contiguous among structural folders.
-                    $moodlesectionposition++;
-                    $results[] = $this->apply_section(
-                        $course,
-                        $operation,
-                        $sourcecourseid,
-                        $sourceversion,
-                        $moodlesectionposition
-                    );
-                    continue;
+            try {
+                $operations = $plan['operations'];
+                $courseoperation = array_shift($operations);
+                $courseresult = $this->apply_course($courseoperation, $sourceversion);
+                $course = $courseresult['course'];
+
+                $results = [$courseresult['operation']];
+                $moodlesectionposition = 0;
+                $sectionsbysourceref = [];
+
+                foreach ($operations as $operation) {
+                    if ($operation['kind'] === 'section') {
+                        // ILIAS item positions include non-folder resources. Moodle section
+                        // positions must instead be contiguous among structural folders.
+                        $moodlesectionposition++;
+                        $sectionresult = $this->apply_section(
+                            $course,
+                            $operation,
+                            $sourcecourseid,
+                            $sourceversion,
+                            $moodlesectionposition
+                        );
+                        $results[] = $sectionresult;
+                        $sectionsbysourceref[(string) $operation['source_ref_id']] = [
+                            'target_id' => (int) $sectionresult['target_id'],
+                            'section' => (int) $sectionresult['moodle_section_position'],
+                        ];
+                        continue;
+                    }
+
+                    if ($operation['kind'] === 'subsection') {
+                        $parentref = (string) ($operation['parent_source_ref_id'] ?? '');
+                        if ($parentref === '' || !isset($sectionsbysourceref[$parentref])) {
+                            throw new \coding_exception(
+                                'Subsection parent section is missing from the current execution plan.'
+                            );
+                        }
+
+                        $results[] = $this->apply_subsection(
+                            $course,
+                            $operation,
+                            $sourcecourseid,
+                            $sourceversion,
+                            (int) $sectionsbysourceref[$parentref]['section']
+                        );
+                        continue;
+                    }
+
+                    // Resource/activity migration is intentionally deferred to later phases.
+                    $results[] = $operation;
                 }
 
-                // Resource/activity migration is intentionally deferred to later phases.
-                $results[] = $operation;
+                $transaction->allow_commit();
+            } catch (\Throwable $exception) {
+                $transaction->rollback($exception);
             }
-
-            $transaction->allow_commit();
-        } catch (\Throwable $exception) {
-            $transaction->rollback($exception);
+        } finally {
+            if ($originaluser instanceof \stdClass) {
+                \core\session\manager::set_user($originaluser);
+            }
         }
 
         $plan['mode'] = 'apply';
@@ -72,7 +109,7 @@ final class structure_executor {
         $plan['course']['visible'] = (int) $course->visible;
         $plan['operations'] = $results;
         $plan['warnings'][] = [
-            'code' => 'COURSE_CREATED_HIDDEN',
+            'code' => 'COURSE_REMAINS_HIDDEN',
             'message' => 'The imported course remains hidden until later migration phases are validated.',
         ];
 
@@ -89,7 +126,7 @@ final class structure_executor {
             $kind = (string) ($operation['kind'] ?? '');
             $action = (string) ($operation['action'] ?? '');
 
-            if (in_array($kind, ['course', 'section'], true)) {
+            if (in_array($kind, ['course', 'section', 'subsection'], true)) {
                 if (!in_array($action, ['CREATE', 'UPDATE'], true)) {
                     $reason = (string) ($operation['reason'] ?? 'structural operation is not safe');
                     throw new \coding_exception(
@@ -99,10 +136,10 @@ final class structure_executor {
                 continue;
             }
 
-            if ($kind === 'subsection' || $action === 'FLATTEN_REQUIRED' || $action === 'BLOCKED') {
+            if ($action === 'FLATTEN_REQUIRED' || $action === 'BLOCKED') {
                 throw new \coding_exception(
-                    'Apply currently supports only the course and first-level sections. '
-                        . 'Subsections/deeper folders must be validated separately.'
+                    'Apply supports at most two ILIAS folder levels. '
+                        . 'Deeper folders must be flattened by a later policy.'
                 );
             }
         }
@@ -234,6 +271,110 @@ final class structure_executor {
         $result['target_id'] = $sectionid;
         $result['source_position'] = (int) ($operation['position'] ?? 0);
         $result['moodle_section_position'] = $position;
+
+        return $result;
+    }
+
+    /**
+     * Create/update a Moodle mod_subsection activity for a second-level ILIAS folder.
+     *
+     * @param \stdClass $course Moodle course.
+     * @param array $operation Planned subsection operation.
+     * @param string $sourcecourseid ILIAS course ref_id.
+     * @param string $sourceversion ILIAS source version.
+     * @param int $parentsectionnumber Parent Moodle section number.
+     * @return array Execution operation.
+     */
+    private function apply_subsection(
+        \stdClass $course,
+        array $operation,
+        string $sourcecourseid,
+        string $sourceversion,
+        int $parentsectionnumber
+    ): array {
+        global $DB;
+
+        $requested = (string) $operation['action'];
+        $title = (string) $operation['title'];
+
+        if ($requested === 'CREATE') {
+            $moduleinfo = create_module((object) [
+                'modulename' => 'subsection',
+                'course' => (int) $course->id,
+                'section' => $parentsectionnumber,
+                'visible' => 1,
+                'name' => $title,
+            ]);
+            $cmid = (int) $moduleinfo->coursemodule;
+            $instanceid = (int) $moduleinfo->instance;
+            $performed = 'CREATED';
+        } else {
+            $cmid = (int) $operation['target_id'];
+            $cm = get_coursemodule_from_id('subsection', $cmid, $course->id, false, MUST_EXIST);
+            $parentsection = $DB->get_record(
+                'course_sections',
+                ['id' => $cm->section],
+                'id,course,section',
+                MUST_EXIST
+            );
+            if ((int) $parentsection->course !== (int) $course->id) {
+                throw new \coding_exception('Mapped subsection belongs to a different Moodle course.');
+            }
+            if ((int) $parentsection->section !== $parentsectionnumber) {
+                throw new \coding_exception(
+                    'Moving an existing subsection to a different parent section is not supported yet.'
+                );
+            }
+
+            [, , , $moduleinfo] = get_moduleinfo_data($cm, $course);
+            $moduleinfo->name = $title;
+            update_module($moduleinfo);
+
+            $instanceid = (int) $cm->instance;
+            $performed = 'UPDATED';
+        }
+
+        rebuild_course_cache($course->id, true);
+        $delegatedrecord = $DB->get_record(
+            'course_sections',
+            [
+                'course' => $course->id,
+                'component' => 'mod_subsection',
+                'itemid' => $instanceid,
+            ],
+            'id,course,section,name,component,itemid',
+            MUST_EXIST
+        );
+        $delegatedinfo = get_fast_modinfo($course->id)->get_section_info_by_id($delegatedrecord->id);
+        if (!$delegatedinfo) {
+            throw new \coding_exception('Unable to resolve the delegated Moodle subsection section.');
+        }
+        if ((string) $delegatedinfo->name !== $title) {
+            formatactions::section($course)->update($delegatedinfo, ['name' => $title]);
+            rebuild_course_cache($course->id, true);
+            $delegatedinfo = get_fast_modinfo($course->id)->get_section_info_by_id($delegatedrecord->id);
+        }
+        if (!$delegatedinfo) {
+            throw new \coding_exception('Unable to refresh the delegated Moodle subsection section.');
+        }
+
+        $this->save_mapping(
+            $sourcecourseid,
+            (string) $operation['source_ref_id'],
+            (string) ($operation['source_obj_id'] ?? ''),
+            'subsection',
+            $cmid,
+            $sourceversion
+        );
+
+        $result = $operation;
+        $result['requested_action'] = $requested;
+        $result['action'] = $performed;
+        $result['target_id'] = $cmid;
+        $result['instance_id'] = $instanceid;
+        $result['delegated_section_id'] = (int) $delegatedinfo->id;
+        $result['parent_moodle_section_position'] = $parentsectionnumber;
+        $result['source_position'] = (int) ($operation['position'] ?? 0);
 
         return $result;
     }
