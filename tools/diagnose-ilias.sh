@@ -4,9 +4,21 @@ set -u
 INPUT_URL="${1:-}"
 
 if [[ -z "$INPUT_URL" ]]; then
-  echo "Usage: $0 https://ilias.example.org"
+  echo "Usage: $0 'https://ilias.example.org'"
   echo "Vous pouvez aussi fournir une URL complete de cours ; le script en extraira la racine du site."
+  echo "IMPORTANT : entourez toujours les URL contenant des & avec des quotes simples."
   exit 2
+fi
+
+# Detecte le cas typique ou Bash a coupe une URL ILIAS non quotee sur le premier '&'.
+# Ex.: ./diagnose-ilias.sh http://host/ilias.php?baseClass=...&cmd=...&ref_id=123
+# Dans ce cas, le script ne recoit souvent que la partie avant le premier '&'.
+if [[ "$INPUT_URL" == *"/ilias.php?baseClass="* && "$INPUT_URL" != *"ref_id="* ]]; then
+  echo "AVERTISSEMENT : l'URL ILIAS semble incomplete (ref_id absent)."
+  echo "Cause probable : l'URL contient des '&' et n'a pas ete entouree de quotes."
+  echo "Exemple :"
+  echo "  $0 'http://host/ilias.php?baseClass=ilrepositorygui&cmd=view&ref_id=123'"
+  echo
 fi
 
 # Normalise automatiquement une URL de cours/permalink vers scheme://host[:port].
