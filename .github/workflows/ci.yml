@@ -32,3 +32,15 @@ jobs:
 
       - name: Pytest
         run: pytest -q
+
+  php:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: PHP version
+        run: php -v
+
+      - name: PHP syntax
+        run: find moodle/local_iliasmigration -name '*.php' -print0 | xargs -0 -n1 php -l
