@@ -9,26 +9,26 @@ defined('MOODLE_INTERNAL') || die();
  */
 final class importer {
     /**
-     * Analyse a neutral migration document and build the Moodle execution plan.
+     * Analyse a neutral migration document or apply the validated Phase 2 subset.
      *
-     * Phase 2 alpha intentionally supports dry-run only. No Moodle course content is written.
+     * Dry-run never writes Moodle content. Apply currently creates/updates only
+     * the course and first-level sections; resources remain deferred.
      *
      * @param string $migrationjson Absolute path to migration.json.
      * @param int $categoryid Moodle target category id.
      * @param bool $dryrun Whether Moodle writes are forbidden.
-     * @return array Dry-run plan.
+     * @return array Plan or execution report.
      */
     public function import(string $migrationjson, int $categoryid, bool $dryrun = true): array {
-        if (!$dryrun) {
-            throw new \coding_exception(
-                'Phase 2 alpha only supports dry-run. No Moodle writes are enabled yet.'
-            );
-        }
-
         $reader = new migration_reader();
         $document = $reader->read($migrationjson);
 
-        $planner = new plan_builder($categoryid);
-        return $planner->build($document);
+        if ($dryrun) {
+            $planner = new plan_builder($categoryid);
+            return $planner->build($document);
+        }
+
+        $executor = new structure_executor();
+        return $executor->execute($document, $categoryid);
     }
 }
