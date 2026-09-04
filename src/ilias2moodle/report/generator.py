@@ -3,8 +3,9 @@ from __future__ import annotations
 import html
 import json
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from ilias2moodle.model import MigrationDocument, MigrationItem
 

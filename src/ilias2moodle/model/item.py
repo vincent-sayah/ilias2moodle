@@ -12,7 +12,7 @@ class MigrationItem:
     description: str = ""
     position: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
-    items: list["MigrationItem"] = field(default_factory=list)
+    items: list[MigrationItem] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

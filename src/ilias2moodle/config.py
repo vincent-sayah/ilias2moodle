@@ -26,7 +26,7 @@ class Settings:
     log_level: str = "INFO"
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         load_dotenv()
         return cls(
             ilias_mode=os.getenv("ILIAS_MODE", "demo").strip().lower(),
