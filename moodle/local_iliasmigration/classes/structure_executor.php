@@ -41,13 +41,18 @@ final class structure_executor {
             $course = $courseresult['course'];
 
             $results = [$courseresult['operation']];
+            $moodlesectionposition = 0;
             foreach ($operations as $operation) {
                 if ($operation['kind'] === 'section') {
+                    // ILIAS item positions include non-folder resources. Moodle section
+                    // positions must instead be contiguous among structural folders.
+                    $moodlesectionposition++;
                     $results[] = $this->apply_section(
                         $course,
                         $operation,
                         $sourcecourseid,
-                        $sourceversion
+                        $sourceversion,
+                        $moodlesectionposition
                     );
                     continue;
                 }
@@ -87,11 +92,7 @@ final class structure_executor {
             if (in_array($kind, ['course', 'section'], true)) {
                 if (!in_array($action, ['CREATE', 'UPDATE'], true)) {
                     $reason = (string) ($operation['reason'] ?? 'structural operation is not safe');
-                    throw new \moodle_exception(
-                        'error',
-                        'local_iliasmigration',
-                        '',
-                        null,
+                    throw new \coding_exception(
                         "Cannot apply {$kind}: {$action} ({$reason})"
                     );
                 }
@@ -99,11 +100,7 @@ final class structure_executor {
             }
 
             if ($kind === 'subsection' || $action === 'FLATTEN_REQUIRED' || $action === 'BLOCKED') {
-                throw new \moodle_exception(
-                    'error',
-                    'local_iliasmigration',
-                    '',
-                    null,
+                throw new \coding_exception(
                     'Apply currently supports only the course and first-level sections. '
                         . 'Subsections/deeper folders must be validated separately.'
                 );
@@ -170,17 +167,19 @@ final class structure_executor {
      * @param array $operation Planned section operation.
      * @param string $sourcecourseid ILIAS course ref_id.
      * @param string $sourceversion ILIAS source version.
+     * @param int $moodleposition Contiguous Moodle section position.
      * @return array Execution operation.
      */
     private function apply_section(
         \stdClass $course,
         array $operation,
         string $sourcecourseid,
-        string $sourceversion
+        string $sourceversion,
+        int $moodleposition
     ): array {
         global $DB;
 
-        $position = max(1, (int) $operation['position']);
+        $position = max(1, $moodleposition);
         $requested = (string) $operation['action'];
         $sectionactions = formatactions::section($course);
 
@@ -233,6 +232,8 @@ final class structure_executor {
         $result['requested_action'] = $requested;
         $result['action'] = $performed;
         $result['target_id'] = $sectionid;
+        $result['source_position'] = (int) ($operation['position'] ?? 0);
+        $result['moodle_section_position'] = $position;
 
         return $result;
     }
