@@ -43,8 +43,8 @@ Options:
   --source      Absolute path to migration.json.
   --category    Existing Moodle course category id.
   --dry-run     Build the import plan; performs no Moodle content writes.
-  --apply       Create/update only the course and first-level sections.
-                The course is created hidden. Resources remain deferred.
+  --apply       Create/update the hidden course, first-level sections and
+                second-level Moodle subsections. Resources remain deferred.
   -h, --help    Display this help.
 
 Exactly one of --dry-run or --apply is required.
