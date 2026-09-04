@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/iliasmigration/db" VERSION="20260904" COMMENT="XMLDB file for local_iliasmigration"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
+  <TABLES>
+    <TABLE NAME="local_iliasmigration_map" COMMENT="Persistent mapping between ILIAS source objects and Moodle targets">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="sourcelms" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="ILIAS" SEQUENCE="false"/>
+        <FIELD NAME="sourceversion" TYPE="char" LENGTH="20" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="sourcecourse" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="sourceref" TYPE="char" LENGTH="64" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="sourceobj" TYPE="char" LENGTH="64" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="targettype" TYPE="char" LENGTH="32" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="targetid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="16" NOTNULL="true" DEFAULT="PENDING" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="source_target_unique" TYPE="unique" FIELDS="sourcelms,sourcecourse,sourceref,targettype"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="sourceobj_idx" UNIQUE="false" FIELDS="sourceobj"/>
+        <INDEX NAME="target_idx" UNIQUE="false" FIELDS="targettype,targetid"/>
+      </INDEXES>
+    </TABLE>
+  </TABLES>
+</XMLDB>
