@@ -33,9 +33,28 @@ echo "Base URL  : $BASE_URL"
 if [[ "$INPUT_URL" != "$BASE_URL" && "$INPUT_URL" != "$BASE_URL/" ]]; then
   echo "Info      : l'URL fournie a ete normalisee vers la racine du site."
 fi
-echo
 
-echo "[1] PHP"
+echo
+echo "[1] Python / ILIAS2Moodle"
+FOUND_PYTHON=0
+for candidate in python3.13 python3.12 python3.11; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    echo "$candidate : $($candidate --version 2>&1) ($(command -v "$candidate"))"
+    FOUND_PYTHON=1
+  fi
+done
+if command -v python3 >/dev/null 2>&1; then
+  echo "python3    : $(python3 --version 2>&1) ($(command -v python3))"
+fi
+if [[ "$FOUND_PYTHON" -eq 0 ]]; then
+  echo "Compatibilité ILIAS2Moodle : NON - Python 3.11+ non détecté"
+  echo "Le Python système ne doit pas être remplacé. Installer Python 3.11 en parallèle."
+else
+  echo "Compatibilité ILIAS2Moodle : OUI"
+fi
+
+echo
+echo "[2] PHP"
 if command -v php >/dev/null 2>&1; then
   php -v | head -n 1
   if php -m 2>/dev/null | grep -qi '^soap$'; then
@@ -48,8 +67,7 @@ else
 fi
 
 echo
-
-echo "[2] Recherche d'une installation ILIAS dans le repertoire courant"
+echo "[3] Recherche d'une installation ILIAS dans le repertoire courant"
 if [[ -f "cli/setup.php" ]]; then
   echo "ILIAS     : cli/setup.php trouve"
   if command -v php >/dev/null 2>&1; then
@@ -62,8 +80,7 @@ else
 fi
 
 echo
-
-echo "[3] Test des endpoints SOAP/WSDL"
+echo "[4] Test des endpoints SOAP/WSDL"
 FOUND=0
 
 for PATH_WSDL in "/soap/server.php?wsdl" "/public/soap/server.php?wsdl"; do
@@ -113,7 +130,7 @@ else
 fi
 
 echo
-echo "[4] Informations a relever manuellement"
+echo "[5] Informations a relever manuellement"
 echo "  - version ILIAS exacte (ex. 10.x)"
 echo "  - URL du cours POC"
 echo "  - ref_id du cours POC"
