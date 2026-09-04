@@ -5,7 +5,7 @@ Plugin local Moodle utilisé par ILIAS2Moodle pour reconstruire dans Moodle les 
 ## Compatibilité
 
 - Moodle 4.5 minimum ;
-- POC de développement validé sur Moodle 5.0.2 ;
+- POC de développement actuellement ciblé et validé côté environnement sur Moodle 5.0.2 ;
 - PHP 8.3 sur le POC Moodle.
 
 ## État actuel — Phase 2 alpha
