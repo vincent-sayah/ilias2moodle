@@ -1,14 +1,25 @@
 #!/usr/bin/env bash
 set -u
 
-BASE_URL="${1:-}"
+INPUT_URL="${1:-}"
 
-if [[ -z "$BASE_URL" ]]; then
+if [[ -z "$INPUT_URL" ]]; then
   echo "Usage: $0 https://ilias.example.org"
+  echo "Vous pouvez aussi fournir une URL complete de cours ; le script en extraira la racine du site."
   exit 2
 fi
 
+# Normalise automatiquement une URL de cours/permalink vers scheme://host[:port].
+# Ex.: http://host/ilias.php?... ou http://host/goto.php/crs/123 -> http://host
+BASE_URL="$(printf '%s' "$INPUT_URL" | sed -E 's#^(https?://[^/]+).*$#\1#')"
 BASE_URL="${BASE_URL%/}"
+
+if [[ ! "$BASE_URL" =~ ^https?://[^/]+$ ]]; then
+  echo "ERREUR : URL non reconnue : $INPUT_URL"
+  echo "Exemple attendu : https://ilias.example.org"
+  exit 2
+fi
+
 TMPDIR_DIAG="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_DIAG"' EXIT
 
@@ -17,7 +28,11 @@ echo " ILIAS2Moodle - Diagnostic ILIAS Phase 1"
 echo "============================================"
 echo "Date      : $(date -Iseconds 2>/dev/null || date)"
 echo "Host      : $(hostname 2>/dev/null || echo unknown)"
+echo "Input URL : $INPUT_URL"
 echo "Base URL  : $BASE_URL"
+if [[ "$INPUT_URL" != "$BASE_URL" && "$INPUT_URL" != "$BASE_URL/" ]]; then
+  echo "Info      : l'URL fournie a ete normalisee vers la racine du site."
+fi
 echo
 
 echo "[1] PHP"
@@ -84,7 +99,7 @@ for PATH_WSDL in "/soap/server.php?wsdl" "/public/soap/server.php?wsdl"; do
     fi
   fi
   echo
- done
+done
 
 if [[ "$FOUND" -eq 0 ]]; then
   cat <<'EOF'
