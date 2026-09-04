@@ -11,8 +11,8 @@ final class importer {
     /**
      * Analyse a neutral migration document or apply the validated Phase 2 subset.
      *
-     * Dry-run never writes Moodle content. Apply currently creates/updates only
-     * the course and first-level sections; resources remain deferred.
+     * Dry-run never writes Moodle content. Apply creates/updates the hidden course,
+     * first-level sections and second-level Moodle subsections. Resources remain deferred.
      *
      * @param string $migrationjson Absolute path to migration.json.
      * @param int $categoryid Moodle target category id.
