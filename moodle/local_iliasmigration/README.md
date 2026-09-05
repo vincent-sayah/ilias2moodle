@@ -26,7 +26,8 @@ Le plugin sait maintenant :
 - conserver provisoirement les WebResource internes ILIAS sous forme de liens permanents vers l'instance source ;
 - valider les packages SCORM Phase 4 sans les extraire pendant le dry-run ;
 - créer ou mettre à jour les activités `mod_scorm`, stocker le ZIP par File API et laisser Moodle parser les SCO ;
-- laisser les modules d'apprentissage natifs, tests et banques de questions pour les phases suivantes.
+- valider en dry-run les Learning Modules natifs ILIAS et produire une prévisualisation Moodle Book ;
+- laisser l'apply Moodle Book, les tests et banques de questions pour les étapes suivantes.
 
 Le cours reste masqué tant que les phases de migration suivantes n'ont pas été validées.
 
@@ -159,10 +160,42 @@ Les diagnostics Moodle 5.0 ne doivent pas utiliser l'ancienne table `scorm_scoes
 - `scorm_element` ;
 - `scorm_scoes_value`.
 
-Les rapports Moodle eux-mêmes joignent ces tables pour retrouver utilisateur, numéro de tentative, SCO, élément CMI et valeur.
+Le POC réel a validé le lancement, le suivi, les scores/statuts, les tentatives, un deuxième apply en `UPDATE`, le même CMID/instance, aucun doublon et aucune perte des 106 valeurs suivies.
+
+## Phase 5 — Learning Module natif -> Moodle Book
+
+Depuis `0.9.0-alpha`, la Phase 5 est disponible en **dry-run uniquement** :
+
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/chemin/vers/migration.json \
+  --category=ID \
+  --phase=5 \
+  --dry-run
+```
+
+Le dry-run Phase 5 :
+
+- vérifie que `mod_book` est installé et actif ;
+- résout le Learning Module en `CREATE` ou `UPDATE` avec `targettype=book` ;
+- revalide les objets et packages Phase 2/3/4 du même export ;
+- valide `learning_modules/<ref_id>/structure.json` ;
+- contrôle l'identité source, l'arbre, les pages, les parents et l'ordre ;
+- vérifie tous les médias/fichiers extraits et leurs références ;
+- bloque tout composant `unsupported` ;
+- produit `book_preview` avec la future table des matières Moodle Book.
+
+Pour le POC ILIAS 10.8 `ref_id=243`, la représentation validée contient 2 chapitres, 3 pages, 1 image JPEG et 2 PDF embarqués. La politique de prévisualisation crée un marqueur Book pour chaque chapitre puis place les pages ILIAS en sous-chapitres.
+
+`--phase=5 --apply` est volontairement refusé dans `0.9.0-alpha`. Le rendu HTML, la File API `mod_book/chapter`, la réécriture des liens internes et l'idempotence Book doivent être validés avant activation de l'écriture réelle.
+
+Voir `docs/phase5-learning-modules.md`.
+
+## Principes d'écriture
+
+Les écritures de contenu passent par les API Moodle du module cible et la File API. Le plugin n'écrit pas directement les contenus pédagogiques dans les tables cœur Moodle en contournant les API de module.
 
 Restent à réaliser :
 
-- validation finale de l'idempotence SCORM et conservation des traces → Phase 4 ;
-- module d'apprentissage natif → Phase 5 ;
+- rendu HTML + apply Moodle Book → Phase 5 ;
 - test et banque de questions → Phase 6.
