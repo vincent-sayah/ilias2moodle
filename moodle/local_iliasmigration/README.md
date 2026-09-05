@@ -24,7 +24,8 @@ Le plugin sait maintenant :
 - refuser l'écriture si un dossier de profondeur supérieure à 2 exige un aplatissement ;
 - valider et importer les ressources simples Phase 3 : URL, fichiers et modules HTML exportés ;
 - conserver provisoirement les WebResource internes ILIAS sous forme de liens permanents vers l'instance source ;
-- laisser SCORM, modules d'apprentissage natifs, tests et banques de questions en `DEFER` pour les phases suivantes.
+- valider en dry-run les packages SCORM Phase 4 sans les extraire dans Moodle ;
+- laisser l'apply SCORM, les modules d'apprentissage natifs, tests et banques de questions pour les phases suivantes.
 
 Le cours reste masqué tant que les phases de migration suivantes n'ont pas été validées.
 
@@ -107,8 +108,36 @@ La Phase 3 prend en charge :
 
 L'exécution est idempotente : premier passage `CREATED`, passages suivants `UPDATED` à partir du mapping persistant.
 
-Restent différés :
+## Phase 4 — dry-run SCORM
 
-- SCORM → Phase 4 ;
+À partir de `0.7.0-alpha`, le plugin sait préparer et valider un plan SCORM sans écriture Moodle :
+
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/chemin/vers/migration.json \
+  --category=ID \
+  --phase=4 \
+  --dry-run
+```
+
+Le dry-run Phase 4 :
+
+- vérifie que `mod_scorm` existe et est actif ;
+- retrouve un éventuel mapping SCORM pour produire `CREATE` ou `UPDATE` ;
+- vérifie que les Phases 2/3 de ce même export sont déjà synchronisées ;
+- valide `migration_package_path` ;
+- ouvre le ZIP via l'API archive Moodle sans l'extraire ;
+- bloque les chemins ZIP absolus/traversants et collisions de chemins ;
+- exige `imsmanifest.xml` à la racine ;
+- parse le manifeste XML sans accès réseau ;
+- expose taille du ZIP, SHA-256, nombre d'entrées/fichiers, taille décompressée et ratio de compression ;
+- détecte le standard SCORM à partir de `schemaversion` lorsque celui-ci est explicite ;
+- avertit sur les gros packages et sur un manque potentiel d'espace dans `dataroot`.
+
+`--phase=4 --apply` est volontairement désactivé tant que le POC réel `mod_scorm` n'a pas validé la création, le lancement, le suivi et l'idempotence.
+
+Restent à réaliser :
+
+- SCORM apply → Phase 4 ;
 - module d'apprentissage natif → Phase 5 ;
 - test et banque de questions → Phase 6.
