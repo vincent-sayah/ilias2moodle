@@ -16,6 +16,7 @@ Learning Module :
 - `obj_id=721` ;
 - titre : `module ilias` ;
 - description : `ceci est un module de test pour la migration` ;
+- parent : dossier ILIAS `ref_id=230` (`quizz`) ;
 - export interne : `set_10/1788613890__0__lm_721`.
 
 Structure observée :
@@ -40,12 +41,14 @@ module ilias
 
 Contenus représentatifs observés :
 
-- paragraphes ;
-- média via `MediaAlias OriginId=il_0_mob_722` ;
-- tableau ;
-- section `Characteristic=Remark` ;
-- `FileList` avec deux PDF ;
-- image JPEG `vince.jpg`.
+- 7 paragraphes ;
+- 1 média via `MediaAlias OriginId=il_0_mob_722` ;
+- 1 tableau ;
+- 1 section `Characteristic=Remark` ;
+- 1 `FileList` avec deux PDF ;
+- image JPEG `vince.jpg` ;
+- aucun `internal_link` ;
+- aucun composant `unsupported`.
 
 ## Représentation neutre validée
 
@@ -120,11 +123,13 @@ Le dry-run :
 Le dry-run réel est entièrement prêt :
 
 - `book_available=true` ;
-- Learning Module `ref_id=243` en `CREATE` ;
+- `book_importhtml_available=true` ;
+- Learning Module `ref_id=243` en `CREATE` avant le premier apply ;
 - `structure_validation.status=OK` ;
 - 6 nœuds, 2 chapitres, 3 pages ;
 - 1 média, 2 fichiers, 3 assets vérifiés ;
 - 0 composant non supporté ;
+- 0 lien interne ;
 - 5 chapitres/sous-chapitres Moodle prévus ;
 - `phase3_package.ready=true` ;
 - `phase4_package.ready=true` ;
@@ -140,7 +145,7 @@ Moodle Book ne possède qu'un indicateur `subchapter` et ne reproduit pas un arb
 - chaque chapitre ILIAS devient un marqueur de chapitre Moodle Book (`subchapter=0`) ;
 - chaque page ILIAS du chapitre devient une entrée Moodle Book en sous-chapitre (`subchapter=1`).
 
-Le POC doit donc produire cinq entrées :
+Le POC produit exactement cinq entrées :
 
 ```text
 1. Chapitre1          (chapter marker)
@@ -152,7 +157,7 @@ Le POC doit donc produire cinq entrées :
 
 Cette politique conserve les titres de chapitres et les titres de pages dans la table des matières. Les profondeurs ILIAS supérieures devront être traitées par une politique de réduction/flattening explicite avant généralisation.
 
-## Phase 5 apply — version courante `0.10.2-alpha`
+## Phase 5 apply — `0.10.2-alpha`
 
 Commande :
 
@@ -180,7 +185,51 @@ L'apply :
 
 Le plugin `local_iliasmigration` ne fait donc pas d'INSERT/UPDATE direct sur `book_chapters`. Le seul DML propre au plugin reste sa table de mapping.
 
-### Idempotence POC
+## Validation réelle du premier apply Moodle 5.0.2
+
+Le premier `--phase=5 --apply` réel est validé :
+
+- `requested_action=CREATE` ;
+- `action=CREATED` ;
+- CMID Book `24` ;
+- instance Book `2` ;
+- section Moodle `1`, correspondant au dossier ILIAS `quizz` ;
+- empreinte source `64835eb43e23443d23bfe7ba5fc71337340ef1133e2ccb92f7bb167848a55e61` ;
+- `content_reimported=true` ;
+- révision Book `1` ;
+- `moodle_chapter_count=5` ;
+- `moodle_subchapter_count=3` ;
+- `moodle_chapter_file_count=3`.
+
+La table des matières réellement créée est :
+
+```text
+1. Chapitre1       subchapter=0
+2. Nouvelle page   subchapter=1
+3. page2           subchapter=1
+4. Chapitre 2      subchapter=0
+5. page 1          subchapter=1
+```
+
+Les chemins `importsrc` des cinq chapitres contiennent tous la même empreinte source et restent déterministes.
+
+### File API réellement vérifiée
+
+La zone `mod_book/chapter` contient exactement trois fichiers :
+
+```text
+chapter=2 /assets/media/722/vince.jpg                         186497 octets
+chapter=3 /assets/files/723/devoirs CP MON Petit CéP.pdf     379705 octets
+chapter=3 /assets/files/724/dossier-31316547.pdf               60152 octets
+```
+
+Le diagnostic confirme donc :
+
+- `vince.jpg` attaché au chapitre `Nouvelle page` ;
+- les deux PDF attachés au chapitre `page2` ;
+- aucun fichier File API supplémentaire créé au premier passage.
+
+## Idempotence réelle validée
 
 Chaque import Book reçoit une empreinte SHA-256 calculée à partir :
 
@@ -190,13 +239,22 @@ Chaque import Book reçoit une empreinte SHA-256 calculée à partir :
 
 Cette empreinte est intégrée aux chemins `importsrc` déterministes des chapitres.
 
-Au deuxième apply, si les cinq chapitres existants correspondent exactement à l'empreinte et à la table des matières attendues :
+Le deuxième apply réel, sans modification de la source, a confirmé :
 
-- même CMID ;
-- même instance Book ;
-- aucun nouveau chapitre ;
-- aucun asset dupliqué ;
-- `content_reimported=false`.
+- `requested_action=UPDATE` ;
+- `action=UPDATED` ;
+- même CMID `24` ;
+- même instance Book `2` ;
+- même section Moodle `1` ;
+- même empreinte source ;
+- `content_reimported=false` ;
+- révision Book toujours `1` ;
+- toujours 5 chapitres ;
+- toujours 3 sous-chapitres ;
+- toujours 3 fichiers File API ;
+- aucun chapitre ni fichier dupliqué.
+
+Un deuxième diagnostic DB/File API après cet UPDATE confirme encore exactement 5 chapitres et 3 fichiers.
 
 Si la source pédagogique a changé, `0.10.2-alpha` refuse volontairement l'UPDATE des chapitres plutôt que de les dupliquer ou d'écrire directement dans `book_chapters`. Le remplacement sûr d'un Book déjà migré sera une évolution ultérieure.
 
@@ -223,12 +281,16 @@ Moodle Book ne fournit pas d'API publique CRUD de chapitre séparée dans cette 
 
 ## Critère de sortie POC
 
-La Phase 5 sera considérée validée lorsque le POC réel aura confirmé :
+Validé techniquement par CLI/DB/File API :
 
-- `CREATED` vers un `mod_book` Moodle ;
-- 5 entrées de table des matières dans l'ordre attendu ;
-- rendu des paragraphes, image, tableau, section et FileList ;
-- `vince.jpg` et les deux PDF présents via File API ;
-- navigation Moodle Book fonctionnelle ;
-- deuxième apply en `UPDATED` avec le même CMID et la même instance ;
-- aucun chapitre ni fichier dupliqué.
+- [x] `CREATED` vers un `mod_book` Moodle ;
+- [x] 5 entrées de table des matières dans l'ordre attendu ;
+- [x] `vince.jpg` et les deux PDF présents via File API ;
+- [x] deuxième apply en `UPDATED` avec le même CMID et la même instance ;
+- [x] aucun chapitre ni fichier dupliqué.
+
+Reste à confirmer dans l'interface Moodle :
+
+- [ ] rendu visuel des paragraphes, image, tableau, section et FileList ;
+- [ ] ouverture effective de l'image et des deux PDF par les URLs Moodle ;
+- [ ] navigation Moodle Book utilisateur.
