@@ -26,8 +26,11 @@ Le plugin sait maintenant :
 - conserver provisoirement les WebResource internes ILIAS sous forme de liens permanents vers l'instance source ;
 - valider les packages SCORM Phase 4 sans les extraire pendant le dry-run ;
 - créer ou mettre à jour les activités `mod_scorm`, stocker le ZIP par File API et laisser Moodle parser les SCO ;
-- valider en dry-run les Learning Modules natifs ILIAS et produire une prévisualisation Moodle Book ;
-- laisser l'apply Moodle Book, les tests et banques de questions pour les étapes suivantes.
+- valider les Learning Modules natifs ILIAS et produire une prévisualisation Moodle Book ;
+- créer un Moodle Book à partir du Learning Module via `create_module()` et le `booktool_importhtml` core ;
+- importer les assets de chapitre via la File API `mod_book/chapter` ;
+- rejouer un Book inchangé sans dupliquer ses chapitres ;
+- laisser les tests et banques de questions pour les étapes suivantes.
 
 Le cours reste masqué tant que les phases de migration suivantes n'ont pas été validées.
 
@@ -139,7 +142,7 @@ Le dry-run Phase 4 :
 - exige `imsmanifest.xml` à la racine ;
 - parse le manifeste XML sans accès réseau ;
 - expose taille du ZIP, SHA-256, nombre d'entrées/fichiers, taille décompressée et ratio de compression ;
-- détecte le standard SCORM à partir de `schemaversion` lorsque celui-ci est explicite ;
+- détecte le standard SCORM 1.2/2004 à partir de `schemaversion`, y compris `CAM 1.3` ;
 - avertit sur les gros packages et sur un manque potentiel d'espace dans `dataroot`.
 
 L'apply Phase 4 :
@@ -164,7 +167,7 @@ Le POC réel a validé le lancement, le suivi, les scores/statuts, les tentative
 
 ## Phase 5 — Learning Module natif -> Moodle Book
 
-Depuis `0.9.0-alpha`, la Phase 5 est disponible en **dry-run uniquement** :
+Depuis `0.10.0-alpha`, la Phase 5 prend en charge le dry-run et le premier chemin d'apply réel :
 
 ```bash
 php local/iliasmigration/cli/import.php \
@@ -172,6 +175,12 @@ php local/iliasmigration/cli/import.php \
   --category=ID \
   --phase=5 \
   --dry-run
+
+php local/iliasmigration/cli/import.php \
+  --source=/chemin/vers/migration.json \
+  --category=ID \
+  --phase=5 \
+  --apply
 ```
 
 Le dry-run Phase 5 :
@@ -185,17 +194,43 @@ Le dry-run Phase 5 :
 - bloque tout composant `unsupported` ;
 - produit `book_preview` avec la future table des matières Moodle Book.
 
-Pour le POC ILIAS 10.8 `ref_id=243`, la représentation validée contient 2 chapitres, 3 pages, 1 image JPEG et 2 PDF embarqués. La politique de prévisualisation crée un marqueur Book pour chaque chapitre puis place les pages ILIAS en sous-chapitres.
+Le POC ILIAS 10.8 `ref_id=243` contient 2 chapitres, 3 pages, 1 image JPEG et 2 PDF embarqués. Le dry-run réel Moodle 5.0.2 est maintenant entièrement prêt (`phase5_package.ready=true`).
 
-`--phase=5 --apply` est volontairement refusé dans `0.9.0-alpha`. Le rendu HTML, la File API `mod_book/chapter`, la réécriture des liens internes et l'idempotence Book doivent être validés avant activation de l'écriture réelle.
+L'apply Phase 5 :
+
+- revalide les Phases 3/4/5 avant toute écriture ;
+- crée `mod_book` avec `create_module()` ;
+- rend les blocs `paragraph`, `media`, `file_list`, `table` et `section` en HTML ;
+- construit un ZIP HTML déterministe ;
+- délègue la création des chapitres au `booktool_importhtml` fourni par Moodle ;
+- laisse Moodle gérer la File API `mod_book/chapter` et les événements Book ;
+- vérifie l'ordre, les titres, les sous-chapitres et les assets ;
+- enregistre le mapping `targettype=book` sur le CMID.
+
+Le plugin n'effectue aucun INSERT/UPDATE direct sur `book_chapters`.
+
+### Idempotence Book actuelle
+
+Une empreinte SHA-256 du contenu neutre et des fichiers binaires est intégrée aux chemins d'import déterministes. Un second apply identique :
+
+- retrouve le même CMID et la même instance Book ;
+- vérifie les mêmes chapitres ;
+- n'importe aucun chapitre supplémentaire (`content_reimported=false`) ;
+- ne duplique aucun fichier.
+
+Si le contenu pédagogique source a changé, `0.10.0-alpha` refuse l'UPDATE des chapitres afin d'éviter toute duplication ou écriture directe dans les tables Book. Le remplacement sûr d'un Book déjà migré reste à implémenter.
+
+Les `internal_link` sont également refusés en apply tant que leur cible n'est pas normalisée et testée. Le POC actuel n'en contient aucun.
 
 Voir `docs/phase5-learning-modules.md`.
 
 ## Principes d'écriture
 
-Les écritures de contenu passent par les API Moodle du module cible et la File API. Le plugin n'écrit pas directement les contenus pédagogiques dans les tables cœur Moodle en contournant les API de module.
+Les écritures de contenu passent par les API Moodle du module cible, les outils core du module et la File API. Le plugin n'écrit pas directement les contenus pédagogiques dans les tables cœur Moodle en contournant les API/outils du module.
 
 Restent à réaliser :
 
-- rendu HTML + apply Moodle Book → Phase 5 ;
+- validation réelle CREATE/UPDATE du Moodle Book POC → Phase 5 ;
+- remplacement sûr d'un Book dont le contenu source a changé ;
+- réécriture/validation des liens internes de Learning Module ;
 - test et banque de questions → Phase 6.
