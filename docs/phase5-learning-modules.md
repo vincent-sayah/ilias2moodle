@@ -260,6 +260,19 @@ Si la source pédagogique a changé, `0.10.2-alpha` refuse volontairement l'UPDA
 
 Les changements limités au nom/à la description de l'activité peuvent être appliqués via `update_module()` lorsque le contenu des chapitres est inchangé.
 
+## Validation visuelle Moodle 5.0.2
+
+La vérification utilisateur du Book `CMID 24` est validée :
+
+- navigation entre les cinq entrées correcte ;
+- paragraphes correctement rendus ;
+- `vince.jpg` correctement affiché ;
+- les deux PDF de `page2` sont présents et ouvrables ;
+- tableau de `page 1` correctement rendu ;
+- section issue du `Remark` correctement rendue.
+
+Le POC Phase 5 est donc validé de bout en bout, depuis l'export ILIAS jusqu'au rendu utilisateur Moodle.
+
 ## API Moodle utilisée
 
 Moodle 5.0.2 fournit :
@@ -281,16 +294,14 @@ Moodle Book ne fournit pas d'API publique CRUD de chapitre séparée dans cette 
 
 ## Critère de sortie POC
 
-Validé techniquement par CLI/DB/File API :
+Tous les critères du POC sont validés :
 
 - [x] `CREATED` vers un `mod_book` Moodle ;
 - [x] 5 entrées de table des matières dans l'ordre attendu ;
-- [x] `vince.jpg` et les deux PDF présents via File API ;
+- [x] rendu visuel des paragraphes, image, tableau, section et FileList ;
+- [x] `vince.jpg` et les deux PDF présents via File API et accessibles dans Moodle ;
+- [x] navigation Moodle Book utilisateur ;
 - [x] deuxième apply en `UPDATED` avec le même CMID et la même instance ;
 - [x] aucun chapitre ni fichier dupliqué.
 
-Reste à confirmer dans l'interface Moodle :
-
-- [ ] rendu visuel des paragraphes, image, tableau, section et FileList ;
-- [ ] ouverture effective de l'image et des deux PDF par les URLs Moodle ;
-- [ ] navigation Moodle Book utilisateur.
+Phase 5 POC : **VALIDÉE**.
