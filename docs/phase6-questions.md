@@ -169,10 +169,20 @@ Deux revues de fidélité pédagogique restent volontairement visibles :
 `phase6_package.ready=true` signifie que le package et l'environnement sont valides pour
 continuer le développement. Cela ne signifie pas qu'un apply est disponible.
 
-## Périmètre actuel
+## État du code
 
-Le dry-run Moodle Phase 6 est implémenté. L'écriture Question Bank / Quiz reste
-volontairement désactivée : `--phase=6 --apply` est refusé.
+Le dry-run Moodle Phase 6 est présent sur `main` :
+
+- `classes/phase6_plan_builder.php` ;
+- `classes/phase6_package_validator.php` ;
+- routage `--phase=6 --dry-run` dans `classes/importer.php` ;
+- option CLI dans `cli/import.php` ;
+- version plugin `0.11.0-alpha`.
+
+L'apply Phase 6 est explicitement refusé. Le code n'écrit donc encore aucune banque,
+question, activité Quiz ou slot de question Moodle.
+
+## Périmètre actuel
 
 La prochaine étape est d'exécuter le dry-run réel sur Moodle 5.0.2, d'analyser les deux
 revues de scoring, puis d'implémenter un chemin d'apply basé sur les API/outils core
