@@ -15,11 +15,12 @@ final class importer {
      * Phase 3 supports dry-run/package validation and real simple-resource writes.
      * Phase 4 supports dry-run/package validation and real SCORM writes.
      * Phase 5 supports dry-run/package validation and real Learning Module -> Moodle Book writes.
+     * Phase 6 currently supports read-only Question Bank + Quiz dry-run validation.
      *
      * @param string $migrationjson Absolute path to migration.json.
      * @param int $categoryid Moodle target category id.
      * @param bool $dryrun Whether Moodle writes are forbidden.
-     * @param int $phase Requested project phase (2, 3, 4 or 5).
+     * @param int $phase Requested project phase (2, 3, 4, 5 or 6).
      * @return array Plan or execution report.
      */
     public function import(
@@ -28,9 +29,9 @@ final class importer {
         bool $dryrun = true,
         int $phase = 2
     ): array {
-        if (!in_array($phase, [2, 3, 4, 5], true)) {
+        if (!in_array($phase, [2, 3, 4, 5, 6], true)) {
             throw new \coding_exception(
-                'Only migration phases 2, 3, 4 and 5 are supported by this plugin version.'
+                'Only migration phases 2, 3, 4, 5 and 6 are supported by this plugin version.'
             );
         }
 
@@ -38,6 +39,26 @@ final class importer {
         $document = $reader->read($migrationjson);
 
         if ($dryrun) {
+            if ($phase === 6) {
+                $planner = new phase6_plan_builder($categoryid);
+                $plan = $planner->build($document);
+
+                // Phase 6 uses the newest complete export. Revalidate all
+                // earlier package families so tests/questions cannot be applied
+                // on top of a stale Moodle course.
+                $phase3validator = new phase3_package_validator($migrationjson);
+                $plan = $phase3validator->validate($plan);
+
+                $phase4validator = new phase4_package_validator($migrationjson);
+                $plan = $phase4validator->validate($plan);
+
+                $phase5validator = new phase5_package_validator($migrationjson);
+                $plan = $phase5validator->validate($plan);
+
+                $phase6validator = new phase6_package_validator($migrationjson);
+                return $phase6validator->validate($plan);
+            }
+
             if ($phase === 5) {
                 $planner = new phase5_plan_builder($categoryid);
                 $plan = $planner->build($document);
@@ -78,6 +99,12 @@ final class importer {
             }
 
             return $plan;
+        }
+
+        if ($phase === 6) {
+            throw new \coding_exception(
+                'Phase 6 apply is intentionally not implemented yet. Run Phase 6 with --dry-run.'
+            );
         }
 
         if ($phase === 5) {
