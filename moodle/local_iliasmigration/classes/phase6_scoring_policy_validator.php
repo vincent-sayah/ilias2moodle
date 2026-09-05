@@ -20,12 +20,14 @@ final class phase6_scoring_policy_validator {
     }
 
     /**
-     * Annotate exact score-preserving transforms and enable apply when supported.
+     * Annotate exact score-preserving transforms, generate the exact Moodle XML
+     * in memory, and enable apply only when that XML passes a read-only preflight.
      */
     public function validate(array $plan): array {
         $addedreviews = 0;
         $multichoicereviews = 0;
         $transformedquestions = 0;
+        $preflightblocked = 0;
 
         foreach ($plan['operations'] as &$operation) {
             if (($operation['kind'] ?? '') !== 'test'
@@ -121,6 +123,54 @@ final class phase6_scoring_policy_validator {
             }
             $operation['phase6_validation']['score_preserving_transform_count'] = $operationtransforms;
             $operation['phase6_validation']['scoring_policy_ready'] = true;
+
+            try {
+                $built = (new phase6_moodle_xml_builder())->build($questions, $testref);
+                $xml = (string) ($built['xml'] ?? '');
+                $descriptors = is_array($built['questions'] ?? null) ? $built['questions'] : [];
+                $parsed = $this->parse_xml_without_network($xml);
+                $expectedcount = (int) ($questions['question_count'] ?? count($questions['questions']));
+                if ($parsed === null || count($parsed->question) !== $expectedcount || count($descriptors) !== $expectedcount) {
+                    throw new \coding_exception('Generated Moodle XML top-level question count differs from questions.json.');
+                }
+
+                $qtypes = [];
+                $transforms = [];
+                foreach ($descriptors as $descriptor) {
+                    $qtype = (string) ($descriptor['effective_qtype'] ?? '');
+                    $qtypes[$qtype] = ($qtypes[$qtype] ?? 0) + 1;
+                    if (($descriptor['transform'] ?? 'NATIVE') !== 'NATIVE') {
+                        $transforms[] = [
+                            'source_ident' => (string) ($descriptor['source_ident'] ?? ''),
+                            'policy' => (string) ($descriptor['transform'] ?? ''),
+                            'effective_moodle_qtype' => $qtype,
+                            'max_score' => (float) ($descriptor['max_score'] ?? 0.0),
+                        ];
+                    }
+                }
+                $operation['phase6_validation']['moodle_xml_preflight'] = [
+                    'status' => 'OK',
+                    'sha256' => hash('sha256', $xml),
+                    'bytes' => strlen($xml),
+                    'question_count' => count($descriptors),
+                    'effective_qtype_counts' => $qtypes,
+                    'score_preserving_transforms' => $transforms,
+                ];
+            } catch (\Throwable $exception) {
+                $preflightblocked++;
+                $operation['action'] = 'BLOCKED';
+                $operation['reason'] = 'PHASE6_MOODLE_XML_PREFLIGHT_FAILED';
+                $operation['phase6_validation']['moodle_xml_preflight'] = [
+                    'status' => 'BLOCKED',
+                    'code' => 'PHASE6_MOODLE_XML_PREFLIGHT_FAILED',
+                    'message' => $exception->getMessage(),
+                ];
+                $plan['warnings'][] = [
+                    'code' => 'PHASE6_MOODLE_XML_PREFLIGHT_FAILED',
+                    'source_ref_id' => $testref,
+                    'message' => $exception->getMessage(),
+                ];
+            }
         }
         unset($operation);
 
@@ -132,12 +182,20 @@ final class phase6_scoring_policy_validator {
             }
             $plan['phase6_package']['multiple_choice_unselected_scoring_review_count'] = $multichoicereviews;
             $plan['phase6_package']['score_preserving_transform_count'] = $transformedquestions;
-            $plan['phase6_package']['scoring_policy_ready'] = true;
+            $plan['phase6_package']['moodle_xml_preflight_blocked_tests'] = $preflightblocked;
+            $plan['phase6_package']['moodle_xml_preflight_ready'] = $preflightblocked === 0;
+            $plan['phase6_package']['scoring_policy_ready'] = $preflightblocked === 0;
             $plan['phase6_package']['apply_implemented'] = true;
-            $plan['phase6_package']['apply_ready'] = !empty($plan['phase6_package']['ready']);
+            if ($preflightblocked > 0) {
+                $plan['phase6_package']['blocked_tests'] =
+                    (int) ($plan['phase6_package']['blocked_tests'] ?? 0) + $preflightblocked;
+                $plan['phase6_package']['ready'] = false;
+            }
+            $plan['phase6_package']['apply_ready'] =
+                !empty($plan['phase6_package']['ready']) && $preflightblocked === 0;
         }
 
-        // The old structural validator warning is replaced by explicit policies.
+        // The old structural-validator warning is replaced by explicit policies.
         $plan['warnings'] = array_values(array_filter(
             $plan['warnings'],
             static fn(array $warning): bool => ($warning['code'] ?? '') !== 'PHASE6_APPLY_NOT_IMPLEMENTED'
@@ -158,6 +216,29 @@ final class phase6_scoring_policy_validator {
         }
 
         return $plan;
+    }
+
+    /** Parse generated XML without network access or entity substitution. */
+    private function parse_xml_without_network(string $xml): ?\SimpleXMLElement {
+        if ($xml === '') {
+            return null;
+        }
+        $previous = libxml_use_internal_errors(true);
+        try {
+            $parsed = simplexml_load_string($xml, \SimpleXMLElement::class, LIBXML_NONET | LIBXML_COMPACT);
+            if ($parsed === false) {
+                $errors = libxml_get_errors();
+                $message = $errors ? trim((string) $errors[0]->message) : 'unknown XML parse error';
+                throw new \coding_exception('Generated Moodle XML is invalid: ' . $message);
+            }
+            if ($parsed->getName() !== 'quiz') {
+                throw new \coding_exception('Generated Moodle XML root element must be <quiz>.');
+            }
+            return $parsed;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
     }
 
     private function answers_with_unselected_score(array $question): array {
