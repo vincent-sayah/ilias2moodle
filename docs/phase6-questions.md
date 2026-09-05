@@ -15,16 +15,16 @@ dans le sous-export du test `tst_713`.
 
 Le test contient 11 questions couvrant 8 types ILIAS :
 
-| Type ILIAS | Type neutre |
-| --- | --- |
-| `assSingleChoice` | `single_choice` |
-| `assMultipleChoice` | `multiple_choice` |
-| `assNumeric` | `numeric` |
-| `assMatchingQuestion` | `matching` |
-| `assTextQuestion` | `essay` |
-| `assTextSubset` | `short_answer` |
-| `assClozeTest` | `cloze` |
-| `assOrderingQuestion` | `ordering` |
+| Type ILIAS | Type neutre | Moodle qtype |
+| --- | --- | --- |
+| `assSingleChoice` | `single_choice` | `multichoice` |
+| `assMultipleChoice` | `multiple_choice` | `multichoice` |
+| `assNumeric` | `numeric` | `numerical` |
+| `assMatchingQuestion` | `matching` | `match` |
+| `assTextQuestion` | `essay` | `essay` |
+| `assTextSubset` | `short_answer` | `shortanswer` |
+| `assClozeTest` | `cloze` | `multianswer` |
+| `assOrderingQuestion` | `ordering` | `ordering` |
 
 Observations du POC réel :
 
@@ -69,8 +69,8 @@ brutes. Cela évite de transformer `5` en `5.0000000000001` à cause des flottan
 
 ## Intégration à prepare-export
 
-`prepare-export` génère maintenant automatiquement les quatre fichiers suivants pour
-chaque test ayant un QTI :
+`prepare-export` génère automatiquement les quatre fichiers suivants pour chaque test
+ayant un QTI :
 
 ```text
 tests/<ref_id>/questions.xml
@@ -96,9 +96,9 @@ Les métadonnées de l'objet test dans `migration.json` contiennent notamment :
 Le fichier `test-structure.xml` est utilisé pour l'ordre via `QRef`. S'il est absent,
 le parseur peut utiliser l'ordre du QTI comme repli.
 
-## Résultat attendu sur le v5
+## Validation réelle du package v5
 
-Après `prepare-export` sur l'archive de référence :
+Validation exécutée sur ILIAS 10.8 après intégration automatique :
 
 - `question_count = 11` ;
 - `ordered_question_count = 11` ;
@@ -107,15 +107,73 @@ Après `prepare-export` sur l'archive de référence :
 - 8 types neutres distincts ;
 - `total_max_score = 46.0` ;
 - Matching : `france → paris`, `italie → rome`, `espagne → madrid` ;
-- Ordering : `max_score = 5.0`.
+- Ordering : `max_score = 5.0` ;
+- `missing_count = 0` ;
+- `test_normalizations = 1` ;
+- `normalized_questions = 11`.
+
+Les quatre fichiers attendus sont présents directement sous `tests/236/`.
 
 L'outil `tools/normalize-phase6.py` reste disponible pour le diagnostic standalone, mais
 il n'est plus nécessaire dans le flux normal de préparation du package.
 
+## Moodle 5.0 — stratégie de banque
+
+Moodle 5.0 distingue les banques de questions partagées du cours et la banque privée de
+chaque Quiz.
+
+Pour le POC v5 :
+
+- l'objet ILIAS `question_pool` `ref_id=235` est planifié vers `mod_qbank` ;
+- comme son sous-export ne contient aucun QTI de questions, la banque Moodle est traitée
+  comme un conteneur vide : aucune question n'est inventée ;
+- les 11 questions réellement exportées dans le test `ref_id=236` sont planifiées dans
+  la banque privée du futur `mod_quiz` correspondant au test.
+
+Cette politique évite d'attribuer artificiellement au pool des questions dont l'export
+ILIAS ne prouve pas l'appartenance.
+
+## Dry-run Moodle Phase 6
+
+Le plugin Moodle `local_iliasmigration` `0.11.0-alpha` ajoute un dry-run Phase 6 :
+
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/chemin/vers/migration.json \
+  --category=ID \
+  --phase=6 \
+  --dry-run
+```
+
+Le dry-run :
+
+- revalide les packages Phases 3, 4 et 5 ;
+- exige que les objets Phases 2 à 5 soient déjà synchronisés (`UPDATE`) ;
+- vérifie `mod_qbank`, `mod_quiz`, `mod/quiz/locallib.php`, le helper Question Bank 5.0
+  et le format XML core ;
+- vérifie que les qtypes Moodle `multichoice`, `numerical`, `match`, `essay`,
+  `shortanswer`, `multianswer` et `ordering` sont utilisables ;
+- valide les identités source et les schémas 1.0 de `questions.json` et `quiz.json` ;
+- valide les comptes, identifiants uniques, types, ordre, QRef et barème total ;
+- produit `quiz_preview` avec l'ordre futur des 11 questions et leur qtype Moodle ;
+- signale la banque ILIAS sans contenu exporté sans la bloquer ;
+- signale les points de notation qui doivent encore être arbitrés avant l'apply.
+
+Deux revues de fidélité pédagogique restent volontairement visibles :
+
+1. le Matching ILIAS utilise des poids de paires différents (`4`, `2`, `5`) ; le mapping
+   exact de cette pondération dans Moodle doit être validé avant écriture ;
+2. Moodle Ordering propose plusieurs stratégies de notation ; il faut sélectionner celle
+   correspondant au scoring ILIAS par position.
+
+`phase6_package.ready=true` signifie que le package et l'environnement sont valides pour
+continuer le développement. Cela ne signifie pas qu'un apply est disponible.
+
 ## Périmètre actuel
 
-Cette étape reste limitée à la normalisation ILIAS → JSON neutre. Aucune écriture Moodle
-Question Bank / Quiz n'est encore effectuée.
+Le dry-run Moodle Phase 6 est implémenté. L'écriture Question Bank / Quiz reste
+volontairement désactivée : `--phase=6 --apply` est refusé.
 
-La prochaine étape est la validation du package v5 généré automatiquement, puis la
-construction du dry-run Moodle Question Bank + Quiz.
+La prochaine étape est d'exécuter le dry-run réel sur Moodle 5.0.2, d'analyser les deux
+revues de scoring, puis d'implémenter un chemin d'apply basé sur les API/outils core
+Question Bank et Quiz, sans INSERT/UPDATE direct dans les tables pédagogiques Moodle.
