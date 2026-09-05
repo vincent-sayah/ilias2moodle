@@ -38,8 +38,6 @@ L'installation crée `local_iliasmigration_map`. Elle associe durablement les id
 
 Pour une sous-section, `targetid` correspond à l'ID du `course_module` Moodle de type `subsection`. La section déléguée associée est résolue par les API Moodle lors de l'import des ressources qui y sont contenues.
 
-Pour un SCORM, `targetid` correspond à l'ID du `course_module` Moodle de type `scorm`.
-
 ## Lister les catégories
 
 Depuis la racine Moodle :
@@ -113,7 +111,7 @@ L'exécution est idempotente : premier passage `CREATED`, passages suivants `UPD
 
 ## Phase 4 — SCORM
 
-Le dry-run Phase 4 :
+Depuis `0.8.0-alpha`, la Phase 4 prend en charge le dry-run et l'apply réel :
 
 ```bash
 php local/iliasmigration/cli/import.php \
@@ -121,9 +119,15 @@ php local/iliasmigration/cli/import.php \
   --category=ID \
   --phase=4 \
   --dry-run
+
+php local/iliasmigration/cli/import.php \
+  --source=/chemin/vers/migration.json \
+  --category=ID \
+  --phase=4 \
+  --apply
 ```
 
-Il :
+Le dry-run Phase 4 :
 
 - vérifie que `mod_scorm` existe et est actif ;
 - retrouve un éventuel mapping SCORM pour produire `CREATE` ou `UPDATE` ;
@@ -137,32 +141,28 @@ Il :
 - détecte le standard SCORM à partir de `schemaversion` lorsque celui-ci est explicite ;
 - avertit sur les gros packages et sur un manque potentiel d'espace dans `dataroot`.
 
-À partir de `0.8.0-alpha`, l'apply SCORM est disponible lorsque `phase4_package.ready=true` :
+L'apply Phase 4 :
 
-```bash
-php local/iliasmigration/cli/import.php \
-  --source=/chemin/vers/migration.json \
-  --category=ID \
-  --phase=4 \
-  --apply
-```
+- revalide les prérequis et le package juste avant écriture ;
+- crée un draft File API du ZIP ;
+- utilise `create_module()` / `update_module()` sur `mod_scorm` ;
+- stocke le ZIP dans `mod_scorm/package` via les API Moodle ;
+- laisse `scorm_parse()` extraire le contenu et construire les SCO ;
+- exige au moins un SCO lançable ;
+- conserve un mapping persistant `targettype=scorm` sur le CMID.
 
-L'apply :
+### Tracking SCORM Moodle 5.0
 
-- refait les validations Phase 3/4 juste avant toute écriture ;
-- crée un draft utilisateur contenant le ZIP ;
-- crée/met à jour `mod_scorm` via `create_module()` / `update_module()` ;
-- laisse `scorm_add_instance()` / `scorm_update_instance()` stocker le package dans `mod_scorm/package` ;
-- laisse `scorm_parse()` extraire le contenu dans `mod_scorm/content` et construire les SCO ;
-- vérifie après écriture le package, `imsmanifest.xml` et au moins un SCO lançable ;
-- mappe `tries` ILIAS vers `maxattempt` Moodle quand la valeur est compatible (1 à 6) ;
-- conserve largeur/hauteur exportées ;
-- écrit le mapping `targettype=scorm` pour permettre le second passage `UPDATED` sans doublon.
+Les diagnostics Moodle 5.0 ne doivent pas utiliser l'ancienne table `scorm_scoes_track`. Le suivi est normalisé dans :
 
-Le POC réel doit encore valider en exploitation : lancement du package, suivi SCORM/attempts et idempotence complète du second apply.
+- `scorm_attempt` ;
+- `scorm_element` ;
+- `scorm_scoes_value`.
+
+Les rapports Moodle eux-mêmes joignent ces tables pour retrouver utilisateur, numéro de tentative, SCO, élément CMI et valeur.
 
 Restent à réaliser :
 
-- validation fonctionnelle finale SCORM → Phase 4 ;
+- validation finale de l'idempotence SCORM et conservation des traces → Phase 4 ;
 - module d'apprentissage natif → Phase 5 ;
 - test et banque de questions → Phase 6.
