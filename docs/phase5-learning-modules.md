@@ -49,7 +49,7 @@ Contenus représentatifs observés :
 
 ## Représentation neutre validée
 
-Le parseur produit temporairement `learning_module_structure` avec :
+Le parseur produit `learning_module_structure` avec :
 
 - paramètres du Learning Module ;
 - nœuds `root`, `chapter`, `page` avec parent, profondeur et ordre ;
@@ -79,7 +79,7 @@ learning_modules/<ref_id>/files/<file_id>/...
 }
 ```
 
-Validation réelle v4 :
+Validation réelle v4 effectuée sur ILIAS 10.8 :
 
 - `learning_module_structures=1` ;
 - `learning_module_media_files=1` ;
