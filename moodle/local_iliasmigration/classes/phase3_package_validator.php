@@ -11,6 +11,9 @@ final class phase3_package_validator {
     /** @var string Canonical migration package root. */
     private string $packageroot;
 
+    /** @var string Canonical source ILIAS instance URL. */
+    private string $sourceinstance = '';
+
     /**
      * @param string $migrationjson Absolute path to migration.json.
      */
@@ -33,6 +36,7 @@ final class phase3_package_validator {
     public function validate(array $plan): array {
         $blocked = 0;
         $checked = 0;
+        $this->sourceinstance = rtrim(trim((string) ($plan['source']['instance'] ?? '')), '/');
 
         foreach ($plan['operations'] as &$operation) {
             $kind = (string) ($operation['kind'] ?? '');
@@ -46,6 +50,16 @@ final class phase3_package_validator {
             $checked++;
             if ($kind === 'url') {
                 $this->validate_url($operation);
+                if (($operation['package_validation']['code'] ?? '') === 'ILIAS_INTERNAL_LINK') {
+                    $plan['warnings'][] = [
+                        'code' => 'ILIAS_INTERNAL_LINK_PRESERVED',
+                        'source_ref_id' => (string) ($operation['source_ref_id'] ?? ''),
+                        'source_target' => (string) ($operation['source_url'] ?? ''),
+                        'resolved_url' => (string) ($operation['resolved_url'] ?? ''),
+                        'message' => 'ILIAS internal Web Link is preserved as a link back to the source ILIAS instance '
+                            . 'until internal-link rewriting to migrated Moodle targets is implemented.',
+                    ];
+                }
             } else if ($kind === 'file') {
                 $this->validate_file($operation);
             } else {
@@ -71,22 +85,70 @@ final class phase3_package_validator {
     /**
      * Validate one URL resource.
      *
+     * ILIAS exports two relevant Web Link forms:
+     * - external links as regular http/https URLs;
+     * - internal links as "type|ref_id" (for example "blog|131").
+     *
+     * Internal links are resolved to an ILIAS permanent-link fallback on the
+     * source instance. A later link-rewriting phase may replace that URL when
+     * the referenced ILIAS object is itself migrated to Moodle.
+     *
      * @param array $operation Operation being validated.
      */
     private function validate_url(array &$operation): void {
         $url = trim((string) ($operation['source_url'] ?? ''));
         $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
 
-        if ($url === '' || filter_var($url, FILTER_VALIDATE_URL) === false
-                || !in_array($scheme, ['http', 'https'], true)) {
-            $this->block($operation, 'URL_MISSING_OR_INVALID', 'A valid http/https URL is required.');
+        if ($url !== '' && filter_var($url, FILTER_VALIDATE_URL) !== false
+                && in_array($scheme, ['http', 'https'], true)) {
+            $operation['resolved_url'] = $url;
+            $operation['package_validation'] = [
+                'status' => 'OK',
+                'code' => 'EXTERNAL_URL',
+                'resolved_url' => $url,
+                'url_scheme' => $scheme,
+            ];
             return;
         }
 
-        $operation['package_validation'] = [
-            'status' => 'OK',
-            'url_scheme' => $scheme,
-        ];
+        if (preg_match('/^([A-Za-z][A-Za-z0-9_-]*)\|([1-9][0-9]*)$/', $url, $matches) === 1) {
+            $basescheme = strtolower((string) parse_url($this->sourceinstance, PHP_URL_SCHEME));
+            if ($this->sourceinstance === ''
+                    || filter_var($this->sourceinstance, FILTER_VALIDATE_URL) === false
+                    || !in_array($basescheme, ['http', 'https'], true)) {
+                $this->block(
+                    $operation,
+                    'ILIAS_INTERNAL_LINK_NO_SOURCE_INSTANCE',
+                    'An ILIAS internal Web Link requires a valid source instance http/https URL.'
+                );
+                return;
+            }
+
+            $type = strtolower((string) $matches[1]);
+            $refid = (string) $matches[2];
+            $target = $type . '_' . $refid;
+            $resolved = $this->sourceinstance . '/goto.php?target=' . rawurlencode($target);
+
+            $operation['resolved_url'] = $resolved;
+            $operation['ilias_internal_target'] = [
+                'type' => $type,
+                'ref_id' => $refid,
+            ];
+            $operation['package_validation'] = [
+                'status' => 'OK',
+                'code' => 'ILIAS_INTERNAL_LINK',
+                'source_target' => $url,
+                'resolved_url' => $resolved,
+                'url_scheme' => $basescheme,
+            ];
+            return;
+        }
+
+        $this->block(
+            $operation,
+            'URL_MISSING_OR_INVALID',
+            'A valid http/https URL or ILIAS internal target type|ref_id is required.'
+        );
     }
 
     /**
