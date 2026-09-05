@@ -42,20 +42,27 @@ Phase 2 real structure write:
       --phase=2 \\
       --apply
 
-Phase 3 resource/package preview (no resource writes yet):
+Phase 3 resource/package preview:
   php local/iliasmigration/cli/import.php \\
       --source=/path/to/migration.json \\
       --category=ID \\
       --phase=3 \\
       --dry-run
 
+Phase 3 real simple-resource write:
+  php local/iliasmigration/cli/import.php \\
+      --source=/path/to/migration.json \\
+      --category=ID \\
+      --phase=3 \\
+      --apply
+
 Options:
   --source      Absolute path to migration.json.
   --category    Existing Moodle course category id.
   --phase       Migration phase: 2 (structure) or 3 (simple resources). Default: 2.
   --dry-run     Build and validate the import plan; performs no Moodle content writes.
-  --apply       Phase 2 only: create/update the hidden course, sections and subsections.
-                Phase 3 apply remains disabled until its POC dry-run is validated.
+  --apply       Apply the selected supported phase.
+                Phase 3 requires Phase 2 structure to exist and package validation to pass.
   -h, --help    Display this help.
 
 Exactly one of --dry-run or --apply is required.
