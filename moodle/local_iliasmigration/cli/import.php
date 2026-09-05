@@ -91,12 +91,19 @@ Phase 6 Question Bank + Quiz preview:
       --phase=6 \\
       --dry-run
 
+Phase 6 real Question Bank + Quiz write:
+  php local/iliasmigration/cli/import.php \\
+      --source=/path/to/migration.json \\
+      --category=ID \\
+      --phase=6 \\
+      --apply
+
 Options:
   --source      Absolute path to migration.json.
   --category    Existing Moodle course category id.
   --phase       Migration phase: 2 (structure), 3 (simple resources),
                 4 (SCORM), 5 (Learning Module -> Moodle Book), or
-                6 (Question Bank + Quiz dry-run). Default: 2.
+                6 (Question Bank + Quiz). Default: 2.
   --dry-run     Build and validate the import plan; performs no Moodle content writes.
   --apply       Apply the selected supported phase.
                 Phase 3 requires Phase 2 structure to exist and package validation to pass.
@@ -104,7 +111,10 @@ Options:
                 Phase 5 requires Phases 2/3/4 to be synchronized and the Learning Module package
                 validation to pass. A changed already-mapped Book is refused until safe chapter
                 replacement is implemented; unchanged replays are idempotent.
-                Phase 6 apply is not implemented yet; use --phase=6 --dry-run.
+                Phase 6 requires Phases 2-5 to be synchronized and the Phase 6 dry-run package,
+                qtype and scoring-policy checks to be ready. Score-preserving transforms are used
+                for unequal-weight Matching and Multiple Choice with unselected-option credit.
+                An already-mapped Quiz whose question fingerprint/order/marks changed is refused.
   -h, --help    Display this help.
 
 Exactly one of --dry-run or --apply is required.
@@ -134,9 +144,6 @@ $dryrun = (bool) $options['dry-run'];
 $apply = (bool) $options['apply'];
 if ($dryrun === $apply) {
     cli_error("Choose exactly one of --dry-run or --apply.\n\n" . $help);
-}
-if ($phase === 6 && $apply) {
-    cli_error("Phase 6 apply is not implemented yet. Use --phase=6 --dry-run.\n\n" . $help);
 }
 
 $importer = new \local_iliasmigration\importer();
