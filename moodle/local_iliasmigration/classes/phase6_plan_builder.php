@@ -80,6 +80,7 @@ final class phase6_plan_builder {
         $this->index_items($document['course']['items'] ?? [], $metadataindex);
 
         $pending = [];
+        $qbanksectionzerocount = 0;
         foreach ($plan['operations'] as &$operation) {
             $kind = (string) ($operation['kind'] ?? '');
             $action = (string) ($operation['action'] ?? '');
@@ -100,6 +101,19 @@ final class phase6_plan_builder {
                     : 'BLOCKED';
                 $operation['target_id'] = $mapping['target_id'];
                 $operation['moodle_module'] = 'qbank';
+
+                // Moodle 5.0 declares mod_qbank FEATURE_CAN_DISPLAY=false. Core
+                // therefore requires every qbank course module to remain in
+                // section 0. Preserve the logical ILIAS parent separately while
+                // clearing parent_source_ref_id so the executor deterministically
+                // resolves Moodle section 0 instead of trying to place qbank in
+                // the visible ILIAS parent section.
+                $operation['source_parent_ref_id'] = $operation['parent_source_ref_id'] ?? null;
+                $operation['parent_source_ref_id'] = null;
+                $operation['moodle_section_policy'] = 'SECTION_ZERO_REQUIRED_BY_FEATURE_CAN_DISPLAY_FALSE';
+                $operation['planned_moodle_section'] = 0;
+                $qbanksectionzerocount++;
+
                 $operation['question_export_files'] = array_values(array_filter(
                     (array) ($metadata['migration_question_export_files'] ?? []),
                     static fn($path): bool => is_string($path) && $path !== ''
@@ -201,6 +215,13 @@ final class phase6_plan_builder {
                 'message' => 'Moodle mod_qbank is missing or disabled; ILIAS question pools cannot be represented as Moodle shared question banks.',
             ];
         }
+        if ($qbanksectionzerocount > 0) {
+            $plan['warnings'][] = [
+                'code' => 'QBANK_SECTION_ZERO_POLICY',
+                'question_pool_count' => $qbanksectionzerocount,
+                'message' => 'Moodle 5.0 requires mod_qbank (FEATURE_CAN_DISPLAY=false) to remain in course section 0. The ILIAS parent relationship is preserved as metadata, while the Question Bank container itself is stored in section 0.',
+            ];
+        }
         if (!$quizlocallibavailable) {
             $plan['warnings'][] = [
                 'code' => 'QUIZ_LOCALLIB_UNAVAILABLE',
@@ -250,6 +271,7 @@ final class phase6_plan_builder {
             'pending_count' => count($pending),
             'quiz_available' => $quizavailable,
             'qbank_available' => $qbankavailable,
+            'qbank_section_zero_required' => true,
             'quiz_locallib_available' => $quizlocallibavailable,
             'question_xml_format_available' => $xmlformatavailable,
             'question_bank_helper_available' => $qbankhelperavailable,
