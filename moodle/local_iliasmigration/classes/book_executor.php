@@ -638,9 +638,9 @@ final class book_executor {
 
     /** Wrap rendered chapter content in the HTML document expected by booktool_importhtml. */
     private function html_document(string $title, string $body): string {
-        $title = preg_replace('/[<>\x00-\x1F\x7F]/u', ' ', $title) ?? $title;
+        $title = preg_replace('/[\x00-\x1F\x7F]/u', ' ', $title) ?? $title;
         return '<!doctype html><html><head><meta charset="UTF-8"><title>'
-            . $title . '</title></head><body>' . $body . '</body></html>';
+            . s($title) . '</title></head><body>' . $body . '</body></html>';
     }
 
     /** Create a Moodle user-draft ZIP consumed by core booktool_importhtml. */
