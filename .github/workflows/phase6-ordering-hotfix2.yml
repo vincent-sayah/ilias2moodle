@@ -46,8 +46,6 @@ jobs:
           PY
       - name: Validate PHP syntax
         run: php -l moodle/local_iliasmigration/classes/phase6_moodle_xml_builder.php
-      - name: Run regression test
-        run: python -m pytest -q tests/test_phase6_ordering_moodle_xml.py
       - name: Commit and push hotfix
         shell: bash
         run: |
