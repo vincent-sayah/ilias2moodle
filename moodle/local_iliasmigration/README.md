@@ -1,6 +1,6 @@
 # local_iliasmigration
 
-Plugin local Moodle utilisé par ILIAS2Moodle pour reconstruire dans Moodle les structures extraites d'ILIAS.
+Plugin local Moodle utilisé par ILIAS2Moodle pour reconstruire dans Moodle les structures et ressources extraites d'ILIAS.
 
 ## Compatibilité
 
@@ -8,7 +8,7 @@ Plugin local Moodle utilisé par ILIAS2Moodle pour reconstruire dans Moodle les 
 - POC de développement actuellement ciblé et validé sur Moodle 5.0.2 ;
 - PHP 8.3 sur le POC Moodle.
 
-## État actuel — Phase 2
+## État actuel
 
 Le plugin sait maintenant :
 
@@ -22,15 +22,19 @@ Le plugin sait maintenant :
 - conserver un mapping persistant ILIAS ↔ Moodle ;
 - rejouer la migration sans créer de doublons ;
 - refuser l'écriture si un dossier de profondeur supérieure à 2 exige un aplatissement ;
-- laisser les ressources et activités en `DEFER` pour les phases suivantes.
+- valider et importer les ressources simples Phase 3 : URL, fichiers et modules HTML exportés ;
+- conserver provisoirement les WebResource internes ILIAS sous forme de liens permanents vers l'instance source ;
+- laisser SCORM, modules d'apprentissage natifs, tests et banques de questions en `DEFER` pour les phases suivantes.
 
-L'option `--apply` est volontairement limitée à la structure. Le cours reste masqué tant que les ressources n'ont pas été validées.
+Le cours reste masqué tant que les phases de migration suivantes n'ont pas été validées.
 
 ## Table de mapping
 
 L'installation crée `local_iliasmigration_map`. Elle associe durablement les identifiants ILIAS aux objets Moodle pour rendre la migration rejouable et idempotente.
 
-Pour une sous-section, `targetid` correspond à l'ID du `course_module` Moodle de type `subsection`. La section déléguée associée est vérifiée par les API Moodle lors de l'import.
+À partir des développements Phase 3, les nouveaux mappings incluent `sourceinstance` afin de distinguer plusieurs installations ILIAS. Les anciens mappings structurels sans instance restent pris en charge en compatibilité.
+
+Pour une sous-section, `targetid` correspond à l'ID du `course_module` Moodle de type `subsection`. La section déléguée associée est résolue par les API Moodle lors de l'import des ressources qui y sont contenues.
 
 ## Lister les catégories
 
@@ -40,34 +44,71 @@ Depuis la racine Moodle :
 php local/iliasmigration/cli/categories.php
 ```
 
-## Dry-run Phase 2
+## Phase 2 — dry-run
 
 ```bash
 php local/iliasmigration/cli/import.php \
   --source=/chemin/vers/migration.json \
   --category=ID \
+  --phase=2 \
   --dry-run
 ```
 
-Le dry-run ne modifie jamais les contenus Moodle.
-
-## Écriture réelle de la structure
+## Phase 2 — écriture réelle de la structure
 
 ```bash
 php local/iliasmigration/cli/import.php \
   --source=/chemin/vers/migration.json \
   --category=ID \
+  --phase=2 \
   --apply
 ```
 
-L'écriture réelle prend en charge :
+L'écriture réelle Phase 2 prend en charge :
 
 - cours ILIAS → cours Moodle masqué ;
 - dossier ILIAS niveau 1 → section Moodle ;
-- dossier ILIAS niveau 2 → `mod_subsection` Moodle ;
-- PDF, URL, module HTML → `DEFER` Phase 3 ;
-- SCORM → `DEFER` Phase 4 ;
-- module d'apprentissage natif → `DEFER` Phase 5 ;
-- test et banque de questions → `DEFER` Phase 6.
+- dossier ILIAS niveau 2 → `mod_subsection` Moodle.
 
 Les dossiers ILIAS de niveau supérieur à 2 sont refusés en `--apply` jusqu'à définition de la politique d'aplatissement.
+
+## Phase 3 — dry-run ressources simples
+
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/chemin/vers/migration.json \
+  --category=ID \
+  --phase=3 \
+  --dry-run
+```
+
+Le dry-run ne modifie jamais les contenus Moodle. Il contrôle le package complet, les URL et les chemins avant l'apply.
+
+## Phase 3 — écriture réelle
+
+Précondition : la Phase 2 doit déjà être appliquée et le dry-run Phase 3 doit retourner `blocked_resources=0` et `ready=true`.
+
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/chemin/vers/migration.json \
+  --category=ID \
+  --phase=3 \
+  --apply
+```
+
+La Phase 3 prend en charge :
+
+- WebResource/URL ILIAS → `mod_url` Moodle ;
+- fichier ILIAS → `mod_resource` Moodle ;
+- module HTML exporté → `mod_resource` Moodle avec conservation des sous-répertoires et du fichier de démarrage ;
+- ressource racine → section Moodle 0 ;
+- ressource d'un dossier → section Moodle correspondante ;
+- ressource d'une sous-section → section déléguée `mod_subsection`.
+
+L'exécution est idempotente : premier passage `CREATED`, passages suivants `UPDATED` à partir du mapping persistant.
+
+Restent différés :
+
+- SCORM → Phase 4 ;
+- module d'apprentissage natif → Phase 5 ;
+- test et banque de questions → Phase 6.
