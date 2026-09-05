@@ -9,23 +9,47 @@ defined('MOODLE_INTERNAL') || die();
  */
 final class importer {
     /**
-     * Analyse a neutral migration document or apply the validated Phase 2 subset.
+     * Analyse a neutral migration document or apply the validated migration subset.
      *
-     * Dry-run never writes Moodle content. Apply creates/updates the hidden course,
-     * first-level sections and second-level Moodle subsections. Resources remain deferred.
+     * Phase 2 supports dry-run and real structure writes.
+     * Phase 3 currently supports dry-run/package validation only; resource writes
+     * remain disabled until the POC dry-run is validated.
      *
      * @param string $migrationjson Absolute path to migration.json.
      * @param int $categoryid Moodle target category id.
      * @param bool $dryrun Whether Moodle writes are forbidden.
+     * @param int $phase Requested project phase (2 or 3).
      * @return array Plan or execution report.
      */
-    public function import(string $migrationjson, int $categoryid, bool $dryrun = true): array {
+    public function import(
+        string $migrationjson,
+        int $categoryid,
+        bool $dryrun = true,
+        int $phase = 2
+    ): array {
+        if (!in_array($phase, [2, 3], true)) {
+            throw new \coding_exception('Only migration phases 2 and 3 are supported by this plugin version.');
+        }
+
         $reader = new migration_reader();
         $document = $reader->read($migrationjson);
 
         if ($dryrun) {
-            $planner = new plan_builder($categoryid);
-            return $planner->build($document);
+            $planner = new plan_builder($categoryid, $phase);
+            $plan = $planner->build($document);
+
+            if ($phase === 3) {
+                $validator = new phase3_package_validator($migrationjson);
+                return $validator->validate($plan);
+            }
+
+            return $plan;
+        }
+
+        if ($phase === 3) {
+            throw new \coding_exception(
+                'Phase 3 apply is intentionally disabled until the resource dry-run is validated on the POC.'
+            );
         }
 
         $executor = new structure_executor();
