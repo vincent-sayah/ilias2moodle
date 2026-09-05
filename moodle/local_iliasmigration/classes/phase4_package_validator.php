@@ -318,7 +318,7 @@ final class phase4_package_validator {
                 : '';
 
             $standard = 'unknown';
-            if (stripos($version, '2004') !== false) {
+            if (stripos($version, '2004') !== false || strcasecmp($version, 'CAM 1.3') === 0) {
                 $standard = 'SCORM_2004';
             } else if (preg_match('/(^|\s)1\.2($|\s)/', $version) === 1) {
                 $standard = 'SCORM_1_2';
