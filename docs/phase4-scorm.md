@@ -28,6 +28,8 @@ Le même export contient également un deuxième `html_module` par rapport au PO
 
 `0.8.0-alpha` active l'apply réel SCORM : draft File API, `create_module()` / `update_module()`, stockage `mod_scorm/package`, parsing Moodle, extraction `mod_scorm/content`, contrôle des SCO et mapping idempotent.
 
+`0.8.1-alpha` documente le schéma de tracking Moodle 5.0 utilisé pour les contrôles d'idempotence.
+
 ```bash
 php local/iliasmigration/cli/import.php \
   --source=/opt/ilias2moodle-data/course-128-v3/migration.json \
