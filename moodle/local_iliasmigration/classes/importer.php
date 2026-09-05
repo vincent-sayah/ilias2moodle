@@ -15,7 +15,7 @@ final class importer {
      * Phase 3 supports dry-run/package validation and real simple-resource writes.
      * Phase 4 supports dry-run/package validation and real SCORM writes.
      * Phase 5 supports dry-run/package validation and real Learning Module -> Moodle Book writes.
-     * Phase 6 currently supports read-only Question Bank + Quiz dry-run validation.
+     * Phase 6 supports Question Bank + Quiz dry-run validation and guarded real writes.
      *
      * @param string $migrationjson Absolute path to migration.json.
      * @param int $categoryid Moodle target category id.
@@ -59,8 +59,8 @@ final class importer {
                 $plan = $phase6validator->validate($plan);
 
                 // Keep scoring semantics separate from structural/package
-                // validation. These reviews do not make the package invalid,
-                // but they must be visible before an apply path is enabled.
+                // validation. These reviews remain visible because the apply
+                // uses explicit score-preserving transforms for those cases.
                 $scoringvalidator = new phase6_scoring_policy_validator($migrationjson);
                 return $scoringvalidator->validate($plan);
             }
@@ -108,9 +108,8 @@ final class importer {
         }
 
         if ($phase === 6) {
-            throw new \coding_exception(
-                'Phase 6 apply is intentionally not implemented yet. Run Phase 6 with --dry-run.'
-            );
+            $executor = new phase6_executor($migrationjson);
+            return $executor->execute($document, $categoryid);
         }
 
         if ($phase === 5) {
