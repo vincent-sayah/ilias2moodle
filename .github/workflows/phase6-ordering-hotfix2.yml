@@ -23,19 +23,16 @@ jobs:
 
           builder = Path('moodle/local_iliasmigration/classes/phase6_moodle_xml_builder.php')
           text = builder.read_text(encoding='utf-8')
-          bad = (
-              '        // Moodle Ordering import creates default hint options when shownumcorrect is absent;\\\\n'
-              '        // make it explicit so question_hints.hintformat is never inferred as NULL.\\\\n'
-              '        $xml .= "    <shownumcorrect>1</shownumcorrect>\\\\n";\n'
-          )
-          good = (
+          start_marker = '        $xml .= "    <numberingstyle>none</numberingstyle>\\n";\n'
+          end_marker = '        $xml .= "    <correctfeedback format=\\"html\\"><text></text></correctfeedback>\\n";\n'
+          start = text.index(start_marker) + len(start_marker)
+          end = text.index(end_marker, start)
+          replacement = (
               '        // Moodle Ordering import creates default hint options when shownumcorrect is absent.\n'
               '        // Make it explicit so question_hints.hintformat is never inferred as NULL.\n'
-              '        $xml .= "    <shownumcorrect>1</shownumcorrect>\\\\n";\n'
+              '        $xml .= "    <shownumcorrect>1</shownumcorrect>\\n";\n'
           )
-          if bad not in text:
-              raise SystemExit('Malformed Ordering hotfix block not found')
-          text = text.replace(bad, good, 1)
+          text = text[:start] + replacement + text[end:]
           builder.write_text(text, encoding='utf-8')
 
           version = Path('moodle/local_iliasmigration/version.php')
