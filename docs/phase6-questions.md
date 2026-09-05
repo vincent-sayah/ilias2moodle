@@ -26,6 +26,15 @@ Le test contient 11 questions couvrant 8 types ILIAS :
 | `assClozeTest` | `cloze` |
 | `assOrderingQuestion` | `ordering` |
 
+Observations du POC réel :
+
+- Matching : trois associations scorées séparément (`4 + 2 + 5 = 11` points) ;
+- Numeric : intervalle accepté `[4, 6]` pour `3` points ;
+- Essay : notation manuelle avec `WritingScore maxvalue=5` ;
+- TextSubset : réponse `paris`, `3` points, comparaison insensible à la casse ;
+- Cloze : gap `gap_0`, réponse `paris`, `5` points ;
+- Ordering : trois positions à `1.6666666666667`, soit `5` points au total.
+
 ## Identifiants
 
 `ident` peut changer lorsqu'une question de banque est insérée dans un test. Le champ
