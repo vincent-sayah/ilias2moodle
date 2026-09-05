@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 from __future__ import annotations
 
 from ilias2moodle.ilias.qti import parse_test_qti
