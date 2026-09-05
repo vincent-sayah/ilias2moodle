@@ -30,7 +30,8 @@ Le plugin sait maintenant :
 - créer un Moodle Book à partir du Learning Module via `create_module()` et le `booktool_importhtml` core ;
 - importer les assets de chapitre via la File API `mod_book/chapter` ;
 - rejouer un Book inchangé sans dupliquer ses chapitres ou fichiers ;
-- laisser les tests et banques de questions pour la Phase 6.
+- valider en dry-run les questions normalisées Phase 6 et produire une prévisualisation Question Bank + Quiz ;
+- vérifier les modules Moodle `qbank` / `quiz` et les qtypes core nécessaires avant toute écriture Phase 6.
 
 Le cours reste masqué tant que les phases de migration suivantes n'ont pas été validées.
 
@@ -167,7 +168,7 @@ Le POC réel a validé le lancement, le suivi, les scores/statuts, les tentative
 
 ## Phase 5 — Learning Module natif -> Moodle Book
 
-Depuis `0.10.1-alpha`, la Phase 5 prend en charge le dry-run et le premier chemin d'apply réel. La version courante est `0.10.2-alpha`.
+Depuis `0.10.1-alpha`, la Phase 5 prend en charge le dry-run et le premier chemin d'apply réel. La version courante validée de la Phase 5 est `0.10.2-alpha`.
 
 ```bash
 php local/iliasmigration/cli/import.php \
@@ -253,6 +254,42 @@ Les `internal_link` sont également refusés en apply tant que leur cible n'est 
 
 Voir `docs/phase5-learning-modules.md`.
 
+## Phase 6 — Questions et Quiz
+
+Depuis `0.11.0-alpha`, la Phase 6 possède un dry-run Moodle. L'apply reste volontairement désactivé.
+
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/chemin/vers/migration.json \
+  --category=ID \
+  --phase=6 \
+  --dry-run
+```
+
+Le dry-run Phase 6 :
+
+- revalide les packages Phases 3/4/5 et exige que les objets Phases 2 à 5 soient synchronisés ;
+- vérifie `mod_qbank`, `mod_quiz`, le helper Question Bank Moodle 5.0, `mod/quiz/locallib.php` et le format XML core ;
+- vérifie les qtypes `multichoice`, `numerical`, `match`, `essay`, `shortanswer`, `multianswer` et `ordering` ;
+- valide `tests/<ref_id>/questions.json` et `quiz.json` sans écriture ;
+- vérifie identité source, schéma, nombres de questions, identifiants uniques, types, ordre, QRef et barème total ;
+- produit `quiz_preview` avec le futur ordre et le qtype Moodle de chaque question ;
+- planifie `question_pool -> mod_qbank` et `test -> mod_quiz` ;
+- traite un pool sans QTI exporté comme conteneur vide au lieu d'inventer des questions ;
+- place les questions réellement exportées par le test dans la banque privée du futur Quiz ;
+- signale les différences de sémantique de notation qui exigent une décision avant l'apply.
+
+Le POC v5 validé côté ILIAS contient 11 questions, 8 types, aucun QRef absent et un total de `46.0` points.
+
+Deux points restent à arbitrer avant l'écriture réelle :
+
+- Matching : ILIAS utilise des poids de paires `4/2/5` ;
+- Ordering : Moodle propose plusieurs stratégies de notation et celle correspondant au scoring ILIAS par position doit être sélectionnée.
+
+`--phase=6 --apply` est refusé tant que ces mappings et l'écriture via les API/outils core Question Bank + Quiz ne sont pas implémentés et validés.
+
+Voir `docs/phase6-questions.md`.
+
 ## Principes d'écriture
 
 Les écritures de contenu passent par les API Moodle du module cible, les outils core du module et la File API. Le plugin n'écrit pas directement les contenus pédagogiques dans les tables cœur Moodle en contournant les API/outils du module.
@@ -262,11 +299,12 @@ Phases POC validées :
 - Phase 2 : structure ;
 - Phase 3 : ressources simples ;
 - Phase 4 : SCORM ;
-- Phase 5 : Learning Module natif → Moodle Book.
+- Phase 5 : Learning Module natif → Moodle Book ;
+- Phase 6 : normalisation ILIAS et dry-run Moodle Question Bank + Quiz implémentés, validation Moodle réelle à exécuter.
 
 Restent notamment à réaliser :
 
-- test et banque de questions → Phase 6 ;
+- Phase 6 : choix final des mappings de notation puis apply Question Bank + Quiz ;
 - remplacement sûr d'un Book dont le contenu source a changé ;
 - réécriture/validation des liens internes de Learning Module ;
 - politique globale d'ordre des objets racine et de flattening des profondeurs non représentables.
