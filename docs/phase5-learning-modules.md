@@ -47,7 +47,7 @@ Contenus représentatifs observés :
 - `FileList` avec deux PDF ;
 - image JPEG `vince.jpg`.
 
-## Représentation neutre
+## Représentation neutre validée
 
 Le parseur produit temporairement `learning_module_structure` avec :
 
@@ -79,13 +79,89 @@ learning_modules/<ref_id>/files/<file_id>/...
 }
 ```
 
-## Étape Moodle suivante
+Validation réelle v4 :
 
-La création `mod_book` n'est pas encore activée. La prochaine étape consiste à :
+- `learning_module_structures=1` ;
+- `learning_module_media_files=1` ;
+- `learning_module_files=2` ;
+- `missing_count=0` ;
+- 6 nœuds : 1 root, 2 chapitres, 3 pages ;
+- 1 média : `vince.jpg` ;
+- 2 PDF intégrés ;
+- `unsupported_components=[]`.
 
-1. valider le `structure.json` produit par le POC réel ;
-2. définir le rendu HTML des blocs ;
-3. définir la représentation des chapitres ILIAS dans Moodle Book ;
-4. déposer médias et fichiers via la File API Moodle ;
-5. créer le Book et ses chapitres via les API Moodle ;
-6. vérifier idempotence et réécriture des liens internes.
+## Phase 5 Moodle dry-run
+
+Plugin : `local_iliasmigration` `0.9.0-alpha`.
+
+Commande :
+
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/opt/ilias2moodle-data/course-128-v4/migration.json \
+  --category=1 \
+  --phase=5 \
+  --dry-run
+```
+
+Le dry-run :
+
+1. reconstruit le plan Phase 2/3/4 afin de vérifier qu'aucun objet plus ancien n'est en attente ;
+2. vérifie que `mod_book` est installé et activé ;
+3. résout l'action du Learning Module en `CREATE` ou `UPDATE` via la table de mapping ;
+4. valide le chemin et le JSON `structure.json` ;
+5. valide l'identité ILIAS, l'arbre, les parents et les pages ;
+6. vérifie tous les médias et fichiers référencés ;
+7. vérifie les références page -> média/fichier ;
+8. bloque explicitement tout composant `unsupported` ;
+9. produit une prévisualisation déterministe de la future navigation Moodle Book.
+
+### Politique de navigation POC
+
+Moodle Book ne possède qu'un indicateur `subchapter` et ne reproduit pas un arbre arbitraire. Pour la structure POC validée :
+
+- chaque chapitre ILIAS devient un marqueur de chapitre Moodle Book (`subchapter=0`) ;
+- chaque page ILIAS du chapitre devient une entrée Moodle Book en sous-chapitre (`subchapter=1`).
+
+Le POC doit donc produire cinq entrées :
+
+```text
+1. Chapitre1          (chapter marker)
+2. Nouvelle page      (subchapter)
+3. page2              (subchapter)
+4. Chapitre 2         (chapter marker)
+5. page 1             (subchapter)
+```
+
+Cette politique conserve les titres de chapitres et les titres de pages dans la table des matières. Les profondeurs ILIAS supérieures devront être traitées par une politique de réduction/flattening explicite avant généralisation.
+
+## Prérequis v4
+
+L'export v4 contient plus d'objets que le v3, notamment un deuxième URL et un deuxième SCORM. Le dry-run Phase 5 doit donc signaler tout objet Phase 2/3/4 encore en `CREATE`, `BLOCKED`, `CONFLICT` ou mapping invalide.
+
+Un futur apply Book ne sera autorisé que lorsque :
+
+- tous les objets Phase 2/3/4 du même export v4 sont synchronisés ;
+- `phase3_package.ready=true` ;
+- `phase4_package.ready=true` ;
+- `phase5_prerequisites.ready=true` ;
+- `phase5_package.structure_checks_ready=true` ;
+- aucun Learning Module n'est bloqué.
+
+## Moodle Book — API cible
+
+La création réelle n'est pas encore activée. Moodle Book fournit le module `mod_book`; les chapitres sont stockés dans `book_chapters` avec notamment `pagenum`, `subchapter`, `title`, `content` et `contentformat`. Les fichiers de chapitre sont servis par la zone File API `mod_book/chapter`.
+
+L'apply futur devra :
+
+1. créer/mettre à jour le module via les API Moodle de module (`create_module()` / `update_module()`) ;
+2. rendre les blocs neutres en HTML Moodle ;
+3. créer les entrées de navigation Book selon la politique validée ;
+4. déposer médias et fichiers via la File API Moodle dans la zone de chapitre ;
+5. réécrire les références internes vers les chapitres Moodle ;
+6. préserver le même CMID en UPDATE ;
+7. vérifier absence de doublons et conservation des contenus lors d'un deuxième apply.
+
+## Sécurité
+
+`--phase=5 --apply` est volontairement refusé dans `0.9.0-alpha`. La première validation Moodle doit obligatoirement être un dry-run sur le package v4 réel.
