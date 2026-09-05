@@ -46,6 +46,14 @@ final class importer {
         }
 
         if ($phase === 3) {
+            global $CFG;
+
+            // Moodle 5.0 mod_resource update relies on resource_set_mainfile()
+            // from locallib.php. Load it explicitly for CLI imports so the
+            // UPDATE path is deterministic even when update_module() has not
+            // caused the module-local helper to be loaded yet.
+            require_once($CFG->dirroot . '/mod/resource/locallib.php');
+
             $executor = new resource_executor($migrationjson);
             return $executor->execute($document, $categoryid);
         }
