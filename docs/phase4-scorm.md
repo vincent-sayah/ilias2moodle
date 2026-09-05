@@ -24,6 +24,8 @@ Le même export contient également un deuxième `html_module` par rapport au PO
 
 `0.7.0-alpha` introduit le dry-run Phase 4 uniquement.
 
+`0.7.1-alpha` corrige un faux positif du contrôle de chemins ZIP observé avec le package POC : la vérification native `ZipArchive` a confirmé 302 entrées et 0 chemin absolu/traversant/NUL, tandis que la couche `zip_archive` Moodle pouvait exposer une entrée de répertoire racine neutre (`.` / `./`). Ces marqueurs de répertoire sont désormais ignorés explicitement, sans assouplir le blocage de `..`, `/...`, chemins Windows absolus ou octets nuls. Les erreurs de chemin incluent maintenant le chemin fautif et sa représentation hexadécimale.
+
 ```bash
 php local/iliasmigration/cli/import.php \
   --source=/opt/ilias2moodle-data/course-128-v3/migration.json \
@@ -86,7 +88,7 @@ Le dry-run émet donc `ROOT_SCORM_ORDER_APPROXIMATION` lorsqu'un tel cas est dé
 
 ## Apply
 
-`--phase=4 --apply` reste désactivé dans `0.7.0-alpha`.
+`--phase=4 --apply` reste désactivé dans `0.7.1-alpha`.
 
 Son activation nécessitera la validation du POC suivant :
 
