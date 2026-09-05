@@ -13,7 +13,7 @@ final class importer {
      *
      * Phase 2 supports dry-run and real structure writes.
      * Phase 3 supports dry-run/package validation and real simple-resource writes.
-     * Phase 4 currently supports SCORM dry-run/package validation only.
+     * Phase 4 supports dry-run/package validation and real SCORM writes.
      *
      * @param string $migrationjson Absolute path to migration.json.
      * @param int $categoryid Moodle target category id.
@@ -61,9 +61,8 @@ final class importer {
         }
 
         if ($phase === 4) {
-            throw new \coding_exception(
-                'Phase 4 SCORM apply is not enabled yet. Run --phase=4 --dry-run and validate the package first.'
-            );
+            $executor = new scorm_executor($migrationjson);
+            return $executor->execute($document, $categoryid);
         }
 
         if ($phase === 3) {
