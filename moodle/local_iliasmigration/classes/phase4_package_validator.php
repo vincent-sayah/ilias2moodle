@@ -138,12 +138,25 @@ final class phase4_package_validator {
             foreach ($entries as $entry) {
                 $entrycount++;
                 $rawpath = (string) ($entry->original_pathname ?? $entry->pathname ?? '');
+
+                // Some ZIP writers include an explicit neutral root-directory
+                // entry ("." or "./"). Moodle reports it as a directory. It
+                // does not escape the archive root and must not be confused
+                // with traversal. Ignore only this exact neutral directory
+                // marker; absolute paths, ".." and Windows drive paths remain
+                // strictly blocked below.
+                if (!empty($entry->is_directory) && $this->is_neutral_root_directory($rawpath)) {
+                    continue;
+                }
+
                 $normalpath = $this->normalise_zip_path($rawpath);
                 if ($normalpath === null) {
+                    $displaypath = $this->printable_zip_path($rawpath);
                     $this->block(
                         $operation,
                         'SCORM_ZIP_UNSAFE_PATH',
-                        'The SCORM ZIP contains an absolute, traversal or otherwise unsafe entry path.'
+                        'The SCORM ZIP contains an absolute, traversal or otherwise unsafe entry path: '
+                            . $displaypath . ' (hex=' . bin2hex($rawpath) . ').'
                     );
                     return;
                 }
@@ -153,7 +166,8 @@ final class phase4_package_validator {
                     $this->block(
                         $operation,
                         'SCORM_ZIP_PATH_COLLISION',
-                        'The SCORM ZIP contains duplicate paths after normalisation.'
+                        'The SCORM ZIP contains duplicate paths after normalisation: '
+                            . $this->printable_zip_path($rawpath) . '.'
                     );
                     return;
                 }
@@ -321,6 +335,22 @@ final class phase4_package_validator {
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
         }
+    }
+
+    /**
+     * Return whether an archive entry is only a neutral root-directory marker.
+     */
+    private function is_neutral_root_directory(string $path): bool {
+        $path = str_replace('\\', '/', $path);
+        return $path === '.' || $path === './';
+    }
+
+    /**
+     * Make a ZIP entry path safe for inclusion in a diagnostic message.
+     */
+    private function printable_zip_path(string $path): string {
+        $escaped = addcslashes($path, "\0..\37\177..\377");
+        return $escaped === '' ? '<empty>' : $escaped;
     }
 
     /**
