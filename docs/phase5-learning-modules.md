@@ -117,7 +117,7 @@ Le dry-run :
 
 ### Validation réelle Moodle 5.0.2 — export v4
 
-Le dry-run réel est maintenant entièrement prêt :
+Le dry-run réel est entièrement prêt :
 
 - `book_available=true` ;
 - Learning Module `ref_id=243` en `CREATE` ;
@@ -152,7 +152,7 @@ Le POC doit donc produire cinq entrées :
 
 Cette politique conserve les titres de chapitres et les titres de pages dans la table des matières. Les profondeurs ILIAS supérieures devront être traitées par une politique de réduction/flattening explicite avant généralisation.
 
-## Phase 5 apply — `0.10.1-alpha`
+## Phase 5 apply — version courante `0.10.2-alpha`
 
 Commande :
 
@@ -198,7 +198,7 @@ Au deuxième apply, si les cinq chapitres existants correspondent exactement à 
 - aucun asset dupliqué ;
 - `content_reimported=false`.
 
-Si la source pédagogique a changé, `0.10.1-alpha` refuse volontairement l'UPDATE des chapitres plutôt que de les dupliquer ou d'écrire directement dans `book_chapters`. Le remplacement sûr d'un Book déjà migré sera une évolution ultérieure.
+Si la source pédagogique a changé, `0.10.2-alpha` refuse volontairement l'UPDATE des chapitres plutôt que de les dupliquer ou d'écrire directement dans `book_chapters`. Le remplacement sûr d'un Book déjà migré sera une évolution ultérieure.
 
 Les changements limités au nom/à la description de l'activité peuvent être appliqués via `update_module()` lorsque le contenu des chapitres est inchangé.
 
