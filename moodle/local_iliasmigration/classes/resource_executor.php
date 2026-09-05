@@ -33,9 +33,6 @@ final class resource_executor {
     /**
      * Create or update Phase 3 URL/file/HTML resources.
      *
-     * Phase 2 structure must already exist. Database writes are transactional;
-     * resource payloads are written exclusively through Moodle's File API.
-     *
      * @param array $document Validated migration document.
      * @param int $categoryid Moodle target course category id.
      * @return array Execution report.
@@ -66,13 +63,12 @@ final class resource_executor {
         $course = $DB->get_record('course', ['id' => $courseid], '*', MUST_EXIST);
 
         $originaluser = $USER;
-        // create_module()/update_module() enforce capabilities. CLI migration is an
-        // administrative operation, as already established for Phase 2.
+        // create_module()/update_module() enforce capabilities. This CLI migration
+        // is an administrative operation, matching the established Phase 2 policy.
         \core\session\manager::set_user(get_admin());
 
         try {
             $transaction = $DB->start_delegated_transaction();
-
             try {
                 $results = [];
                 foreach ($plan['operations'] as $operation) {
@@ -105,8 +101,8 @@ final class resource_executor {
                         continue;
                     }
 
-                    // Phase 2 structure is only verified here. Later activities remain
-                    // deferred and are copied unchanged into the execution report.
+                    // Structure is verified but not rewritten by Phase 3. Later
+                    // activities stay DEFER and are preserved in the report.
                     $results[] = $operation;
                 }
 
@@ -135,8 +131,7 @@ final class resource_executor {
     }
 
     /**
-     * Refuse Phase 3 apply unless Phase 2 structure already exists and every
-     * Phase 3 package check passed.
+     * Refuse Phase 3 apply unless Phase 2 structure exists and package checks pass.
      *
      * @param array $plan Validated Phase 3 plan.
      */
@@ -178,13 +173,6 @@ final class resource_executor {
 
     /**
      * Create/update one Moodle URL activity.
-     *
-     * @param \stdClass $course Moodle course.
-     * @param array $operation Planned URL operation.
-     * @param string $sourcecourseid ILIAS course ref_id.
-     * @param string $sourceversion ILIAS version.
-     * @param int $sectionnumber Moodle section number.
-     * @return array Execution operation.
      */
     private function apply_url(
         \stdClass $course,
@@ -199,6 +187,7 @@ final class resource_executor {
             throw new \coding_exception('Resolved URL is empty during Phase 3 apply.');
         }
 
+        $description = (string) ($operation['description'] ?? '');
         $config = get_config('url');
         $moduledata = (object) [
             'modulename' => 'url',
@@ -206,7 +195,10 @@ final class resource_executor {
             'section' => $sectionnumber,
             'visible' => 1,
             'name' => (string) $operation['title'],
-            'intro' => (string) ($operation['description'] ?? ''),
+            // Moodle 5.0 create_module() requires introeditor for modules that
+            // advertise FEATURE_MOD_INTRO (including mod_url and mod_resource).
+            'introeditor' => $this->build_intro_editor($description),
+            'intro' => $description,
             'introformat' => FORMAT_HTML,
             'externalurl' => $externalurl,
             'display' => isset($config->display) ? (int) $config->display : RESOURCELIB_DISPLAY_AUTO,
@@ -226,11 +218,13 @@ final class resource_executor {
             $this->assert_module_section($cm, $course, $sectionnumber);
 
             [, , , $moduleinfo] = get_moduleinfo_data($cm, $course);
-            foreach (get_object_vars($moduledata) as $property => $value) {
-                if (!in_array($property, ['modulename', 'course', 'section', 'visible'], true)) {
-                    $moduleinfo->{$property} = $value;
-                }
-            }
+            $moduleinfo->name = $moduledata->name;
+            $moduleinfo->introeditor = $moduledata->introeditor;
+            $moduleinfo->externalurl = $moduledata->externalurl;
+            $moduleinfo->display = $moduledata->display;
+            $moduleinfo->popupwidth = $moduledata->popupwidth;
+            $moduleinfo->popupheight = $moduledata->popupheight;
+            $moduleinfo->printintro = $moduledata->printintro;
             update_module($moduleinfo);
             $instanceid = (int) $cm->instance;
             $performed = 'UPDATED';
@@ -258,13 +252,6 @@ final class resource_executor {
 
     /**
      * Create/update a Moodle File resource from a single file or HTML package.
-     *
-     * @param \stdClass $course Moodle course.
-     * @param array $operation Planned file/html operation.
-     * @param string $sourcecourseid ILIAS course ref_id.
-     * @param string $sourceversion ILIAS version.
-     * @param int $sectionnumber Moodle section number.
-     * @return array Execution operation.
      */
     private function apply_resource(
         \stdClass $course,
@@ -275,6 +262,7 @@ final class resource_executor {
     ): array {
         $requested = (string) $operation['action'];
         $draft = $this->build_resource_draft($operation);
+        $description = (string) ($operation['description'] ?? '');
         $config = get_config('resource');
 
         $moduledata = (object) [
@@ -283,7 +271,8 @@ final class resource_executor {
             'section' => $sectionnumber,
             'visible' => 1,
             'name' => (string) $operation['title'],
-            'intro' => (string) ($operation['description'] ?? ''),
+            'introeditor' => $this->build_intro_editor($description),
+            'intro' => $description,
             'introformat' => FORMAT_HTML,
             'files' => $draft['draft_item_id'],
             'display' => isset($config->display) ? (int) $config->display : RESOURCELIB_DISPLAY_AUTO,
@@ -307,9 +296,15 @@ final class resource_executor {
 
             [, , , $moduleinfo] = get_moduleinfo_data($cm, $course);
             $moduleinfo->name = $moduledata->name;
-            $moduleinfo->intro = $moduledata->intro;
-            $moduleinfo->introformat = FORMAT_HTML;
+            $moduleinfo->introeditor = $moduledata->introeditor;
             $moduleinfo->files = $moduledata->files;
+            $moduleinfo->display = $moduledata->display;
+            $moduleinfo->popupwidth = $moduledata->popupwidth;
+            $moduleinfo->popupheight = $moduledata->popupheight;
+            $moduleinfo->printintro = $moduledata->printintro;
+            $moduleinfo->showsize = $moduledata->showsize;
+            $moduleinfo->showtype = $moduledata->showtype;
+            $moduleinfo->showdate = $moduledata->showdate;
             update_module($moduleinfo);
             $instanceid = (int) $cm->instance;
             $performed = 'UPDATED';
@@ -338,10 +333,21 @@ final class resource_executor {
     }
 
     /**
-     * Build a Moodle user draft area from the migration package.
+     * Build the editor payload required by Moodle's create/update module APIs.
      *
-     * @param array $operation Planned file/html operation.
-     * @return array Draft descriptor.
+     * Descriptions in the current neutral schema contain no embedded draft files,
+     * but Moodle still requires a valid editor draft item id.
+     */
+    private function build_intro_editor(string $text): array {
+        return [
+            'text' => $text,
+            'format' => FORMAT_HTML,
+            'itemid' => file_get_unused_draft_itemid(),
+        ];
+    }
+
+    /**
+     * Build a Moodle user draft area from the migration package.
      */
     private function build_resource_draft(array $operation): array {
         global $USER;
@@ -430,14 +436,6 @@ final class resource_executor {
 
     /**
      * Resolve the Moodle section number for a resource parent.
-     *
-     * Root ILIAS resources use section 0. First-level folders map to normal
-     * sections. Second-level folders map to mod_subsection delegated sections.
-     *
-     * @param \stdClass $course Moodle course.
-     * @param string $parentsourceref Parent ILIAS ref_id or empty for root.
-     * @param string $sourcecourseid ILIAS course ref_id.
-     * @return int Moodle section number.
      */
     private function resolve_parent_section_number(
         \stdClass $course,
@@ -490,10 +488,6 @@ final class resource_executor {
 
     /**
      * Ensure an updated course module remains in its expected section.
-     *
-     * @param \stdClass $cm Moodle course module.
-     * @param \stdClass $course Moodle course.
-     * @param int $expectedsectionnumber Expected section number.
      */
     private function assert_module_section(
         \stdClass $cm,
@@ -517,11 +511,6 @@ final class resource_executor {
 
     /**
      * Find a mapping for the current source instance, with legacy fallback.
-     *
-     * @param string $sourcecourse ILIAS course ref_id.
-     * @param string $sourceref ILIAS object ref_id.
-     * @param string $targettype Mapping target type.
-     * @return \stdClass|false
      */
     private function find_mapping(
         string $sourcecourse,
@@ -548,15 +537,7 @@ final class resource_executor {
 
     /**
      * Insert or refresh one Phase 3 mapping row.
-     *
      * Legacy mappings with sourceinstance='' are upgraded in place.
-     *
-     * @param string $sourcecourse ILIAS course ref_id.
-     * @param string $sourceref ILIAS object ref_id.
-     * @param string $sourceobj ILIAS obj_id.
-     * @param string $targettype Mapping target type.
-     * @param int $targetid Moodle course_modules id.
-     * @param string $sourceversion ILIAS version.
      */
     private function save_mapping(
         string $sourcecourse,
@@ -604,9 +585,6 @@ final class resource_executor {
 
     /**
      * Resolve and validate a package-relative file.
-     *
-     * @param string $relative Package-relative path.
-     * @return string Canonical file path.
      */
     private function resolve_relative_file(string $relative): string {
         $resolved = $this->resolve_relative($relative);
@@ -618,9 +596,6 @@ final class resource_executor {
 
     /**
      * Resolve and validate a package-relative directory.
-     *
-     * @param string $relative Package-relative path.
-     * @return string Canonical directory path.
      */
     private function resolve_relative_directory(string $relative): string {
         $resolved = $this->resolve_relative($relative);
@@ -632,9 +607,6 @@ final class resource_executor {
 
     /**
      * Resolve one relative package path without allowing traversal.
-     *
-     * @param string $relative Package-relative path.
-     * @return string Canonical path.
      */
     private function resolve_relative(string $relative): string {
         $relative = trim(str_replace('\\', '/', $relative));
