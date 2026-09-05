@@ -84,11 +84,19 @@ Phase 5 real Learning Module -> Moodle Book write:
       --phase=5 \\
       --apply
 
+Phase 6 Question Bank + Quiz preview:
+  php local/iliasmigration/cli/import.php \\
+      --source=/path/to/migration.json \\
+      --category=ID \\
+      --phase=6 \\
+      --dry-run
+
 Options:
   --source      Absolute path to migration.json.
   --category    Existing Moodle course category id.
   --phase       Migration phase: 2 (structure), 3 (simple resources),
-                4 (SCORM), or 5 (Learning Module -> Moodle Book). Default: 2.
+                4 (SCORM), 5 (Learning Module -> Moodle Book), or
+                6 (Question Bank + Quiz dry-run). Default: 2.
   --dry-run     Build and validate the import plan; performs no Moodle content writes.
   --apply       Apply the selected supported phase.
                 Phase 3 requires Phase 2 structure to exist and package validation to pass.
@@ -96,6 +104,7 @@ Options:
                 Phase 5 requires Phases 2/3/4 to be synchronized and the Learning Module package
                 validation to pass. A changed already-mapped Book is refused until safe chapter
                 replacement is implemented; unchanged replays are idempotent.
+                Phase 6 apply is not implemented yet; use --phase=6 --dry-run.
   -h, --help    Display this help.
 
 Exactly one of --dry-run or --apply is required.
@@ -117,14 +126,17 @@ if ($categoryid <= 0) {
 }
 
 $phase = (int) $options['phase'];
-if (!in_array($phase, [2, 3, 4, 5], true)) {
-    cli_error("Invalid --phase. Use 2, 3, 4 or 5.\n\n" . $help);
+if (!in_array($phase, [2, 3, 4, 5, 6], true)) {
+    cli_error("Invalid --phase. Use 2, 3, 4, 5 or 6.\n\n" . $help);
 }
 
 $dryrun = (bool) $options['dry-run'];
 $apply = (bool) $options['apply'];
 if ($dryrun === $apply) {
     cli_error("Choose exactly one of --dry-run or --apply.\n\n" . $help);
+}
+if ($phase === 6 && $apply) {
+    cli_error("Phase 6 apply is not implemented yet. Use --phase=6 --dry-run.\n\n" . $help);
 }
 
 $importer = new \local_iliasmigration\importer();
