@@ -12,8 +12,7 @@ final class importer {
      * Analyse a neutral migration document or apply the validated migration subset.
      *
      * Phase 2 supports dry-run and real structure writes.
-     * Phase 3 currently supports dry-run/package validation only; resource writes
-     * remain disabled until the POC dry-run is validated.
+     * Phase 3 supports dry-run/package validation and real simple-resource writes.
      *
      * @param string $migrationjson Absolute path to migration.json.
      * @param int $categoryid Moodle target category id.
@@ -47,9 +46,8 @@ final class importer {
         }
 
         if ($phase === 3) {
-            throw new \coding_exception(
-                'Phase 3 apply is intentionally disabled until the resource dry-run is validated on the POC.'
-            );
+            $executor = new resource_executor($migrationjson);
+            return $executor->execute($document, $categoryid);
         }
 
         $executor = new structure_executor();
