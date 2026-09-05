@@ -70,15 +70,26 @@ Phase 4 real SCORM write:
       --phase=4 \\
       --apply
 
+Phase 5 Learning Module -> Moodle Book preview:
+  php local/iliasmigration/cli/import.php \\
+      --source=/path/to/migration.json \\
+      --category=ID \\
+      --phase=5 \\
+      --dry-run
+
+Phase 5 apply is intentionally disabled until the Book rendering/File API path
+has been validated from a real dry-run package.
+
 Options:
   --source      Absolute path to migration.json.
   --category    Existing Moodle course category id.
   --phase       Migration phase: 2 (structure), 3 (simple resources),
-                or 4 (SCORM). Default: 2.
+                4 (SCORM), or 5 (Learning Module -> Book preview). Default: 2.
   --dry-run     Build and validate the import plan; performs no Moodle content writes.
   --apply       Apply the selected supported phase.
                 Phase 3 requires Phase 2 structure to exist and package validation to pass.
                 Phase 4 requires Phases 2/3 to be synchronized and SCORM validation to pass.
+                Phase 5 apply is not enabled yet.
   -h, --help    Display this help.
 
 Exactly one of --dry-run or --apply is required.
@@ -100,8 +111,8 @@ if ($categoryid <= 0) {
 }
 
 $phase = (int) $options['phase'];
-if (!in_array($phase, [2, 3, 4], true)) {
-    cli_error("Invalid --phase. Use 2, 3 or 4.\n\n" . $help);
+if (!in_array($phase, [2, 3, 4, 5], true)) {
+    cli_error("Invalid --phase. Use 2, 3, 4 or 5.\n\n" . $help);
 }
 
 $dryrun = (bool) $options['dry-run'];
