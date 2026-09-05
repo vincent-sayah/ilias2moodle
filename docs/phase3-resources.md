@@ -18,7 +18,7 @@ Les types suivants restent différés :
 
 ## Sécurité du premier POC
 
-La version `0.5.0-alpha` active uniquement le dry-run Phase 3 :
+La branche alpha active d'abord le dry-run Phase 3 :
 
 ```bash
 php local/iliasmigration/cli/import.php \
@@ -28,17 +28,43 @@ php local/iliasmigration/cli/import.php \
   --dry-run
 ```
 
-`--phase=3 --apply` est volontairement refusé tant que ce dry-run n'a pas été validé sur le POC.
+`--phase=3 --apply` reste volontairement refusé tant que le dry-run du POC n'est pas entièrement validé.
 
 Le dry-run vérifie :
 
 - présence du package complet à côté de `migration.json` ;
 - chemins relatifs sûrs ;
 - présence des fichiers ;
-- URL `http`/`https` valide ;
+- URL externe `http`/`https` valide ;
+- liens WebResource internes ILIAS au format `type|ref_id` ;
 - répertoire et fichier de démarrage des modules HTML ;
 - absence de liens symboliques dans un paquet HTML ;
 - état `CREATE`/`UPDATE` à partir de la table de mapping.
+
+## Liens WebResource internes ILIAS
+
+ILIAS 10.8 peut exporter un lien WebResource interne avec un `Target` comme :
+
+```text
+blog|131
+```
+
+Ce n'est pas une URL corrompue : ILIAS encode ici le type de l'objet et son `ref_id`. À partir de `0.5.1-alpha`, le validateur Phase 3 reconnaît ce format.
+
+Pour le POC, avec l'instance source `http://192.168.56.50`, le lien est résolu provisoirement vers le lien permanent ILIAS :
+
+```text
+http://192.168.56.50/goto.php?target=blog_131
+```
+
+Le dry-run ajoute :
+
+- `package_validation.code = ILIAS_INTERNAL_LINK` ;
+- `resolved_url` ;
+- les composantes `type` et `ref_id` ;
+- un warning `ILIAS_INTERNAL_LINK_PRESERVED`.
+
+Cette stratégie préserve le fonctionnement du lien sans inventer une destination Moodle. Une phase ultérieure de réécriture des liens pourra remplacer ce lien vers ILIAS par l'URL Moodle cible lorsque l'objet référencé a lui-même été migré.
 
 ## Instance ILIAS source
 
@@ -50,13 +76,13 @@ Les mappings créés avant cette évolution restent lisibles comme mappings hist
 
 Ressources simples attendues :
 
-- `ref_id=132` — URL `lien` ;
+- `ref_id=132` — WebResource `lien`, target interne `blog|131` ;
 - `ref_id=134` — module HTML `html` ;
 - `ref_id=138` — fichier `missing_bios_report.txt` ;
 - `ref_id=238` — fichier situé dans `sous dossier test` ;
 - `ref_id=234` — PDF racine.
 
-Le dry-run Phase 3 doit donc contrôler 5 ressources simples.
+Le dry-run Phase 3 doit donc contrôler 5 ressources simples avec `blocked_resources=0` avant l'activation de l'apply.
 
 ## Limitation d'ordre racine à résoudre
 
