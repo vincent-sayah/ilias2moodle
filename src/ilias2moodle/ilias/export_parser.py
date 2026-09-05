@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import zipfile
+from collections import defaultdict
 from pathlib import PurePosixPath
 from typing import Any
 from xml.etree import ElementTree as ET
@@ -37,6 +38,17 @@ def _text_descendant(element: ET.Element, name: str, default: str = "") -> str:
     if candidate is None or candidate.text is None:
         return default
     return candidate.text.strip()
+
+
+def _element_text(element: ET.Element) -> str:
+    return "".join(element.itertext()).strip()
+
+
+def _source_id_from_identifier(value: str) -> str:
+    match = re.search(r"_(\d+)$", value)
+    if match:
+        return match.group(1)
+    return value.rsplit(":", 1)[-1].strip()
 
 
 class IliasExportParser:
@@ -190,6 +202,8 @@ class IliasExportParser:
             self._enrich_scorm(item, base)
         elif ilias_type == "htlm":
             self._enrich_html_module(item, base)
+        elif ilias_type == "lm":
+            self._enrich_learning_module(item, base)
         elif ilias_type == "tst":
             self._enrich_test(item, base)
         elif ilias_type == "qpl":
@@ -265,6 +279,332 @@ class IliasExportParser:
             {
                 "start_file": _text_descendant(root, "StartFile"),
                 "content_dir": f"{base}/{content_dir}" if content_dir else "",
+            }
+        )
+
+    def _parse_learning_module_media(self, base: str) -> dict[str, dict[str, Any]]:
+        component = self._component_export(base, "MediaObjects")
+        if component is None:
+            return {}
+
+        root = self._parse_xml(component)
+        media: dict[str, dict[str, Any]] = {}
+        for export_item in root.iter():
+            if _local_name(export_item.tag) != "ExportItem":
+                continue
+            mob = _first_descendant(export_item, "Mob")
+            if mob is None:
+                continue
+            source_id = _text_descendant(mob, "Id") or export_item.attrib.get("Id", "")
+            container = _text_descendant(mob, "MediaContainer")
+            media_items: list[dict[str, Any]] = []
+            for candidate in export_item.iter():
+                if _local_name(candidate.tag) != "MobMediaItem":
+                    continue
+                location = _text_descendant(candidate, "Location")
+                archive_path = (
+                    f"{base}/{container.rstrip('/')}/{location.lstrip('/')}"
+                    if container and location
+                    else ""
+                )
+                media_items.append(
+                    {
+                        "id": _text_descendant(candidate, "Id"),
+                        "purpose": _text_descendant(candidate, "Purpose"),
+                        "location": location,
+                        "location_type": _text_descendant(candidate, "LocationType"),
+                        "mime_type": _text_descendant(candidate, "Format"),
+                        "width": _text_descendant(candidate, "Width"),
+                        "height": _text_descendant(candidate, "Height"),
+                        "horizontal_align": _text_descendant(candidate, "Halign"),
+                        "caption": _text_descendant(candidate, "Caption"),
+                        "text_representation": _text_descendant(
+                            candidate, "TextRepresentation"
+                        ),
+                        "archive_path": archive_path,
+                    }
+                )
+            media[source_id] = {
+                "source_id": source_id,
+                "title": _text_descendant(mob, "Title"),
+                "description": _text_descendant(mob, "Description"),
+                "media_container": container,
+                "items": media_items,
+            }
+        return media
+
+    def _parse_learning_module_files(self, base: str) -> dict[str, dict[str, Any]]:
+        component = self._component_export(base, "File")
+        if component is None:
+            return {}
+
+        root = self._parse_xml(component)
+        files: dict[str, dict[str, Any]] = {}
+        for export_item in root.iter():
+            if _local_name(export_item.tag) != "ExportItem":
+                continue
+            file_element = _first_descendant(export_item, "File")
+            if file_element is None:
+                continue
+            source_id = export_item.attrib.get("Id", "")
+            obj_identifier = file_element.attrib.get("obj_id", "")
+            if not source_id and obj_identifier:
+                source_id = _source_id_from_identifier(obj_identifier)
+            version = _first_descendant(file_element, "Version")
+            relative_path = (version.text or "").strip() if version is not None else ""
+            files[source_id] = {
+                "source_id": source_id,
+                "identifier": obj_identifier,
+                "filename": _text_descendant(file_element, "Filename"),
+                "title": _text_descendant(file_element, "Title"),
+                "description": _text_descendant(file_element, "Description"),
+                "mime_type": file_element.attrib.get("type", ""),
+                "size": int(file_element.attrib.get("size", "0") or 0),
+                "archive_path": f"{base}/{relative_path}" if relative_path else "",
+            }
+        return files
+
+    def _parse_page_content(
+        self,
+        element: ET.Element,
+        media: dict[str, dict[str, Any]],
+        files: dict[str, dict[str, Any]],
+    ) -> dict[str, Any]:
+        tag = _local_name(element.tag)
+
+        if tag == "Paragraph":
+            return {
+                "type": "paragraph",
+                "text": _element_text(element),
+                "language": element.attrib.get("Language", ""),
+                "characteristic": element.attrib.get("Characteristic", ""),
+            }
+
+        if tag == "MediaObject":
+            alias = _first_descendant(element, "MediaAlias")
+            origin_id = alias.attrib.get("OriginId", "") if alias is not None else ""
+            source_id = _source_id_from_identifier(origin_id) if origin_id else ""
+            alias_item = _first_descendant(element, "MediaAliasItem")
+            layout = _first_descendant(element, "Layout")
+            return {
+                "type": "media",
+                "source_id": source_id,
+                "origin_id": origin_id,
+                "purpose": alias_item.attrib.get("Purpose", "") if alias_item is not None else "",
+                "horizontal_align": (
+                    layout.attrib.get("HorizontalAlign", "") if layout is not None else ""
+                ),
+                "media": media.get(source_id),
+            }
+
+        if tag == "FileList":
+            title = _text_descendant(element, "Title")
+            file_items: list[dict[str, Any]] = []
+            for file_item in element.iter():
+                if _local_name(file_item.tag) != "FileItem":
+                    continue
+                identifier = _first_descendant(file_item, "Identifier")
+                entry = identifier.attrib.get("Entry", "") if identifier is not None else ""
+                source_id = _source_id_from_identifier(entry) if entry else ""
+                file_items.append(
+                    {
+                        "source_id": source_id,
+                        "identifier": entry,
+                        "filename": _text_descendant(file_item, "Location"),
+                        "mime_type": _text_descendant(file_item, "Format"),
+                        "file": files.get(source_id),
+                    }
+                )
+            return {"type": "file_list", "title": title, "files": file_items}
+
+        if tag == "Table":
+            rows: list[list[list[dict[str, Any]]]] = []
+            for row in element:
+                if _local_name(row.tag) != "TableRow":
+                    continue
+                cells: list[list[dict[str, Any]]] = []
+                for cell in row:
+                    if _local_name(cell.tag) != "TableData":
+                        continue
+                    cells.append(self._parse_page_children(cell, media, files))
+                rows.append(cells)
+            return {
+                "type": "table",
+                "language": element.attrib.get("Language", ""),
+                "class": element.attrib.get("Class", ""),
+                "data_table": element.attrib.get("DataTable", ""),
+                "rows": rows,
+            }
+
+        if tag == "Section":
+            return {
+                "type": "section",
+                "characteristic": element.attrib.get("Characteristic", ""),
+                "blocks": self._parse_page_children(element, media, files),
+            }
+
+        if tag in {"IntLink", "InternalLink", "Link"}:
+            return {
+                "type": "internal_link",
+                "element": tag,
+                "text": _element_text(element),
+                "attributes": dict(element.attrib),
+            }
+
+        return {
+            "type": "unsupported",
+            "element": tag,
+            "text": _element_text(element),
+            "attributes": dict(element.attrib),
+        }
+
+    def _parse_page_children(
+        self,
+        parent: ET.Element,
+        media: dict[str, dict[str, Any]],
+        files: dict[str, dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        blocks: list[dict[str, Any]] = []
+        for child in parent:
+            if _local_name(child.tag) == "PageContent":
+                blocks.extend(self._parse_page_children(child, media, files))
+            else:
+                blocks.append(self._parse_page_content(child, media, files))
+        return blocks
+
+    def _collect_unsupported_blocks(
+        self, blocks: list[dict[str, Any]], page_id: str
+    ) -> list[dict[str, str]]:
+        unsupported: list[dict[str, str]] = []
+        for block in blocks:
+            if block.get("type") == "unsupported":
+                unsupported.append(
+                    {"page_id": page_id, "element": str(block.get("element", ""))}
+                )
+            if block.get("type") == "section":
+                unsupported.extend(
+                    self._collect_unsupported_blocks(block.get("blocks", []), page_id)
+                )
+            if block.get("type") == "table":
+                for row in block.get("rows", []):
+                    for cell in row:
+                        unsupported.extend(self._collect_unsupported_blocks(cell, page_id))
+        return unsupported
+
+    def _enrich_learning_module(self, item: MigrationItem, base: str) -> None:
+        component = self._component_export(base, "LearningModule")
+        if component is None:
+            return
+
+        root = self._parse_xml(component)
+        lm = _first_descendant(root, "Lm")
+        if lm is None:
+            return
+
+        item.description = _text_descendant(lm, "Description")
+        settings = {
+            _local_name(child.tag): (child.text or "").strip()
+            for child in lm
+            if _local_name(child.tag) not in {"Id", "Title", "Description"}
+        }
+
+        sibling_positions: defaultdict[str, int] = defaultdict(int)
+        nodes: list[dict[str, Any]] = []
+        for tree in root.iter():
+            if _local_name(tree.tag) != "LmTree":
+                continue
+            source_id = _text_descendant(tree, "Child")
+            parent_id = _text_descendant(tree, "Parent")
+            node_type = _text_descendant(tree, "Type")
+            sibling_positions[parent_id] += 1
+            nodes.append(
+                {
+                    "source_id": source_id,
+                    "parent_source_id": parent_id,
+                    "depth": int(_text_descendant(tree, "Depth", "0") or 0),
+                    "ilias_type": node_type,
+                    "type": {"du": "root", "st": "chapter", "pg": "page"}.get(
+                        node_type, node_type
+                    ),
+                    "title": _text_descendant(tree, "Title"),
+                    "short_title": _text_descendant(tree, "ShortTitle"),
+                    "position": sibling_positions[parent_id],
+                    "active": _text_descendant(tree, "Active"),
+                    "public_access": _text_descendant(tree, "PublicAccess"),
+                    "layout": _text_descendant(tree, "Layout"),
+                    "import_id": _text_descendant(tree, "ImportId"),
+                }
+            )
+
+        media = self._parse_learning_module_media(base)
+        files = self._parse_learning_module_files(base)
+
+        pages: dict[str, dict[str, Any]] = {}
+        copage_component = self._component_export(base, "COPage")
+        if copage_component is not None:
+            copage_root = self._parse_xml(copage_component)
+            node_by_id = {node["source_id"]: node for node in nodes}
+            for export_item in copage_root.iter():
+                if _local_name(export_item.tag) != "ExportItem":
+                    continue
+                export_id = export_item.attrib.get("Id", "")
+                if not export_id.startswith("lm:"):
+                    continue
+                page_id = export_id.split(":", 1)[1]
+                page_object = _first_descendant(export_item, "PageObject")
+                if page_object is None:
+                    continue
+                blocks = self._parse_page_children(page_object, media, files)
+                node = node_by_id.get(page_id, {})
+                pages[page_id] = {
+                    "source_id": page_id,
+                    "title": node.get("title", ""),
+                    "short_title": node.get("short_title", ""),
+                    "parent_source_id": node.get("parent_source_id", ""),
+                    "position": node.get("position", 0),
+                    "active": page_object.attrib.get("Active", ""),
+                    "language": page_object.attrib.get("Language", ""),
+                    "blocks": blocks,
+                }
+
+        unsupported_components: list[dict[str, str]] = []
+        for page_id, page in pages.items():
+            unsupported_components.extend(
+                self._collect_unsupported_blocks(page.get("blocks", []), page_id)
+            )
+
+        structure = {
+            "schema_version": "1.0",
+            "source": {
+                "lms": "ILIAS",
+                "object_id": item.metadata.get("obj_id", ""),
+                "ref_id": item.source_id,
+                "export_base": base,
+            },
+            "title": _text_descendant(lm, "Title") or item.title,
+            "description": item.description,
+            "settings": settings,
+            "nodes": nodes,
+            "pages": pages,
+            "media": media,
+            "files": files,
+            "unsupported_components": unsupported_components,
+        }
+        item.metadata.update(
+            {
+                "learning_module_schema_version": "1.0",
+                "learning_module_export_base": base,
+                "learning_module_node_count": len(nodes),
+                "learning_module_chapter_count": sum(
+                    1 for node in nodes if node["type"] == "chapter"
+                ),
+                "learning_module_page_count": sum(
+                    1 for node in nodes if node["type"] == "page"
+                ),
+                "learning_module_media_count": len(media),
+                "learning_module_file_count": len(files),
+                "learning_module_unsupported_count": len(unsupported_components),
+                "learning_module_structure": structure,
             }
         )
 
