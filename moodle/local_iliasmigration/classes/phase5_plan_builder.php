@@ -29,14 +29,16 @@ final class phase5_plan_builder {
      * @return array Import plan.
      */
     public function build(array $document): array {
-        global $DB;
+        global $CFG, $DB;
 
         $plan = (new phase4_plan_builder($this->categoryid))->build($document);
         $plan['phase'] = 5;
 
         $bookmodule = $DB->get_record('modules', ['name' => 'book'], 'id,name,visible');
         $bookavailable = $bookmodule && (int) $bookmodule->visible === 1;
+        $importhtmlavailable = is_readable($CFG->dirroot . '/mod/book/tool/importhtml/locallib.php');
         $plan['moodle']['book_available'] = $bookavailable;
+        $plan['moodle']['book_importhtml_available'] = $importhtmlavailable;
 
         $sourcecourseid = (string) ($document['course']['source_id'] ?? '');
         $sourceinstance = (string) ($plan['source']['instance'] ?? '');
@@ -59,7 +61,9 @@ final class phase5_plan_builder {
                     $targetcourseid
                 );
 
-                $operation['action'] = $bookavailable ? $mapping['action'] : 'BLOCKED';
+                $operation['action'] = ($bookavailable && $importhtmlavailable)
+                    ? $mapping['action']
+                    : 'BLOCKED';
                 $operation['target_id'] = $mapping['target_id'];
                 $operation['moodle_module'] = 'book';
                 $operation['migration_structure_path'] = (string) (
@@ -98,6 +102,8 @@ final class phase5_plan_builder {
                 }
                 if (!$bookavailable) {
                     $operation['reason'] = 'BOOK_MODULE_DISABLED';
+                } else if (!$importhtmlavailable) {
+                    $operation['reason'] = 'BOOK_IMPORTHTML_UNAVAILABLE';
                 }
                 continue;
             }
@@ -126,6 +132,13 @@ final class phase5_plan_builder {
             ];
         }
 
+        if (!$importhtmlavailable) {
+            $plan['warnings'][] = [
+                'code' => 'BOOK_IMPORTHTML_UNAVAILABLE',
+                'message' => 'Moodle core booktool_importhtml is unavailable; safe Phase 5 chapter creation cannot run.',
+            ];
+        }
+
         if ($pending) {
             $plan['warnings'][] = [
                 'code' => 'PHASE4_PREREQUISITES_PENDING',
@@ -146,7 +159,8 @@ final class phase5_plan_builder {
             'pending_operations' => $pending,
             'pending_count' => count($pending),
             'book_available' => $bookavailable,
-            'ready' => $bookavailable && count($pending) === 0,
+            'book_importhtml_available' => $importhtmlavailable,
+            'ready' => $bookavailable && $importhtmlavailable && count($pending) === 0,
         ];
 
         return $plan;
