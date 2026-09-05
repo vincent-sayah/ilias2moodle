@@ -63,18 +63,22 @@ Phase 4 SCORM/package preview:
       --phase=4 \\
       --dry-run
 
-Phase 4 --apply is intentionally disabled until the SCORM POC package and
-Moodle mod_scorm creation/update path have been validated.
+Phase 4 real SCORM write:
+  php local/iliasmigration/cli/import.php \\
+      --source=/path/to/migration.json \\
+      --category=ID \\
+      --phase=4 \\
+      --apply
 
 Options:
   --source      Absolute path to migration.json.
   --category    Existing Moodle course category id.
   --phase       Migration phase: 2 (structure), 3 (simple resources),
-                or 4 (SCORM dry-run). Default: 2.
+                or 4 (SCORM). Default: 2.
   --dry-run     Build and validate the import plan; performs no Moodle content writes.
   --apply       Apply the selected supported phase.
                 Phase 3 requires Phase 2 structure to exist and package validation to pass.
-                Phase 4 apply is not enabled yet.
+                Phase 4 requires Phases 2/3 to be synchronized and SCORM validation to pass.
   -h, --help    Display this help.
 
 Exactly one of --dry-run or --apply is required.
