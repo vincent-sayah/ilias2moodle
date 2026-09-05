@@ -263,7 +263,9 @@ final class phase6_moodle_xml_builder {
         $xml .= "    <gradingtype>ABSOLUTE_POSITION</gradingtype>\n";
         $xml .= "    <showgrading>SHOW</showgrading>\n";
         $xml .= "    <numberingstyle>none</numberingstyle>\n";
-        // Moodle Ordering import creates default hint options when shownumcorrect is absent;\n        // make it explicit so question_hints.hintformat is never inferred as NULL.\n        $xml .= "    <shownumcorrect>1</shownumcorrect>\n";
+        // Moodle Ordering import creates default hint options when shownumcorrect is absent.
+        // Make it explicit so question_hints.hintformat is never inferred as NULL.
+        $xml .= "    <shownumcorrect>1</shownumcorrect>\n";
         $xml .= "    <correctfeedback format=\"html\"><text></text></correctfeedback>\n";
         $xml .= "    <partiallycorrectfeedback format=\"html\"><text></text></partiallycorrectfeedback>\n";
         $xml .= "    <incorrectfeedback format=\"html\"><text></text></incorrectfeedback>\n";
