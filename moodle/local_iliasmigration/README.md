@@ -24,8 +24,9 @@ Le plugin sait maintenant :
 - refuser l'écriture si un dossier de profondeur supérieure à 2 exige un aplatissement ;
 - valider et importer les ressources simples Phase 3 : URL, fichiers et modules HTML exportés ;
 - conserver provisoirement les WebResource internes ILIAS sous forme de liens permanents vers l'instance source ;
-- valider en dry-run les packages SCORM Phase 4 sans les extraire dans Moodle ;
-- laisser l'apply SCORM, les modules d'apprentissage natifs, tests et banques de questions pour les phases suivantes.
+- valider les packages SCORM Phase 4 sans les extraire pendant le dry-run ;
+- créer ou mettre à jour les activités `mod_scorm`, stocker le ZIP par File API et laisser Moodle parser les SCO ;
+- laisser les modules d'apprentissage natifs, tests et banques de questions pour les phases suivantes.
 
 Le cours reste masqué tant que les phases de migration suivantes n'ont pas été validées.
 
@@ -36,6 +37,8 @@ L'installation crée `local_iliasmigration_map`. Elle associe durablement les id
 À partir des développements Phase 3, les nouveaux mappings incluent `sourceinstance` afin de distinguer plusieurs installations ILIAS. Les anciens mappings structurels sans instance restent pris en charge en compatibilité.
 
 Pour une sous-section, `targetid` correspond à l'ID du `course_module` Moodle de type `subsection`. La section déléguée associée est résolue par les API Moodle lors de l'import des ressources qui y sont contenues.
+
+Pour un SCORM, `targetid` correspond à l'ID du `course_module` Moodle de type `scorm`.
 
 ## Lister les catégories
 
@@ -108,9 +111,9 @@ La Phase 3 prend en charge :
 
 L'exécution est idempotente : premier passage `CREATED`, passages suivants `UPDATED` à partir du mapping persistant.
 
-## Phase 4 — dry-run SCORM
+## Phase 4 — SCORM
 
-À partir de `0.7.0-alpha`, le plugin sait préparer et valider un plan SCORM sans écriture Moodle :
+Le dry-run Phase 4 :
 
 ```bash
 php local/iliasmigration/cli/import.php \
@@ -120,7 +123,7 @@ php local/iliasmigration/cli/import.php \
   --dry-run
 ```
 
-Le dry-run Phase 4 :
+Il :
 
 - vérifie que `mod_scorm` existe et est actif ;
 - retrouve un éventuel mapping SCORM pour produire `CREATE` ou `UPDATE` ;
@@ -134,10 +137,32 @@ Le dry-run Phase 4 :
 - détecte le standard SCORM à partir de `schemaversion` lorsque celui-ci est explicite ;
 - avertit sur les gros packages et sur un manque potentiel d'espace dans `dataroot`.
 
-`--phase=4 --apply` est volontairement désactivé tant que le POC réel `mod_scorm` n'a pas validé la création, le lancement, le suivi et l'idempotence.
+À partir de `0.8.0-alpha`, l'apply SCORM est disponible lorsque `phase4_package.ready=true` :
+
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/chemin/vers/migration.json \
+  --category=ID \
+  --phase=4 \
+  --apply
+```
+
+L'apply :
+
+- refait les validations Phase 3/4 juste avant toute écriture ;
+- crée un draft utilisateur contenant le ZIP ;
+- crée/met à jour `mod_scorm` via `create_module()` / `update_module()` ;
+- laisse `scorm_add_instance()` / `scorm_update_instance()` stocker le package dans `mod_scorm/package` ;
+- laisse `scorm_parse()` extraire le contenu dans `mod_scorm/content` et construire les SCO ;
+- vérifie après écriture le package, `imsmanifest.xml` et au moins un SCO lançable ;
+- mappe `tries` ILIAS vers `maxattempt` Moodle quand la valeur est compatible (1 à 6) ;
+- conserve largeur/hauteur exportées ;
+- écrit le mapping `targettype=scorm` pour permettre le second passage `UPDATED` sans doublon.
+
+Le POC réel doit encore valider en exploitation : lancement du package, suivi SCORM/attempts et idempotence complète du second apply.
 
 Restent à réaliser :
 
-- SCORM apply → Phase 4 ;
+- validation fonctionnelle finale SCORM → Phase 4 ;
 - module d'apprentissage natif → Phase 5 ;
 - test et banque de questions → Phase 6.
