@@ -56,7 +56,13 @@ final class importer {
                 $plan = $phase5validator->validate($plan);
 
                 $phase6validator = new phase6_package_validator($migrationjson);
-                return $phase6validator->validate($plan);
+                $plan = $phase6validator->validate($plan);
+
+                // Keep scoring semantics separate from structural/package
+                // validation. These reviews do not make the package invalid,
+                // but they must be visible before an apply path is enabled.
+                $scoringvalidator = new phase6_scoring_policy_validator($migrationjson);
+                return $scoringvalidator->validate($plan);
             }
 
             if ($phase === 5) {
