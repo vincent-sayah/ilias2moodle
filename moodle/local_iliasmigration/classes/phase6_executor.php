@@ -300,7 +300,7 @@ final class phase6_executor {
                 }
                 $qid = (int) $questionbyident[$ident]['id'];
                 $maxmark = (float) ($entry['max_score'] ?? 0.0);
-                if (!quiz_add_quiz_question($qid, $quiz, 0, $maxmark)) {
+                if (quiz_add_quiz_question($qid, $quiz, 0, $maxmark) === false) {
                     throw new \coding_exception('Moodle refused to add an imported question to the Quiz: ' . $ident);
                 }
                 $added++;
