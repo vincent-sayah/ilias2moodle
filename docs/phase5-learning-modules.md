@@ -92,8 +92,6 @@ Validation réelle v4 effectuée sur ILIAS 10.8 :
 
 ## Phase 5 Moodle dry-run
 
-Plugin : `local_iliasmigration` `0.9.0-alpha`.
-
 Commande :
 
 ```bash
@@ -116,7 +114,25 @@ Le dry-run :
 8. bloque explicitement tout composant `unsupported` ;
 9. produit une prévisualisation déterministe de la future navigation Moodle Book.
 
-### Politique de navigation POC
+### Validation réelle Moodle 5.0.2 — export v4
+
+Le dry-run réel est maintenant entièrement prêt :
+
+- `book_available=true` ;
+- Learning Module `ref_id=243` en `CREATE` ;
+- `structure_validation.status=OK` ;
+- 6 nœuds, 2 chapitres, 3 pages ;
+- 1 média, 2 fichiers, 3 assets vérifiés ;
+- 0 composant non supporté ;
+- 5 chapitres/sous-chapitres Moodle prévus ;
+- `phase3_package.ready=true` ;
+- `phase4_package.ready=true` ;
+- `phase5_prerequisites.ready=true` ;
+- `phase5_package.ready=true`.
+
+Le même export v4 a également validé la synchronisation des nouveaux prérequis : URL `244` et SCORM 2004 `242`.
+
+## Politique de navigation POC
 
 Moodle Book ne possède qu'un indicateur `subchapter` et ne reproduit pas un arbre arbitraire. Pour la structure POC validée :
 
@@ -135,33 +151,82 @@ Le POC doit donc produire cinq entrées :
 
 Cette politique conserve les titres de chapitres et les titres de pages dans la table des matières. Les profondeurs ILIAS supérieures devront être traitées par une politique de réduction/flattening explicite avant généralisation.
 
-## Prérequis v4
+## Phase 5 apply — `0.10.0-alpha`
 
-L'export v4 contient plus d'objets que le v3, notamment un deuxième URL et un deuxième SCORM. Le dry-run Phase 5 doit donc signaler tout objet Phase 2/3/4 encore en `CREATE`, `BLOCKED`, `CONFLICT` ou mapping invalide.
+Commande :
 
-Un futur apply Book ne sera autorisé que lorsque :
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/opt/ilias2moodle-data/course-128-v4/migration.json \
+  --category=1 \
+  --phase=5 \
+  --apply
+```
 
-- tous les objets Phase 2/3/4 du même export v4 sont synchronisés ;
-- `phase3_package.ready=true` ;
-- `phase4_package.ready=true` ;
-- `phase5_prerequisites.ready=true` ;
-- `phase5_package.structure_checks_ready=true` ;
-- aucun Learning Module n'est bloqué.
+L'apply :
 
-## Moodle Book — API cible
+1. reconstruit et revalide les plans/packages Phase 3, 4 et 5 juste avant écriture ;
+2. exige `phase5_package.ready=true` et aucun prérequis en attente ;
+3. refuse pour l'instant les `internal_link` tant que leur cible n'est pas normalisée/testée ;
+4. crée l'activité `mod_book` via `create_module()` ;
+5. rend les blocs neutres en HTML : paragraphes, image/média, listes de fichiers, tableaux et sections ;
+6. construit un ZIP d'import déterministe avec les cinq fichiers HTML et les assets référencés ;
+7. confie la création des chapitres au plugin Moodle core `booktool_importhtml` ;
+8. laisse ainsi Moodle gérer `book_chapters`, les événements de création et la File API `mod_book/chapter` ;
+9. vérifie le CMID/instance, la section, l'ordre, les titres, `subchapter`, les chemins `importsrc` et le nombre de fichiers File API ;
+10. enregistre le mapping `targettype=book` sur le CMID Moodle.
 
-La création réelle n'est pas encore activée. Moodle Book fournit le module `mod_book`; les chapitres sont stockés dans `book_chapters` avec notamment `pagenum`, `subchapter`, `title`, `content` et `contentformat`. Les fichiers de chapitre sont servis par la zone File API `mod_book/chapter`.
+Le plugin `local_iliasmigration` ne fait donc pas d'INSERT/UPDATE direct sur `book_chapters`. Le seul DML propre au plugin reste sa table de mapping.
 
-L'apply futur devra :
+### Idempotence POC
 
-1. créer/mettre à jour le module via les API Moodle de module (`create_module()` / `update_module()`) ;
-2. rendre les blocs neutres en HTML Moodle ;
-3. créer les entrées de navigation Book selon la politique validée ;
-4. déposer médias et fichiers via la File API Moodle dans la zone de chapitre ;
-5. réécrire les références internes vers les chapitres Moodle ;
-6. préserver le même CMID en UPDATE ;
-7. vérifier absence de doublons et conservation des contenus lors d'un deuxième apply.
+Chaque import Book reçoit une empreinte SHA-256 calculée à partir :
 
-## Sécurité
+- des nœuds/pages ;
+- des descripteurs média/fichier ;
+- du contenu binaire réel de chaque asset.
 
-`--phase=5 --apply` est volontairement refusé dans `0.9.0-alpha`. La première validation Moodle doit obligatoirement être un dry-run sur le package v4 réel.
+Cette empreinte est intégrée aux chemins `importsrc` déterministes des chapitres.
+
+Au deuxième apply, si les cinq chapitres existants correspondent exactement à l'empreinte et à la table des matières attendues :
+
+- même CMID ;
+- même instance Book ;
+- aucun nouveau chapitre ;
+- aucun asset dupliqué ;
+- `content_reimported=false`.
+
+Si la source pédagogique a changé, `0.10.0-alpha` refuse volontairement l'UPDATE des chapitres plutôt que de les dupliquer ou d'écrire directement dans `book_chapters`. Le remplacement sûr d'un Book déjà migré sera une évolution ultérieure.
+
+Les changements limités au nom/à la description de l'activité peuvent être appliqués via `update_module()` lorsque le contenu des chapitres est inchangé.
+
+## API Moodle utilisée
+
+Moodle 5.0.2 fournit :
+
+- `create_module()` / `update_module()` pour l'activité `mod_book` ;
+- File API ;
+- le plugin core `booktool_importhtml` pour importer les chapitres HTML et leurs fichiers.
+
+Moodle Book ne fournit pas d'API publique CRUD de chapitre séparée dans cette version ; son écran core `mod/book/edit.php` manipule lui-même `book_chapters`. Pour respecter l'architecture du projet, l'exécuteur Phase 5 délègue donc la création des chapitres au propre outil d'import Moodle au lieu de reproduire ces écritures dans `local_iliasmigration`.
+
+## Sécurité et limites actuelles
+
+- aucun composant `unsupported` n'est accepté ;
+- les liens internes ILIAS sont refusés en apply tant que leur réécriture n'a pas été validée ;
+- les chemins assets sont revalidés dans le package juste avant utilisation ;
+- un Book déjà mappé dont l'empreinte pédagogique diffère est refusé pour éviter les doublons ;
+- le cours reste masqué pendant le POC ;
+- la politique d'ordre des activités racine et les profondeurs Book supérieures restent des sujets distincts.
+
+## Critère de sortie POC
+
+La Phase 5 sera considérée validée lorsque le POC réel aura confirmé :
+
+- `CREATED` vers un `mod_book` Moodle ;
+- 5 entrées de table des matières dans l'ordre attendu ;
+- rendu des paragraphes, image, tableau, section et FileList ;
+- `vince.jpg` et les deux PDF présents via File API ;
+- navigation Moodle Book fonctionnelle ;
+- deuxième apply en `UPDATED` avec le même CMID et la même instance ;
+- aucun chapitre ni fichier dupliqué.
