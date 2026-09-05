@@ -274,8 +274,19 @@ def _matching_question(item: ET.Element) -> dict[str, Any]:
             continue
         raw_pair = _text(subset)
         parts = [part.strip() for part in raw_pair.split(",", 1)]
-        source_ident = parts[0] if parts else ""
-        target_ident = parts[1] if len(parts) > 1 else ""
+        first_ident = parts[0] if parts else ""
+        second_ident = parts[1] if len(parts) > 1 else ""
+
+        first_label = labels_by_ident.get(first_ident, {})
+        second_label = labels_by_ident.get(second_ident, {})
+        first_is_source = bool(first_label.get("attributes", {}).get("match_group"))
+        second_is_source = bool(second_label.get("attributes", {}).get("match_group"))
+
+        if second_is_source and not first_is_source:
+            source_ident, target_ident = second_ident, first_ident
+        else:
+            source_ident, target_ident = first_ident, second_ident
+
         pairs.append(
             {
                 "source_ident": source_ident,
@@ -406,6 +417,11 @@ def _ordering_question(item: ET.Element) -> dict[str, Any]:
             }
         )
 
+    metadata = _metadata(item)
+    declared_points = metadata.get("points", "")
+    calculated_score = sum(float(entry["points"]) for entry in correct_order)
+    max_score = _float(declared_points) if declared_points != "" else calculated_score
+
     render = _first(response, "render_choice") if response is not None else None
     return {
         "answers": answers,
@@ -414,7 +430,7 @@ def _ordering_question(item: ET.Element) -> dict[str, Any]:
             render is not None
             and render.attrib.get("shuffle", "").lower() == "yes"
         ),
-        "max_score": sum(float(entry["points"]) for entry in correct_order),
+        "max_score": max_score,
     }
 
 
