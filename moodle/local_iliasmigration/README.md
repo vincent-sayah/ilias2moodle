@@ -212,7 +212,7 @@ Le plugin n'effectue aucun INSERT/UPDATE direct sur `book_chapters`.
 
 ### Validation réelle Moodle 5.0.2
 
-Le POC réel est validé côté CLI/DB/File API.
+Le POC réel est validé de bout en bout.
 
 Premier apply du Learning Module `ref_id=243` :
 
@@ -241,7 +241,7 @@ Deuxième apply identique :
 - toujours 3 fichiers File API ;
 - aucun chapitre ni fichier dupliqué.
 
-Un second diagnostic DB/File API confirme la stabilité de ces valeurs après l'UPDATE.
+La validation visuelle dans Moodle est également acquise : navigation correcte, image affichée, deux PDF ouvrables, tableau et section `Remark` correctement rendus.
 
 ### Idempotence Book actuelle
 
@@ -251,17 +251,22 @@ Si le contenu pédagogique source a changé, `0.10.2-alpha` refuse l'UPDATE des 
 
 Les `internal_link` sont également refusés en apply tant que leur cible n'est pas normalisée et testée. Le POC actuel n'en contient aucun.
 
-La validation visuelle du rendu et de la navigation dans l'interface Moodle reste à effectuer avant clôture complète de la Phase 5.
-
 Voir `docs/phase5-learning-modules.md`.
 
 ## Principes d'écriture
 
 Les écritures de contenu passent par les API Moodle du module cible, les outils core du module et la File API. Le plugin n'écrit pas directement les contenus pédagogiques dans les tables cœur Moodle en contournant les API/outils du module.
 
-Restent à réaliser :
+Phases POC validées :
 
-- validation visuelle finale du Moodle Book POC → Phase 5 ;
+- Phase 2 : structure ;
+- Phase 3 : ressources simples ;
+- Phase 4 : SCORM ;
+- Phase 5 : Learning Module natif → Moodle Book.
+
+Restent notamment à réaliser :
+
+- test et banque de questions → Phase 6 ;
 - remplacement sûr d'un Book dont le contenu source a changé ;
 - réécriture/validation des liens internes de Learning Module ;
-- test et banque de questions → Phase 6.
+- politique globale d'ordre des objets racine et de flattening des profondeurs non représentables.
