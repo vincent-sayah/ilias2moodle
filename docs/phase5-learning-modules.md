@@ -106,13 +106,14 @@ Le dry-run :
 
 1. reconstruit le plan Phase 2/3/4 afin de vérifier qu'aucun objet plus ancien n'est en attente ;
 2. vérifie que `mod_book` est installé et activé ;
-3. résout l'action du Learning Module en `CREATE` ou `UPDATE` via la table de mapping ;
-4. valide le chemin et le JSON `structure.json` ;
-5. valide l'identité ILIAS, l'arbre, les parents et les pages ;
-6. vérifie tous les médias et fichiers référencés ;
-7. vérifie les références page -> média/fichier ;
-8. bloque explicitement tout composant `unsupported` ;
-9. produit une prévisualisation déterministe de la future navigation Moodle Book.
+3. vérifie que le `booktool_importhtml` core est disponible ;
+4. résout l'action du Learning Module en `CREATE` ou `UPDATE` via la table de mapping ;
+5. valide le chemin et le JSON `structure.json` ;
+6. valide l'identité ILIAS, l'arbre, les parents et les pages ;
+7. vérifie tous les médias et fichiers référencés ;
+8. vérifie les références page -> média/fichier ;
+9. bloque explicitement tout composant `unsupported` ;
+10. produit une prévisualisation déterministe de la future navigation Moodle Book.
 
 ### Validation réelle Moodle 5.0.2 — export v4
 
@@ -151,7 +152,7 @@ Le POC doit donc produire cinq entrées :
 
 Cette politique conserve les titres de chapitres et les titres de pages dans la table des matières. Les profondeurs ILIAS supérieures devront être traitées par une politique de réduction/flattening explicite avant généralisation.
 
-## Phase 5 apply — `0.10.0-alpha`
+## Phase 5 apply — `0.10.1-alpha`
 
 Commande :
 
@@ -167,14 +168,15 @@ L'apply :
 
 1. reconstruit et revalide les plans/packages Phase 3, 4 et 5 juste avant écriture ;
 2. exige `phase5_package.ready=true` et aucun prérequis en attente ;
-3. refuse pour l'instant les `internal_link` tant que leur cible n'est pas normalisée/testée ;
-4. crée l'activité `mod_book` via `create_module()` ;
-5. rend les blocs neutres en HTML : paragraphes, image/média, listes de fichiers, tableaux et sections ;
-6. construit un ZIP d'import déterministe avec les cinq fichiers HTML et les assets référencés ;
-7. confie la création des chapitres au plugin Moodle core `booktool_importhtml` ;
-8. laisse ainsi Moodle gérer `book_chapters`, les événements de création et la File API `mod_book/chapter` ;
-9. vérifie le CMID/instance, la section, l'ordre, les titres, `subchapter`, les chemins `importsrc` et le nombre de fichiers File API ;
-10. enregistre le mapping `targettype=book` sur le CMID Moodle.
+3. exige le `booktool_importhtml` core ;
+4. refuse pour l'instant les `internal_link` tant que leur cible n'est pas normalisée/testée ;
+5. crée l'activité `mod_book` via `create_module()` ;
+6. rend les blocs neutres en HTML : paragraphes, image/média, listes de fichiers, tableaux et sections ;
+7. construit un ZIP d'import déterministe avec les cinq fichiers HTML et les assets référencés ;
+8. confie la création des chapitres au plugin Moodle core `booktool_importhtml` ;
+9. laisse ainsi Moodle gérer `book_chapters`, les événements de création et la File API `mod_book/chapter` ;
+10. vérifie le CMID/instance, la section, l'ordre, les titres, `subchapter`, les chemins `importsrc` et le nombre de fichiers File API ;
+11. enregistre le mapping `targettype=book` sur le CMID Moodle.
 
 Le plugin `local_iliasmigration` ne fait donc pas d'INSERT/UPDATE direct sur `book_chapters`. Le seul DML propre au plugin reste sa table de mapping.
 
@@ -196,7 +198,7 @@ Au deuxième apply, si les cinq chapitres existants correspondent exactement à 
 - aucun asset dupliqué ;
 - `content_reimported=false`.
 
-Si la source pédagogique a changé, `0.10.0-alpha` refuse volontairement l'UPDATE des chapitres plutôt que de les dupliquer ou d'écrire directement dans `book_chapters`. Le remplacement sûr d'un Book déjà migré sera une évolution ultérieure.
+Si la source pédagogique a changé, `0.10.1-alpha` refuse volontairement l'UPDATE des chapitres plutôt que de les dupliquer ou d'écrire directement dans `book_chapters`. Le remplacement sûr d'un Book déjà migré sera une évolution ultérieure.
 
 Les changements limités au nom/à la description de l'activité peuvent être appliqués via `update_module()` lorsque le contenu des chapitres est inchangé.
 
