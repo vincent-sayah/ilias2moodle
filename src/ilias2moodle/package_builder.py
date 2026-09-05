@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from ilias2moodle.ilias.qti import write_test_normalization
 from ilias2moodle.model import CourseExport, MigrationDocument, MigrationItem
 from ilias2moodle.report import write_reports
 
@@ -50,6 +51,8 @@ class MigrationPackageBuilder:
             "learning_module_media_files": 0,
             "learning_module_files": 0,
             "test_files": 0,
+            "test_normalizations": 0,
+            "normalized_questions": 0,
             "question_pool_files": 0,
         }
 
@@ -281,6 +284,9 @@ class MigrationPackageBuilder:
         return count
 
     def _extract_test(self, archive: zipfile.ZipFile, item: MigrationItem) -> None:
+        test_root = PurePosixPath("tests", item.source_id)
+        qti_local: Path | None = None
+        structure_local: Path | None = None
         mappings = (
             ("qti_path", "questions.xml", "migration_qti_path"),
             ("test_structure_path", "test-structure.xml", "migration_test_structure_path"),
@@ -289,12 +295,43 @@ class MigrationPackageBuilder:
             source_path = str(item.metadata.get(metadata_key, ""))
             if not source_path:
                 continue
-            destination = PurePosixPath("tests", item.source_id, filename)
+            destination = PurePosixPath(*test_root.parts, filename)
             if self._copy_member(archive, source_path, destination):
                 item.metadata[migration_key] = destination.as_posix()
+                local_path = self.output_dir.joinpath(*destination.parts)
+                if metadata_key == "qti_path":
+                    qti_local = local_path
+                else:
+                    structure_local = local_path
                 self.extracted["test_files"] += 1
             else:
                 self._record_missing(item.source_id, "test", source_path)
+
+        if qti_local is None:
+            return
+
+        output_dir = self.output_dir.joinpath(*test_root.parts)
+        normalization = write_test_normalization(
+            qti_local,
+            structure_local,
+            output_dir,
+            source_ref_id=item.source_id,
+            source_obj_id=str(item.metadata.get("obj_id", "")),
+            title=item.title,
+        )
+        questions_path = PurePosixPath(*test_root.parts, "questions.json")
+        quiz_path = PurePosixPath(*test_root.parts, "quiz.json")
+        item.metadata.update(
+            {
+                "migration_questions_path": questions_path.as_posix(),
+                "migration_quiz_path": quiz_path.as_posix(),
+                "normalized_question_count": normalization["question_count"],
+                "normalized_unsupported_count": normalization["unsupported_count"],
+                "normalized_total_max_score": normalization["total_max_score"],
+            }
+        )
+        self.extracted["test_normalizations"] += 1
+        self.extracted["normalized_questions"] += int(normalization["question_count"])
 
     def _extract_question_pool(self, archive: zipfile.ZipFile, item: MigrationItem) -> None:
         migration_paths: list[str] = []
