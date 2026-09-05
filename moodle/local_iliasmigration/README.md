@@ -29,8 +29,8 @@ Le plugin sait maintenant :
 - valider les Learning Modules natifs ILIAS et produire une prévisualisation Moodle Book ;
 - créer un Moodle Book à partir du Learning Module via `create_module()` et le `booktool_importhtml` core ;
 - importer les assets de chapitre via la File API `mod_book/chapter` ;
-- rejouer un Book inchangé sans dupliquer ses chapitres ;
-- laisser les tests et banques de questions pour les étapes suivantes.
+- rejouer un Book inchangé sans dupliquer ses chapitres ou fichiers ;
+- laisser les tests et banques de questions pour la Phase 6.
 
 Le cours reste masqué tant que les phases de migration suivantes n'ont pas été validées.
 
@@ -195,7 +195,7 @@ Le dry-run Phase 5 :
 - bloque tout composant `unsupported` ;
 - produit `book_preview` avec la future table des matières Moodle Book.
 
-Le POC ILIAS 10.8 `ref_id=243` contient 2 chapitres, 3 pages, 1 image JPEG et 2 PDF embarqués. Le dry-run réel Moodle 5.0.2 est maintenant entièrement prêt (`phase5_package.ready=true`).
+Le POC ILIAS 10.8 `ref_id=243` contient 2 chapitres, 3 pages, 1 image JPEG et 2 PDF embarqués. Le dry-run réel Moodle 5.0.2 est entièrement prêt (`phase5_package.ready=true`).
 
 L'apply Phase 5 :
 
@@ -210,18 +210,48 @@ L'apply Phase 5 :
 
 Le plugin n'effectue aucun INSERT/UPDATE direct sur `book_chapters`.
 
+### Validation réelle Moodle 5.0.2
+
+Le POC réel est validé côté CLI/DB/File API.
+
+Premier apply du Learning Module `ref_id=243` :
+
+- `CREATED` ;
+- CMID `24` ;
+- instance Book `2` ;
+- section Moodle `1` (`quizz`) ;
+- 5 chapitres dont 3 sous-chapitres ;
+- 3 fichiers File API ;
+- `content_reimported=true`.
+
+Fichiers vérifiés dans `mod_book/chapter` :
+
+- `vince.jpg` — 186497 octets ;
+- `devoirs CP MON Petit CéP.pdf` — 379705 octets ;
+- `dossier-31316547.pdf` — 60152 octets.
+
+Deuxième apply identique :
+
+- `UPDATED` ;
+- même CMID `24` ;
+- même instance `2` ;
+- même section `1` ;
+- `content_reimported=false` ;
+- toujours 5 chapitres ;
+- toujours 3 fichiers File API ;
+- aucun chapitre ni fichier dupliqué.
+
+Un second diagnostic DB/File API confirme la stabilité de ces valeurs après l'UPDATE.
+
 ### Idempotence Book actuelle
 
-Une empreinte SHA-256 du contenu neutre et des fichiers binaires est intégrée aux chemins d'import déterministes. Un second apply identique :
-
-- retrouve le même CMID et la même instance Book ;
-- vérifie les mêmes chapitres ;
-- n'importe aucun chapitre supplémentaire (`content_reimported=false`) ;
-- ne duplique aucun fichier.
+Une empreinte SHA-256 du contenu neutre et des fichiers binaires est intégrée aux chemins d'import déterministes. Un second apply identique retrouve donc le même Book et n'ajoute aucun contenu.
 
 Si le contenu pédagogique source a changé, `0.10.2-alpha` refuse l'UPDATE des chapitres afin d'éviter toute duplication ou écriture directe dans les tables Book. Le remplacement sûr d'un Book déjà migré reste à implémenter.
 
 Les `internal_link` sont également refusés en apply tant que leur cible n'est pas normalisée et testée. Le POC actuel n'en contient aucun.
+
+La validation visuelle du rendu et de la navigation dans l'interface Moodle reste à effectuer avant clôture complète de la Phase 5.
 
 Voir `docs/phase5-learning-modules.md`.
 
@@ -231,7 +261,7 @@ Les écritures de contenu passent par les API Moodle du module cible, les outils
 
 Restent à réaliser :
 
-- validation réelle CREATE/UPDATE du Moodle Book POC → Phase 5 ;
+- validation visuelle finale du Moodle Book POC → Phase 5 ;
 - remplacement sûr d'un Book dont le contenu source a changé ;
 - réécriture/validation des liens internes de Learning Module ;
 - test et banque de questions → Phase 6.
