@@ -167,7 +167,7 @@ Le POC réel a validé le lancement, le suivi, les scores/statuts, les tentative
 
 ## Phase 5 — Learning Module natif -> Moodle Book
 
-Depuis `0.10.0-alpha`, la Phase 5 prend en charge le dry-run et le premier chemin d'apply réel :
+Depuis `0.10.1-alpha`, la Phase 5 prend en charge le dry-run et le premier chemin d'apply réel :
 
 ```bash
 php local/iliasmigration/cli/import.php \
@@ -186,6 +186,7 @@ php local/iliasmigration/cli/import.php \
 Le dry-run Phase 5 :
 
 - vérifie que `mod_book` est installé et actif ;
+- vérifie que le `booktool_importhtml` core est disponible ;
 - résout le Learning Module en `CREATE` ou `UPDATE` avec `targettype=book` ;
 - revalide les objets et packages Phase 2/3/4 du même export ;
 - valide `learning_modules/<ref_id>/structure.json` ;
@@ -218,7 +219,7 @@ Une empreinte SHA-256 du contenu neutre et des fichiers binaires est intégrée 
 - n'importe aucun chapitre supplémentaire (`content_reimported=false`) ;
 - ne duplique aucun fichier.
 
-Si le contenu pédagogique source a changé, `0.10.0-alpha` refuse l'UPDATE des chapitres afin d'éviter toute duplication ou écriture directe dans les tables Book. Le remplacement sûr d'un Book déjà migré reste à implémenter.
+Si le contenu pédagogique source a changé, `0.10.1-alpha` refuse l'UPDATE des chapitres afin d'éviter toute duplication ou écriture directe dans les tables Book. Le remplacement sûr d'un Book déjà migré reste à implémenter.
 
 Les `internal_link` sont également refusés en apply tant que leur cible n'est pas normalisée et testée. Le POC actuel n'en contient aucun.
 
