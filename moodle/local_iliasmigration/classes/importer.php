@@ -14,7 +14,7 @@ final class importer {
      * Phase 2 supports dry-run and real structure writes.
      * Phase 3 supports dry-run/package validation and real simple-resource writes.
      * Phase 4 supports dry-run/package validation and real SCORM writes.
-     * Phase 5 supports Learning Module -> Moodle Book dry-run validation only.
+     * Phase 5 supports dry-run/package validation and real Learning Module -> Moodle Book writes.
      *
      * @param string $migrationjson Absolute path to migration.json.
      * @param int $categoryid Moodle target category id.
@@ -81,10 +81,8 @@ final class importer {
         }
 
         if ($phase === 5) {
-            throw new \coding_exception(
-                'Phase 5 Moodle Book apply is not enabled yet. '
-                . 'Run --phase=5 --dry-run and validate the Learning Module package first.'
-            );
+            $executor = new book_executor($migrationjson);
+            return $executor->execute($document, $categoryid);
         }
 
         if ($phase === 4) {
