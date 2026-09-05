@@ -15,6 +15,7 @@ MANAGED_DIRS = (
     "media",
     "scorm",
     "html",
+    "learning_modules",
     "tests",
     "question_pools",
 )
@@ -45,6 +46,9 @@ class MigrationPackageBuilder:
             "media": 0,
             "scorm_packages": 0,
             "html_files": 0,
+            "learning_module_structures": 0,
+            "learning_module_media_files": 0,
+            "learning_module_files": 0,
             "test_files": 0,
             "question_pool_files": 0,
         }
@@ -134,6 +138,8 @@ class MigrationPackageBuilder:
             self._extract_scorm(archive, item)
         elif item.type == "html_module":
             self._extract_html_module(archive, item)
+        elif item.type == "learning_module":
+            self._extract_learning_module(archive, item)
         elif item.type == "test":
             self._extract_test(archive, item)
         elif item.type == "question_pool":
@@ -191,6 +197,88 @@ class MigrationPackageBuilder:
             self.extracted["html_files"] += copied
         else:
             self._record_missing(item.source_id, "html_module", source_dir)
+
+    def _extract_learning_module(self, archive: zipfile.ZipFile, item: MigrationItem) -> None:
+        structure = item.metadata.get("learning_module_structure")
+        if not isinstance(structure, dict):
+            source_base = str(item.metadata.get("learning_module_export_base", ""))
+            self._record_missing(item.source_id, "learning_module_structure", source_base)
+            return
+
+        module_root = PurePosixPath("learning_modules", item.source_id)
+
+        media = structure.get("media", {})
+        if isinstance(media, dict):
+            for media_id, media_object in media.items():
+                if not isinstance(media_object, dict):
+                    continue
+                for index, media_item in enumerate(media_object.get("items", []), start=1):
+                    if not isinstance(media_item, dict):
+                        continue
+                    source_path = str(media_item.get("archive_path", ""))
+                    if not source_path:
+                        continue
+                    filename = Path(str(media_item.get("location", "")) or source_path).name
+                    if not filename:
+                        filename = f"media-{index}"
+                    destination = PurePosixPath(
+                        *module_root.parts, "media", str(media_id), filename
+                    )
+                    if self._copy_member(archive, source_path, destination):
+                        media_item["migration_path"] = destination.as_posix()
+                        self.extracted["learning_module_media_files"] += 1
+                    else:
+                        self._record_missing(item.source_id, "learning_module_media", source_path)
+
+        files = structure.get("files", {})
+        if isinstance(files, dict):
+            for file_id, file_object in files.items():
+                if not isinstance(file_object, dict):
+                    continue
+                source_path = str(file_object.get("archive_path", ""))
+                if not source_path:
+                    continue
+                filename = Path(str(file_object.get("filename", "")) or source_path).name
+                destination = PurePosixPath(
+                    *module_root.parts, "files", str(file_id), filename
+                )
+                if self._copy_member(archive, source_path, destination):
+                    file_object["migration_path"] = destination.as_posix()
+                    self.extracted["learning_module_files"] += 1
+                else:
+                    self._record_missing(item.source_id, "learning_module_file", source_path)
+
+        structure_path = PurePosixPath(*module_root.parts, "structure.json")
+        destination = self.output_dir.joinpath(*structure_path.parts)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            json.dumps(structure, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+        item.metadata["migration_structure_path"] = structure_path.as_posix()
+        item.metadata["migration_media_file_count"] = self._count_learning_module_media(structure)
+        item.metadata["migration_embedded_file_count"] = sum(
+            1
+            for file_object in structure.get("files", {}).values()
+            if isinstance(file_object, dict) and file_object.get("migration_path")
+        )
+        item.metadata.pop("learning_module_structure", None)
+        self.extracted["learning_module_structures"] += 1
+
+    def _count_learning_module_media(self, structure: dict[str, Any]) -> int:
+        count = 0
+        media = structure.get("media", {})
+        if not isinstance(media, dict):
+            return count
+        for media_object in media.values():
+            if not isinstance(media_object, dict):
+                continue
+            count += sum(
+                1
+                for media_item in media_object.get("items", [])
+                if isinstance(media_item, dict) and media_item.get("migration_path")
+            )
+        return count
 
     def _extract_test(self, archive: zipfile.ZipFile, item: MigrationItem) -> None:
         mappings = (
