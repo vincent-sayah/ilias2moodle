@@ -11,11 +11,19 @@ final class plan_builder {
     /** @var int Moodle target course category id. */
     private int $categoryid;
 
+    /** @var int Requested migration phase. */
+    private int $phase;
+
+    /** @var string Stable identity of the ILIAS source instance. */
+    private string $sourceinstance = '';
+
     /**
      * @param int $categoryid Moodle target course category id.
+     * @param int $phase Requested migration phase.
      */
-    public function __construct(int $categoryid) {
+    public function __construct(int $categoryid, int $phase = 2) {
         $this->categoryid = $categoryid;
+        $this->phase = $phase;
     }
 
     /**
@@ -27,6 +35,10 @@ final class plan_builder {
     public function build(array $document): array {
         global $CFG, $DB;
 
+        if (!in_array($this->phase, [2, 3], true)) {
+            throw new \coding_exception('Only migration phases 2 and 3 are supported by this plugin version.');
+        }
+
         $category = $DB->get_record(
             'course_categories',
             ['id' => $this->categoryid],
@@ -36,6 +48,8 @@ final class plan_builder {
 
         $subsection = $DB->get_record('modules', ['name' => 'subsection'], 'id,name,visible');
         $subsectionavailable = $subsection && (int) $subsection->visible === 1;
+
+        $this->sourceinstance = $this->source_instance($document);
 
         $course = $document['course'];
         $sourcecourseid = (string) $course['source_id'];
@@ -53,10 +67,11 @@ final class plan_builder {
                 'action' => 'CONFLICT',
                 'reason' => 'A Moodle course already uses shortname ' . $shortname,
                 'target_id' => null,
+                'legacy_mapping' => false,
             ];
         }
 
-        $operations = [[
+        $courseoperation = [
             'kind' => 'course',
             'action' => $courseaction['action'],
             'source_ref_id' => $sourcecourseid,
@@ -65,8 +80,12 @@ final class plan_builder {
             'fullname' => (string) $course['title'],
             'shortname' => $shortname,
             'category_id' => (int) $category->id,
-        ]];
+        ];
+        if (!empty($courseaction['legacy_mapping'])) {
+            $courseoperation['legacy_sourceinstance_mapping'] = true;
+        }
 
+        $operations = [$courseoperation];
         $warnings = [];
         foreach ($course['items'] as $item) {
             if (is_array($item)) {
@@ -89,8 +108,16 @@ final class plan_builder {
             ];
         }
 
+        if ($this->phase >= 3) {
+            $this->append_root_order_warning($course['items'], $warnings);
+        }
+
+        $source = $document['source'];
+        $source['instance'] = $this->sourceinstance;
+
         return [
             'mode' => 'dry-run',
+            'phase' => $this->phase,
             'writes_performed' => false,
             'moodle' => [
                 'release' => (string) $CFG->release,
@@ -102,7 +129,7 @@ final class plan_builder {
                 ],
                 'subsection_available' => $subsectionavailable,
             ],
-            'source' => $document['source'],
+            'source' => $source,
             'course' => [
                 'source_id' => $sourcecourseid,
                 'title' => (string) $course['title'],
@@ -136,12 +163,14 @@ final class plan_builder {
         $sourceid = (string) ($item['source_id'] ?? '');
         $type = (string) ($item['type'] ?? 'unknown');
         $title = (string) ($item['title'] ?? '');
+        $description = (string) ($item['description'] ?? '');
         $position = (int) ($item['position'] ?? 0);
-        $objid = (string) ($item['metadata']['obj_id'] ?? '');
+        $metadata = is_array($item['metadata'] ?? null) ? $item['metadata'] : [];
+        $objid = (string) ($metadata['obj_id'] ?? '');
 
         if ($type === 'folder' && $depth === 1) {
             $mapping = $this->resolve_action($sourcecourseid, $sourceid, 'section', 'course_sections');
-            $operations[] = [
+            $operation = [
                 'kind' => 'section',
                 'action' => $mapping['action'],
                 'source_ref_id' => $sourceid,
@@ -151,6 +180,10 @@ final class plan_builder {
                 'title' => $title,
                 'position' => $position,
             ];
+            if (!empty($mapping['legacy_mapping'])) {
+                $operation['legacy_sourceinstance_mapping'] = true;
+            }
+            $operations[] = $operation;
         } else if ($type === 'folder' && $depth === 2) {
             $mapping = $this->resolve_action(
                 $sourcecourseid,
@@ -158,7 +191,7 @@ final class plan_builder {
                 'subsection',
                 'course_modules'
             );
-            $operations[] = [
+            $operation = [
                 'kind' => 'subsection',
                 'action' => $subsectionavailable ? $mapping['action'] : 'BLOCKED',
                 'source_ref_id' => $sourceid,
@@ -168,6 +201,10 @@ final class plan_builder {
                 'title' => $title,
                 'position' => $position,
             ];
+            if (!empty($mapping['legacy_mapping'])) {
+                $operation['legacy_sourceinstance_mapping'] = true;
+            }
+            $operations[] = $operation;
         } else if ($type === 'folder') {
             $operations[] = [
                 'kind' => 'folder',
@@ -186,17 +223,54 @@ final class plan_builder {
                 'message' => 'Moodle subsections cannot be nested recursively; flattening is required.',
             ];
         } else {
-            $operations[] = [
+            $itemphase = $this->phase_for_type($type);
+            $mapping = null;
+            $action = 'DEFER';
+            $targetid = null;
+
+            if ($this->phase >= 3 && in_array($type, ['file', 'url', 'html_module'], true)) {
+                $mapping = $this->resolve_action(
+                    $sourcecourseid,
+                    $sourceid,
+                    $type,
+                    'course_modules'
+                );
+                $action = $mapping['action'];
+                $targetid = $mapping['target_id'];
+            }
+
+            $operation = [
                 'kind' => $type,
-                'action' => 'DEFER',
-                'phase' => $this->phase_for_type($type),
+                'action' => $action,
+                'phase' => $itemphase,
                 'source_ref_id' => $sourceid,
                 'source_obj_id' => $objid,
                 'parent_source_ref_id' => $parentsourceref,
-                'target_id' => null,
+                'target_id' => $targetid,
                 'title' => $title,
+                'description' => $description,
                 'position' => $position,
             ];
+
+            if ($type === 'url') {
+                $operation['moodle_module'] = 'url';
+                $operation['source_url'] = (string) ($metadata['url'] ?? '');
+            } else if ($type === 'file') {
+                $operation['moodle_module'] = 'resource';
+                $operation['migration_path'] = (string) ($metadata['migration_path'] ?? '');
+                $operation['mime_type'] = (string) ($metadata['mime_type'] ?? '');
+                $operation['size'] = (int) ($metadata['size'] ?? 0);
+            } else if ($type === 'html_module') {
+                $operation['moodle_module'] = 'resource';
+                $operation['migration_content_dir'] = (string) ($metadata['migration_content_dir'] ?? '');
+                $operation['migration_start_file'] = (string) ($metadata['migration_start_file'] ?? '');
+            }
+
+            if ($mapping && !empty($mapping['legacy_mapping'])) {
+                $operation['legacy_sourceinstance_mapping'] = true;
+            }
+
+            $operations[] = $operation;
         }
 
         foreach (($item['items'] ?? []) as $child) {
@@ -218,6 +292,10 @@ final class plan_builder {
     /**
      * Resolve CREATE/UPDATE state from the persistent mapping table.
      *
+     * Existing Phase 2 mappings created before sourceinstance existed are accepted
+     * as legacy mappings. They can be upgraded to the current source instance on a
+     * later write operation.
+     *
      * @param string $sourcecourseid ILIAS course ref_id.
      * @param string $sourceref ILIAS object ref_id.
      * @param string $targettype Mapping target type.
@@ -232,22 +310,107 @@ final class plan_builder {
     ): array {
         global $DB;
 
-        $mapping = $DB->get_record('local_iliasmigration_map', [
+        $conditions = [
             'sourcelms' => 'ILIAS',
+            'sourceinstance' => $this->sourceinstance,
             'sourcecourse' => $sourcecourseid,
             'sourceref' => $sourceref,
             'targettype' => $targettype,
-        ]);
+        ];
+        $mapping = $DB->get_record('local_iliasmigration_map', $conditions);
+        $legacy = false;
+
+        if (!$mapping && $this->sourceinstance !== '') {
+            $legacyconditions = $conditions;
+            $legacyconditions['sourceinstance'] = '';
+            $mapping = $DB->get_record('local_iliasmigration_map', $legacyconditions);
+            $legacy = (bool) $mapping;
+        }
 
         if (!$mapping) {
-            return ['action' => 'CREATE', 'target_id' => null];
+            return [
+                'action' => 'CREATE',
+                'target_id' => null,
+                'legacy_mapping' => false,
+            ];
         }
 
         if (!empty($mapping->targetid) && $DB->record_exists($targettable, ['id' => $mapping->targetid])) {
-            return ['action' => 'UPDATE', 'target_id' => (int) $mapping->targetid];
+            return [
+                'action' => 'UPDATE',
+                'target_id' => (int) $mapping->targetid,
+                'legacy_mapping' => $legacy,
+            ];
         }
 
-        return ['action' => 'ERROR_STALE_MAPPING', 'target_id' => $mapping->targetid ?: null];
+        return [
+            'action' => 'ERROR_STALE_MAPPING',
+            'target_id' => $mapping->targetid ?: null,
+            'legacy_mapping' => $legacy,
+        ];
+    }
+
+    /**
+     * Return a stable source-instance identity from ILIAS manifest metadata.
+     *
+     * @param array $document Migration document.
+     * @return string Source instance identity.
+     */
+    private function source_instance(array $document): string {
+        $metadata = is_array($document['course']['metadata'] ?? null)
+            ? $document['course']['metadata']
+            : [];
+
+        $installationurl = trim((string) ($metadata['installation_url'] ?? ''));
+        if ($installationurl !== '') {
+            return rtrim($installationurl, '/');
+        }
+
+        $installationid = trim((string) ($metadata['installation_id'] ?? ''));
+        if ($installationid !== '') {
+            return 'installation-id:' . $installationid;
+        }
+
+        return 'unknown-ilias-instance';
+    }
+
+    /**
+     * Warn when the ILIAS root order cannot be represented exactly with the
+     * current mapping of first-level folders to Moodle sections.
+     *
+     * Moodle activities in section 0 are displayed before regular sections.
+     * Therefore a root-level resource positioned after an ILIAS folder cannot
+     * remain visually after that folder without introducing a synthetic section.
+     *
+     * @param array $items Root ILIAS course items.
+     * @param array $warnings Collected warnings.
+     */
+    private function append_root_order_warning(array $items, array &$warnings): void {
+        $seenfolder = false;
+        $affected = [];
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $type = (string) ($item['type'] ?? 'unknown');
+            if ($type === 'folder') {
+                $seenfolder = true;
+                continue;
+            }
+            if ($seenfolder && in_array($type, ['file', 'url', 'html_module'], true)) {
+                $affected[] = (string) ($item['source_id'] ?? '');
+            }
+        }
+
+        if ($affected) {
+            $warnings[] = [
+                'code' => 'ROOT_RESOURCE_ORDER_APPROXIMATION',
+                'source_ref_ids' => $affected,
+                'message' => 'Root-level Moodle resources live in section 0 and therefore display before regular sections. '
+                    . 'Exact interleaving with ILIAS first-level folders requires a later ordering policy.',
+            ];
+        }
     }
 
     /**
