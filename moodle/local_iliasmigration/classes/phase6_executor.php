@@ -308,6 +308,14 @@ final class phase6_executor {
             if ($added !== count($order)) {
                 throw new \coding_exception('Not all Phase 6 questions were added to the Moodle Quiz.');
             }
+
+            // Moodle 5.0 does not refresh quiz.sumgrades inside quiz_add_quiz_question().
+            // Core edit flows explicitly recompute it after structural slot changes.
+            quiz_delete_previews($quiz);
+            \mod_quiz\quiz_settings::create($instanceid)
+                ->get_grade_calculator()
+                ->recompute_quiz_sumgrades();
+
             $performed = 'CREATED';
             $contentimported = true;
         } else {
