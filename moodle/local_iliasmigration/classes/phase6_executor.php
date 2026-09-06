@@ -629,7 +629,7 @@ final class phase6_executor {
             'slot_count' => count($slots),
             'sumgrades' => (float) $quiz->sumgrades,
             'grade' => (float) $quiz->grade,
-            'effective_qtypes' => array_values(array_count_values($effective)),
+            'effective_qtypes' => array_count_values($effective),
             'transforms' => $transforms,
         ];
     }

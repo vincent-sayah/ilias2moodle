@@ -308,3 +308,21 @@ Restent notamment à réaliser :
 - remplacement sûr d'un Book dont le contenu source a changé ;
 - réécriture/validation des liens internes de Learning Module ;
 - politique globale d'ordre des objets racine et de flattening des profondeurs non représentables.
+
+
+## Phase 6 — validation POC réelle
+
+Validation réalisée sur Moodle 5.0.2 avec le cours ILIAS 10.8 `ref_id=128` :
+
+- Question Bank ILIAS `ref_id=235` créée comme `mod_qbank` Moodle en section 0 (`CMID 35`) ;
+- test ILIAS `ref_id=236` créé comme Quiz Moodle (`CMID 36`) ;
+- 11 questions importées dans une banque privée du Quiz ;
+- 11 slots reconstruits dans l'ordre ILIAS ;
+- `sumgrades=46` et `grade=46` ;
+- Matching pondéré 4/2/5 transformé en Cloze pondéré ;
+- deux QCM avec crédit de non-sélection transformés en décisions binaires Cloze ;
+- Ordering conservé en qtype natif avec `ABSOLUTE_POSITION` ;
+- second apply idempotent : `question_content_imported=false`, 11 slots inchangés, aucun doublon ;
+- mappings persistants validés : 1 qbank, 1 quiz, 11 questions.
+
+La Phase 6 POC est considérée terminée.
