@@ -343,10 +343,18 @@ final class phase6_executor {
                 $sourcecourseid
             );
 
-            [, , , $moduleinfo] = get_moduleinfo_data($cm, $course);
-            $moduleinfo->name = (string) $operation['title'];
-            $moduleinfo->introeditor = $this->build_intro_editor($description);
-            update_module($moduleinfo);
+            $metadatachanged = (string) $quiz->name !== (string) $operation['title']
+                || (string) $quiz->intro !== $description
+                || (int) $quiz->introformat !== FORMAT_HTML;
+            if ($metadatachanged) {
+                [, , , $moduleinfo] = get_moduleinfo_data($cm, $course);
+                $moduleinfo->name = (string) $operation['title'];
+                $moduleinfo->introeditor = $this->build_intro_editor($description);
+                // Moodle Quiz form uses quizpassword; quiz_process_options() maps it back to password.
+                // Preserve the existing value so a metadata-only update never writes password=NULL.
+                $moduleinfo->quizpassword = (string) $quiz->password;
+                update_module($moduleinfo);
+            }
             $performed = 'UPDATED';
             $contentimported = false;
         }
