@@ -1,13 +1,12 @@
-from pathlib import Path
-
-
-ROOT = Path(__file__).resolve().parents[1]
-RECONCILER = ROOT / "moodle/local_iliasmigration/classes/order_reconciler.php"
-CLI = ROOT / "moodle/local_iliasmigration/cli/reconcile_order.php"
+def read_text(path: str) -> str:
+    with open(path, encoding="utf-8") as handle:
+        return handle.read()
 
 
 def test_order_reconciler_uses_moodle_course_apis_and_preserves_qbank():
-    source = RECONCILER.read_text(encoding="utf-8")
+    source = read_text(
+        "moodle/local_iliasmigration/classes/order_reconciler.php"
+    )
 
     assert "moveto_module(" in source
     assert "course_create_section(" in source
@@ -26,7 +25,9 @@ def test_order_reconciler_uses_moodle_course_apis_and_preserves_qbank():
 
 
 def test_order_reconciler_cli_requires_explicit_dry_run_or_apply():
-    source = CLI.read_text(encoding="utf-8")
+    source = read_text(
+        "moodle/local_iliasmigration/cli/reconcile_order.php"
+    )
 
     assert "--dry-run" in source
     assert "--apply" in source
