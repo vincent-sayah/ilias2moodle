@@ -1,0 +1,60 @@
+name: Phase 6 reporting finalization
+
+on:
+  push:
+    paths:
+      - '.github/workflows/phase6-reporting-finalize.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Finalize Phase 6 reporting and docs
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          executor = Path('moodle/local_iliasmigration/classes/phase6_executor.php')
+          text = executor.read_text(encoding='utf-8')
+          old = "'effective_qtypes' => array_values(array_count_values($effective)),"
+          new = "'effective_qtypes' => array_count_values($effective),"
+          if old not in text:
+              raise SystemExit('effective_qtypes reporting line not found')
+          executor.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          version = Path('moodle/local_iliasmigration/version.php')
+          v = version.read_text(encoding='utf-8')
+          v = v.replace('$plugin->version = 2026090523;', '$plugin->version = 2026090524;')
+          v = v.replace("$plugin->release = '0.12.6-alpha';", "$plugin->release = '0.12.7-alpha';")
+          version.write_text(v, encoding='utf-8')
+
+          test = Path('tests/test_phase6_effective_qtypes_reporting.py')
+          test.write_text('''from pathlib import Path\n\n\ndef test_phase6_effective_qtypes_keeps_type_names():\n    source = Path(\n        "moodle/local_iliasmigration/classes/phase6_executor.php"\n    ).read_text(encoding="utf-8")\n    assert "'effective_qtypes' => array_count_values($effective)," in source\n    assert "'effective_qtypes' => array_values(array_count_values($effective))," not in source\n''', encoding='utf-8')
+
+          readme = Path('moodle/local_iliasmigration/README.md')
+          r = readme.read_text(encoding='utf-8')
+          marker = '## Phase 6 — validation POC réelle\n'
+          if marker not in r:
+              r += '''\n\n## Phase 6 — validation POC réelle\n\nValidation réalisée sur Moodle 5.0.2 avec le cours ILIAS 10.8 `ref_id=128` :\n\n- Question Bank ILIAS `ref_id=235` créée comme `mod_qbank` Moodle en section 0 (`CMID 35`) ;\n- test ILIAS `ref_id=236` créé comme Quiz Moodle (`CMID 36`) ;\n- 11 questions importées dans une banque privée du Quiz ;\n- 11 slots reconstruits dans l'ordre ILIAS ;\n- `sumgrades=46` et `grade=46` ;\n- Matching pondéré 4/2/5 transformé en Cloze pondéré ;\n- deux QCM avec crédit de non-sélection transformés en décisions binaires Cloze ;\n- Ordering conservé en qtype natif avec `ABSOLUTE_POSITION` ;\n- second apply idempotent : `question_content_imported=false`, 11 slots inchangés, aucun doublon ;\n- mappings persistants validés : 1 qbank, 1 quiz, 11 questions.\n\nLa Phase 6 POC est considérée terminée.\n'''
+              readme.write_text(r, encoding='utf-8')
+          PY
+      - name: Validate PHP syntax
+        run: php -l moodle/local_iliasmigration/classes/phase6_executor.php
+      - name: Commit and push finalization
+        shell: bash
+        run: |
+          git config user.name 'Vince'
+          git config user.email '61915948+vincent-sayah@users.noreply.github.com'
+          git add moodle/local_iliasmigration/classes/phase6_executor.php \
+                  moodle/local_iliasmigration/version.php \
+                  moodle/local_iliasmigration/README.md \
+                  tests/test_phase6_effective_qtypes_reporting.py
+          git commit -m 'Finalize Phase 6 idempotence reporting'
+          git push origin HEAD:main
