@@ -47,3 +47,6 @@ jobs:
 
       - name: Phase 2 deep-folder policy regression
         run: php tests/php/test_folder_flattener.php
+
+      - name: Phase 2 category-path policy regression
+        run: php tests/php/test_category_path_resolver.php

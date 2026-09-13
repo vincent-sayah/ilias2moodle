@@ -18,16 +18,18 @@ final class importer {
      * Phase 6 supports Question Bank + Quiz dry-run validation and guarded real writes.
      *
      * @param string $migrationjson Absolute path to migration.json.
-     * @param int $categoryid Moodle target category id.
+     * @param int $categoryid Existing Moodle target category id, or 0 when categorypath is used.
      * @param bool $dryrun Whether Moodle writes are forbidden.
      * @param int $phase Requested project phase (2, 3, 4, 5 or 6).
+     * @param string $categorypath Optional Phase 2 category path to resolve/create.
      * @return array Plan or execution report.
      */
     public function import(
         string $migrationjson,
         int $categoryid,
         bool $dryrun = true,
-        int $phase = 2
+        int $phase = 2,
+        string $categorypath = ''
     ): array {
         if (!in_array($phase, [2, 3, 4, 5, 6], true)) {
             throw new \coding_exception(
@@ -37,6 +39,41 @@ final class importer {
 
         $reader = new migration_reader();
         $document = $reader->read($migrationjson);
+
+        $categorypath = trim($categorypath);
+        $categoryresolution = null;
+
+        if ($categorypath !== '') {
+            if ($categoryid > 0) {
+                throw new \coding_exception('Choose either an existing category id or a category path, not both.');
+            }
+            if ($phase !== 2) {
+                throw new \coding_exception(
+                    'Automatic category-path resolution/creation is intentionally limited to Phase 2. '
+                    . 'Use --category=ID for Phases 3 to 6.'
+                );
+            }
+
+            $resolver = new category_path_resolver();
+            $categoryresolution = $resolver->plan($categorypath);
+
+            if (!$categoryresolution['ready']) {
+                return $this->category_preview_report($document, $categoryresolution);
+            }
+
+            if ($categoryresolution['target_id'] === null) {
+                if ($dryrun) {
+                    return $this->category_preview_report($document, $categoryresolution);
+                }
+                $categoryresolution = $resolver->apply($categorypath);
+            }
+
+            $categoryid = (int) $categoryresolution['target_id'];
+        }
+
+        if ($categoryid <= 0) {
+            throw new \coding_exception('A valid Moodle category id or Phase 2 category path is required.');
+        }
 
         if ($dryrun) {
             if ($phase === 6) {
@@ -104,6 +141,10 @@ final class importer {
                 return $validator->validate($plan);
             }
 
+            if ($categoryresolution !== null) {
+                $plan['moodle']['category_resolution'] = $categoryresolution;
+            }
+
             return $plan;
         }
 
@@ -136,6 +177,73 @@ final class importer {
         }
 
         $executor = new structure_executor();
-        return $executor->execute($document, $categoryid);
+        $result = $executor->execute($document, $categoryid);
+        if ($categoryresolution !== null) {
+            $result['moodle']['category_resolution'] = $categoryresolution;
+        }
+        return $result;
+    }
+
+    /**
+     * Return a Phase 2 dry-run report when the category path must be created
+     * or cannot be resolved safely yet.
+     *
+     * No Moodle writes are performed by this method.
+     *
+     * @param array $document Validated migration document.
+     * @param array $resolution Category resolution plan.
+     * @return array Dry-run report.
+     */
+    private function category_preview_report(array $document, array $resolution): array {
+        global $CFG;
+
+        $course = $document['course'];
+        $sourcecourseid = (string) $course['source_id'];
+        $warnings = [];
+
+        foreach (($resolution['blockers'] ?? []) as $blocker) {
+            $warnings[] = $blocker;
+        }
+
+        $operations = $resolution['operations'] ?? [];
+        $operations[] = [
+            'kind' => 'course',
+            'action' => $resolution['ready'] ? 'WAIT_CATEGORY' : 'BLOCKED',
+            'source_ref_id' => $sourcecourseid,
+            'source_obj_id' => (string) ($course['metadata']['obj_id'] ?? ''),
+            'target_id' => null,
+            'fullname' => (string) $course['title'],
+            'shortname' => 'ILIAS-' . $sourcecourseid,
+            'category_id' => null,
+            'category_path' => (string) ($resolution['path'] ?? ''),
+            'reason' => $resolution['ready']
+                ? 'The category hierarchy must be created before the complete Phase 2 structure can be planned.'
+                : 'The category path is ambiguous and must be resolved before any write.',
+        ];
+
+        return [
+            'mode' => 'dry-run',
+            'phase' => 2,
+            'writes_performed' => false,
+            'ready' => (bool) ($resolution['ready'] ?? false),
+            'moodle' => [
+                'release' => (string) $CFG->release,
+                'version' => (string) $CFG->version,
+                'category' => [
+                    'id' => null,
+                    'name' => (string) ($resolution['target_name'] ?? ''),
+                    'visible' => (int) ($resolution['target_visible'] ?? 0),
+                ],
+                'category_resolution' => $resolution,
+            ],
+            'source' => $document['source'],
+            'course' => [
+                'source_id' => $sourcecourseid,
+                'title' => (string) $course['title'],
+                'shortname' => 'ILIAS-' . $sourcecourseid,
+            ],
+            'operations' => $operations,
+            'warnings' => $warnings,
+        ];
     }
 }

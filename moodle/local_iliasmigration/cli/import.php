@@ -10,6 +10,7 @@ require_once($CFG->libdir . '/clilib.php');
     [
         'source' => '',
         'category' => 0,
+        'category-path' => '',
         'phase' => 2,
         'dry-run' => false,
         'apply' => false,
@@ -28,17 +29,24 @@ if ($unrecognized) {
 $help = <<<EOF
 ILIAS2Moodle - Moodle import
 
-Phase 2 preview:
+Phase 2 preview with an existing Moodle category id:
   php local/iliasmigration/cli/import.php \\
       --source=/path/to/migration.json \\
       --category=ID \\
       --phase=2 \\
       --dry-run
 
-Phase 2 real structure write:
+Phase 2 preview with an automatic category/subcategory path:
   php local/iliasmigration/cli/import.php \\
       --source=/path/to/migration.json \\
-      --category=ID \\
+      --category-path="Parent > Sous-categorie" \\
+      --phase=2 \\
+      --dry-run
+
+Phase 2 real structure write with automatic category creation/selection:
+  php local/iliasmigration/cli/import.php \\
+      --source=/path/to/migration.json \\
+      --category-path="Parent > Sous-categorie" \\
       --phase=2 \\
       --apply
 
@@ -99,25 +107,33 @@ Phase 6 real Question Bank + Quiz write:
       --apply
 
 Options:
-  --source      Absolute path to migration.json.
-  --category    Existing Moodle course category id.
-  --phase       Migration phase: 2 (structure), 3 (simple resources),
-                4 (SCORM), 5 (Learning Module -> Moodle Book), or
-                6 (Question Bank + Quiz). Default: 2.
-  --dry-run     Build and validate the import plan; performs no Moodle content writes.
-  --apply       Apply the selected supported phase.
-                Phase 3 requires Phase 2 structure to exist and package validation to pass.
-                Phase 4 requires Phases 2/3 to be synchronized and SCORM validation to pass.
-                Phase 5 requires Phases 2/3/4 to be synchronized and the Learning Module package
-                validation to pass. A changed already-mapped Book is refused until safe chapter
-                replacement is implemented; unchanged replays are idempotent.
-                Phase 6 requires Phases 2-5 to be synchronized and the Phase 6 dry-run package,
-                qtype and scoring-policy checks to be ready. Score-preserving transforms are used
-                for unequal-weight Matching and Multiple Choice with unselected-option credit.
-                An already-mapped Quiz whose question fingerprint/order/marks changed is refused.
-  -h, --help    Display this help.
+  --source         Absolute path to migration.json.
+  --category       Existing Moodle course category id.
+  --category-path  Phase 2 only. Deterministic category hierarchy to select/create.
+                   Preferred separator: >. Example: "Marine > Formation > PEM".
+                   / is also accepted. New categories are created hidden.
+                   If duplicate sibling names make the path ambiguous, the import is blocked.
+  --phase          Migration phase: 2 (structure), 3 (simple resources),
+                   4 (SCORM), 5 (Learning Module -> Moodle Book), or
+                   6 (Question Bank + Quiz). Default: 2.
+  --dry-run        Build and validate the import plan; performs no Moodle content writes.
+  --apply          Apply the selected supported phase.
+                   Phase 2 can use either --category=ID or --category-path.
+                   Phases 3 to 6 require --category=ID.
+                   Phase 3 requires Phase 2 structure to exist and package validation to pass.
+                   Phase 4 requires Phases 2/3 to be synchronized and SCORM validation to pass.
+                   Phase 5 requires Phases 2/3/4 to be synchronized and the Learning Module package
+                   validation to pass. A changed already-mapped Book is refused until safe chapter
+                   replacement is implemented; unchanged replays are idempotent.
+                   Phase 6 requires Phases 2-5 to be synchronized and the Phase 6 dry-run package,
+                   qtype and scoring-policy checks to be ready. Score-preserving transforms are used
+                   for unequal-weight Matching and Multiple Choice with unselected-option credit.
+                   An already-mapped Quiz whose question fingerprint/order/marks changed is refused.
+  -h, --help       Display this help.
 
 Exactly one of --dry-run or --apply is required.
+For Phase 2 choose exactly one of --category or --category-path.
+For Phases 3 to 6 use --category=ID.
 
 EOF;
 
@@ -130,14 +146,24 @@ if (trim((string) $options['source']) === '') {
     cli_error("Missing --source.\n\n" . $help);
 }
 
-$categoryid = (int) $options['category'];
-if ($categoryid <= 0) {
-    cli_error("Missing or invalid --category.\n\n" . $help);
-}
-
 $phase = (int) $options['phase'];
 if (!in_array($phase, [2, 3, 4, 5, 6], true)) {
     cli_error("Invalid --phase. Use 2, 3, 4, 5 or 6.\n\n" . $help);
+}
+
+$categoryid = (int) $options['category'];
+$categorypath = trim((string) $options['category-path']);
+$hascategoryid = $categoryid > 0;
+$hascategorypath = $categorypath !== '';
+
+if ($phase === 2) {
+    if ($hascategoryid === $hascategorypath) {
+        cli_error("For Phase 2 choose exactly one of --category or --category-path.\n\n" . $help);
+    }
+} else {
+    if (!$hascategoryid || $hascategorypath) {
+        cli_error("Phases 3 to 6 require --category=ID and do not accept --category-path.\n\n" . $help);
+    }
 }
 
 $dryrun = (bool) $options['dry-run'];
@@ -147,7 +173,13 @@ if ($dryrun === $apply) {
 }
 
 $importer = new \local_iliasmigration\importer();
-$result = $importer->import((string) $options['source'], $categoryid, $dryrun, $phase);
+$result = $importer->import(
+    (string) $options['source'],
+    $categoryid,
+    $dryrun,
+    $phase,
+    $categorypath
+);
 
 echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 echo PHP_EOL;
