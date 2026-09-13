@@ -1,17 +1,17 @@
 # ILIAS2Moodle
 
-> Outil de migration semi-automatisée de contenus pédagogiques **ILIAS 10** vers **Moodle 4.5**, en conservant au mieux l’arborescence, les ressources et la logique pédagogique existantes.
+> Outil de migration semi-automatisée de contenus pédagogiques **ILIAS 10** vers **Moodle 4.5+**, conçu pour conserver au mieux l’arborescence, les ressources et la logique pédagogique existantes.
 
 ## Présentation
 
-**ILIAS2Moodle** a pour objectif de construire une moulinette de migration **contrôlée, rejouable et traçable** entre ILIAS 10 et Moodle 4.5.
+**ILIAS2Moodle** construit une chaîne de migration contrôlée, rejouable, traçable et testable entre ILIAS 10 et Moodle.
 
-Le projet suit une approche **ETL** :
+Le projet suit une approche ETL :
 
 ```text
 ILIAS 10
    ↓
-Extraction
+Extraction / export natif
    ↓
 Transformation
    ↓
@@ -21,50 +21,45 @@ Validation / dry-run
    ↓
 Import Moodle
    ↓
-Moodle 4.5
+Moodle 4.5+
 ```
 
-L’objectif n’est pas de copier directement les bases de données, mais de reconstruire les contenus Moodle en utilisant des formats intermédiaires et les API applicatives.
+L’objectif n’est pas de copier directement les bases de données, mais de reconstruire les contenus Moodle à partir d’un format intermédiaire neutre et des API applicatives Moodle.
 
-## Objectifs
+## Environnement de validation
 
-Le projet vise à migrer progressivement :
+Le POC de référence a été validé sur :
 
-- catégories et sous-catégories ;
-- cours ;
-- dossiers et sous-dossiers ;
-- pages et contenus HTML ;
-- fichiers, PDF, documents Office, images, audio et vidéo ;
-- URL ;
-- packages SCORM ;
-- modules d’apprentissage ILIAS ;
-- tests et banques de questions ;
-- utilisateurs, inscriptions et groupes ;
-- certaines données de progression lorsque cela est techniquement fiable.
+- ILIAS `10.8` ;
+- Moodle `5.0.2` ;
+- compatibilité minimale du plugin conservée à Moodle `4.5` ;
+- PHP `8.3` côté Moodle ;
+- Python `3.11+` côté préparation des exports.
+
+Cours POC principal :
+
+- ILIAS `ref_id=128`, `obj_id=504` ;
+- titre : `cours test migration` ;
+- cours Moodle `id=5`, shortname `ILIAS-128`.
 
 ## Principes
 
-ILIAS2Moodle doit être :
+ILIAS2Moodle est conçu pour être :
 
-- **non destructif** : aucun accès SQL direct aux tables Moodle ;
-- **traçable** : chaque objet migré possède un statut et un mapping ILIAS/Moodle ;
-- **rejouable** : une nouvelle exécution ne doit pas dupliquer les objets ;
-- **testable** : un mode `--dry-run` doit permettre de simuler la migration ;
-- **progressif** : les objets complexes sont ajoutés phase par phase ;
-- **auditable** : les objets non supportés doivent apparaître dans les rapports.
+- **non destructif** : aucune copie directe de base à base ;
+- **traçable** : chaque objet migré conserve un mapping ILIAS ↔ Moodle ;
+- **rejouable** : les exécutions successives ne doivent pas créer de doublons ;
+- **testable** : le mode `--dry-run` interdit les écritures Moodle ;
+- **progressif** : les familles d’objets sont prises en charge phase par phase ;
+- **auditable** : les cas non supportés ou ambigus sont signalés explicitement ;
+- **gardé** : les situations structurelles non sûres bloquent l’apply au lieu de produire une migration approximative.
 
-## Architecture cible
+## Architecture
 
 ```text
                     ILIAS 10
                        │
-        ┌──────────────┴──────────────┐
-        │                             │
-   API / SOAP                   Exports ILIAS
-   Métadonnées                   XML / HTML / ZIP
-   Arborescence                  QTI / fichiers
-        │                             │
-        └──────────────┬──────────────┘
+                Export natif ZIP
                        │
                        ▼
               Python ILIAS2Moodle
@@ -79,39 +74,31 @@ ILIAS2Moodle doit être :
           Plugin Moodle local_iliasmigration
                        │
                        ▼
-                   Moodle 4.5
+                  Moodle 4.5+
 ```
 
 ## Format intermédiaire
 
 La migration passe par un modèle neutre sérialisé en JSON.
 
-Exemple :
+Exemple simplifié :
 
 ```json
 {
   "schema_version": "1.0",
   "source": {
     "lms": "ILIAS",
-    "version": "10"
+    "version": "10.8"
   },
   "course": {
-    "source_id": "15342",
-    "title": "Formation LMS",
-    "description": "Formation de démonstration",
+    "source_id": "128",
+    "title": "cours test migration",
     "items": [
       {
-        "source_id": "15343",
+        "source_id": "230",
         "type": "folder",
-        "title": "Séquence 1",
-        "items": [
-          {
-            "source_id": "15344",
-            "type": "file",
-            "title": "Présentation.pdf",
-            "file": "files/presentation.pdf"
-          }
-        ]
+        "title": "quizz",
+        "items": []
       }
     ]
   }
@@ -122,122 +109,62 @@ Voir [`docs/migration-format.md`](docs/migration-format.md).
 
 ## Correspondance ILIAS → Moodle
 
-| ILIAS 10 | Moodle 4.5 | Automatisation visée |
+| ILIAS 10 | Moodle | État |
 |---|---|---|
-| Catégorie | Catégorie de cours | Très élevée |
-| Sous-catégorie | Sous-catégorie | Très élevée |
-| Cours | Cours | Très élevée |
-| Dossier | Section / Sous-section | Très élevée |
-| Fichier | Ressource Fichier | Très élevée |
-| URL | Ressource URL | Très élevée |
-| Page ILIAS | Page / Texte et média | Élevée |
-| SCORM | Activité SCORM | Très élevée |
-| Module d’apprentissage | Livre Moodle | Moyenne à élevée |
-| Test | Quiz Moodle | Moyenne |
-| Banque de questions | Banque Moodle | Moyenne |
-| Groupe | Groupe / Groupement | À étudier |
-| Progression | Achèvement Moodle | Complexe |
-| Historique des tentatives | Données Moodle | Très complexe |
+| Catégorie / sous-catégorie | Catégorie de cours | Validé Phase 2 |
+| Cours | Cours | Validé Phase 2 |
+| Dossier niveau 1 | Section | Validé Phase 2 |
+| Dossier niveau 2 | `mod_subsection` | Validé Phase 2 |
+| Dossier niveau 3+ | Sous-section sœur avec titre hiérarchique | Validé Phase 2 |
+| Fichier / PDF / URL / HTML simple | Ressource Moodle | Socle validé Phase 3 |
+| SCORM | Activité SCORM | Validé Phase 4 |
+| Module d’apprentissage ILIAS | Moodle Book | Validé Phase 5 |
+| Test | Quiz Moodle | Validé Phase 6 |
+| Banque de questions | Banque Moodle | Validé Phase 6 |
+| Utilisateurs / inscriptions / groupes | À définir | Phase 7 |
+| Progression / historique | À étudier | Phase 7 |
 
 La matrice détaillée est maintenue dans [`docs/mapping.md`](docs/mapping.md).
 
-## Les 7 phases
+## Phase 2 — Structure : terminée
 
-### Phase 1 — Inventaire et analyse
+La Phase 2 est clôturée depuis le **13 septembre 2026**.
 
-Analyser un cours ILIAS sans écrire dans Moodle :
+Les éléments suivants sont validés sur le POC réel :
 
-- découverte de l’arborescence ;
-- identification des objets ;
-- récupération des métadonnées ;
-- comptage par type ;
-- détection des objets non supportés ;
-- génération de `migration.json` ;
-- génération d’un rapport JSON/HTML.
+- création et mise à jour idempotentes des cours ;
+- création et mise à jour des sections ;
+- création et mise à jour des sous-sections Moodle ;
+- mapping persistant ILIAS ↔ Moodle ;
+- vrai dry-run sans écriture ;
+- politique déterministe pour les dossiers ILIAS de profondeur supérieure à 2 ;
+- réconciliation de l’ordre global ;
+- sections synthétiques déterministes pour les ressources racine ;
+- sélection ou création de catégories/sous-catégories par chemin ;
+- blocage des chemins de catégories ambigus ;
+- contrôle visuel et idempotence réels sur Moodle 5.0.2.
 
-### Phase 2 — Structure
+Politique des catégories :
 
-Recréer dans Moodle :
-
-- catégories ;
-- sous-catégories ;
-- cours ;
-- sections ;
-- sous-sections ;
-- ordre des objets.
-
-### Phase 3 — Ressources simples
-
-Migrer :
-
-- fichiers ;
-- PDF ;
-- documents Office ;
-- images ;
-- audio et vidéo ;
-- URL ;
-- pages HTML simples ;
-- liens internes lorsque possible.
-
-### Phase 4 — SCORM
-
-Reprendre les packages SCORM ILIAS et les créer comme activités SCORM Moodle.
-
-### Phase 5 — Modules d’apprentissage ILIAS
-
-Convertir les modules d’apprentissage natifs ILIAS vers un format Moodle approprié, avec **Moodle Book** comme cible privilégiée.
-
-### Phase 6 — Tests et banques de questions
-
-Convertir les tests et questions ILIAS vers des formats Moodle, notamment Moodle XML, puis reconstruire banques de questions et quiz.
-
-### Phase 7 — Utilisateurs, inscriptions et progression
-
-Traiter séparément :
-
-- utilisateurs ;
-- inscriptions ;
-- rôles ;
-- groupes ;
-- achèvements et progression sélectionnés.
-
-Les données historiques trop spécifiques à ILIAS seront signalées plutôt que migrées de manière approximative.
-
-## Arborescence du dépôt
-
-```text
-ilias2moodle/
-├── README.md
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-├── .env.example
-├── .gitignore
-├── pyproject.toml
-├── requirements.txt
-├── docs/
-│   ├── architecture.md
-│   ├── mapping.md
-│   ├── migration-format.md
-│   └── roadmap.md
-├── src/
-│   └── ilias2moodle/
-│       ├── __init__.py
-│       ├── cli.py
-│       ├── config.py
-│       ├── ilias/
-│       ├── model/
-│       ├── converters/
-│       ├── report/
-│       └── utils/
-├── moodle/
-│   └── local_iliasmigration/
-├── examples/
-├── tests/
-│   ├── unit/
-│   └── integration/
-└── exports/
-    └── .gitkeep
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/path/to/migration.json \
+  --category-path="Parent > Sous-categorie" \
+  --phase=2 \
+  --dry-run
 ```
+
+Le mode historique reste disponible :
+
+```bash
+php local/iliasmigration/cli/import.php \
+  --source=/path/to/migration.json \
+  --category=ID \
+  --phase=2 \
+  --dry-run
+```
+
+Les catégories créées automatiquement sont masquées pendant le POC. Les catégories existantes ne sont ni renommées, ni déplacées, ni masquées par le résolveur.
 
 ## Installation développeur
 
@@ -245,13 +172,12 @@ Pré-requis :
 
 - Python 3.11 ou supérieur ;
 - environnement virtuel Python ;
-- accès à une instance ILIAS 10 de test pour les phases d’intégration ;
-- accès à une instance Moodle 4.5 de test pour les phases d’import.
+- accès à une instance ILIAS 10 de test ;
+- accès à une instance Moodle 4.5+ de test.
 
 ```bash
 git clone https://github.com/vincent-sayah/ilias2moodle.git
 cd ilias2moodle
-
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
@@ -265,115 +191,72 @@ python -m venv .venv
 pip install -e ".[dev]"
 ```
 
-## Configuration
-
-Copier le modèle d’environnement :
+## Préparation d’un export ILIAS
 
 ```bash
-cp .env.example .env
+./tools/run-ilias2moodle.sh prepare-export \
+  --zip=/path/to/export_ilias.zip \
+  --output=/path/to/package \
+  --ilias-version=10.8
 ```
 
-Les secrets ne doivent jamais être versionnés.
+Le package produit contient notamment `migration.json`, les ressources extraites et les rapports de préparation.
 
-## CLI
+## Plugin Moodle
 
-Le squelette initial expose une commande :
+Le plugin Moodle est situé dans :
 
-```bash
-ilias2moodle --help
+```text
+moodle/local_iliasmigration
 ```
 
-Phase 1 :
+Version courante après clôture de la Phase 2 :
 
-```bash
-ilias2moodle analyse --course 1234 --output ./exports/course-1234
+```text
+0.15.0-alpha
+2026091302
 ```
-
-Mode simulation :
-
-```bash
-ilias2moodle analyse --course 1234 --output ./exports/course-1234 --dry-run
-```
-
-Au début du projet, la commande fonctionne avec un adaptateur ILIAS de démonstration tant que le connecteur réel ILIAS n’est pas encore implémenté.
 
 ## Idempotence
 
-Chaque objet source devra conserver sa correspondance Moodle :
+Les correspondances persistantes permettent de rejouer les imports sans dupliquer les objets :
 
 ```text
-ILIAS ref_id 1234  → Moodle course 72
-ILIAS ref_id 1240  → Moodle section 403
-ILIAS ref_id 1241  → Moodle resource 728
+ILIAS ref_id 128  → Moodle course 5
+ILIAS ref_id 230  → Moodle section 22
+ILIAS ref_id 237  → Moodle subsection CMID 14
+ILIAS ref_id 246  → Moodle subsection CMID 38
 ```
 
-Les actions possibles seront :
+Les plans utilisent notamment les états :
 
 ```text
 CREATE
 UPDATE
-SKIP
-ERROR
-```
-
-## Dry-run
-
-Aucune écriture Moodle ne doit être effectuée en mode simulation.
-
-Exemple de rapport :
-
-```text
-Cours                  : 1
-Sections               : 8
-Sous-sections          : 23
-PDF                     : 34
-Documents               : 12
-URL                     : 6
-SCORM                   : 5
-Learning Modules        : 3
-Tests                   : 4
-Questions               : 126
-Objets non supportés    : 2
-```
-
-## Premier POC
-
-Le premier cours ILIAS de référence devra idéalement contenir :
-
-```text
-Cours
-├── Page d’accueil
-├── Dossier
-│   ├── PDF
-│   ├── document Office
-│   └── URL
-├── Sous-dossier
-│   ├── image
-│   └── vidéo
-├── SCORM
-├── Module d’apprentissage ILIAS
-└── Test
-    └── Banque de questions
+SELECT
+DEFER
+BLOCKED
+ERROR_STALE_MAPPING
 ```
 
 ## Roadmap
 
 ```text
-Phase 1  [~] Inventaire et analyse
-Phase 2  [ ] Structure
-Phase 3  [ ] Ressources simples
-Phase 4  [ ] SCORM
-Phase 5  [ ] Modules d’apprentissage ILIAS
-Phase 6  [ ] Tests et banques de questions
+Phase 1  [x] Inventaire et analyse
+Phase 2  [x] Structure
+Phase 3  [~] Ressources simples — socle validé, couverture étendue à poursuivre
+Phase 4  [x] SCORM
+Phase 5  [x] Modules d’apprentissage ILIAS
+Phase 6  [x] Tests et banques de questions
 Phase 7  [ ] Utilisateurs, inscriptions et progression
 ```
 
-La Phase 1 démarre avec la mise en place du modèle de données, du CLI, du rapport et du contrat du futur adaptateur ILIAS.
+## État actuel
+
+**Phase 2 terminée et clôturée.**
+
+Les validations réelles couvrent désormais la structure Moodle complète du POC, y compris les catégories, les profondeurs de dossiers supérieures à 2 et l’idempotence. La Phase 3 reste ouverte pour sa couverture étendue, et la Phase 7 n’a pas encore démarré.
 
 ## Licence
 
 La licence du projet n’est pas encore définie.
-
-## Statut
-
-**Projet en développement — Phase 1 : Inventaire et analyse.**
