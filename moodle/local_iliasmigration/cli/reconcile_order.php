@@ -40,16 +40,24 @@ visible ILIAS order after Phases 2-6. It never recreates pedagogical content.
 Unmanaged Moodle activities are preserved. Moodle qbank modules remain in
 section 0 because they are non-displayable by design.
 
-First guarded release supports:
+Supported structure policy:
 - root activities before the first ILIAS folder -> Moodle section 0;
 - first-level ILIAS folders -> existing Moodle sections;
 - second-level folders -> existing mod_subsection delegated sections;
+- folder depth > 2 -> deterministic sibling mod_subsection under the nearest
+  first-level section, with a hierarchical title such as
+  "Niveau 2 / Niveau 3 / Niveau 4";
 - root activity runs after the final first-level folder -> synthetic Moodle
   section(s) named Contenu / Contenu N;
-- exact mapped activity order inside each managed section.
+- exact mapped activity order inside each managed section when Moodle can
+  represent that order directly.
 
-It intentionally refuses:
-- folder depth > 2;
+The deep-folder transformation is performed in memory by migration_reader.
+The source migration.json is never modified and every original ref_id remains
+unchanged for mapping and replay. Direct activities remain in their nearest
+source folder; nested folders are promoted as sibling subsections.
+
+The current guarded reconciler still intentionally refuses:
 - a synthetic root activity run between two first-level source folders;
 - a changed order of existing first-level source sections.
 
