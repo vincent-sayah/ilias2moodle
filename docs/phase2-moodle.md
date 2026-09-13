@@ -2,101 +2,102 @@
 
 ## Environnement POC Moodle
 
-Validation initiale du 4 septembre 2026 :
+Validation de référence :
 
 - Moodle `5.0.2 (Build: 20250811)` ;
-- version interne `2025041402.00` ;
 - PHP CLI `8.3.26` ;
-- module `subsection` présent et actif (`visible=1`).
+- module `subsection` présent et actif (`visible=1`) ;
+- compatibilité minimale du plugin conservée à Moodle 4.5.
 
-Le plugin conserve Moodle 4.5 comme version minimale afin de ne pas fermer inutilement la compatibilité, mais la cible POC réelle est désormais Moodle 5.0.2.
+## Structure déjà validée
 
-## Objectif du premier incrément
+La Phase 2 reconstruit la structure Moodle avant l'import des contenus pédagogiques :
 
-Avant toute création réelle, Moodle doit être capable de lire le `migration.json` généré en Phase 1 et produire un plan déterministe.
+- cours ILIAS → cours Moodle ;
+- dossier ILIAS niveau 1 → section Moodle ;
+- dossier ILIAS niveau 2 → `mod_subsection` Moodle ;
+- mapping persistant ILIAS `ref_id` ↔ identifiant Moodle ;
+- dry-run sans écriture ;
+- CREATE / UPDATE idempotents ;
+- ordre global réconcilié après les Phases 2 à 6.
 
-Pour le POC ILIAS `ref_id=31250` :
+Le POC `course-128-v5` a validé l'ordre final, la conservation des activités Moodle hors migration et la création idempotente d'une section synthétique `Contenu` pour les activités ILIAS racine situées après un dossier.
 
-```text
-Test migration
-└── Dossier test
-    └── sous dossier
-```
+## Politique des dossiers de profondeur supérieure à 2
 
-devient :
+Moodle ne permet pas d'imbriquer récursivement des `mod_subsection`. La politique ILIAS2Moodle est donc un aplatissement contrôlé et déterministe.
 
-```text
-Cours Moodle : Test migration
-└── Section : Dossier test
-    └── Sous-section : sous dossier
-```
-
-Les ressources restent différées vers leurs phases dédiées.
-
-## Sécurité
-
-Le premier importeur Moodle est strictement `dry-run` :
-
-- aucune création de cours ;
-- aucune création de section ;
-- aucune création de sous-section ;
-- aucune ressource importée ;
-- aucune ligne de mapping créée pendant le dry-run.
-
-L'installation du plugin crée seulement sa table technique `local_iliasmigration_map`.
-
-## Installation du plugin sur le serveur Moodle
-
-Copier le répertoire :
+Exemple ILIAS :
 
 ```text
-moodle/local_iliasmigration
+Dossier niveau 1
+└── Dossier niveau 2
+    ├── ressource A
+    └── Dossier niveau 3
+        ├── ressource B
+        └── Dossier niveau 4
+            └── ressource C
 ```
 
-vers :
+Représentation Moodle :
 
 ```text
-/var/www/moodle/local/iliasmigration
+Section : Dossier niveau 1
+├── Sous-section : Dossier niveau 2
+│   └── ressource A
+├── Sous-section : Dossier niveau 2 / Dossier niveau 3
+│   └── ressource B
+└── Sous-section : Dossier niveau 2 / Dossier niveau 3 / Dossier niveau 4
+    └── ressource C
 ```
 
-puis lancer depuis `/var/www/moodle` :
+Règles :
+
+- tous les dossiers ILIAS de profondeur 2 ou plus deviennent des `mod_subsection` sœurs sous la section Moodle issue du dossier de niveau 1 ;
+- les dossiers de profondeur 3+ reçoivent un titre hiérarchique déterministe ;
+- les `source_id` / `ref_id` ILIAS ne sont jamais modifiés ;
+- les ressources directes restent rattachées au dossier source le plus proche ;
+- la transformation est effectuée uniquement en mémoire côté Moodle ; le `migration.json` source n'est jamais réécrit ;
+- les métadonnées ajoutées conservent la profondeur, le parent et le titre ILIAS d'origine ;
+- le plan expose un résumé dans `source.transformations.folder_flattening`.
+
+Cette politique évite `FLATTEN_REQUIRED` tout en restant compatible avec les API Moodle et la table de mapping existante.
+
+## Limite d'ordre assumée
+
+Lorsqu'un dossier ILIAS profond est intercalé entre deux activités directes de son dossier parent, Moodle ne peut pas représenter exactement cette imbrication puisque le dossier profond devient une sous-section sœur.
+
+La politique retenue est :
+
+- conserver l'ordre relatif des activités directes dans leur sous-section ;
+- placer les sous-sections profondes immédiatement après leur ancêtre de niveau 2, dans un ordre profondeur d'abord déterministe ;
+- rendre la transformation explicite dans le rapport de normalisation.
+
+## Sécurité et idempotence
+
+Le dry-run doit rester strictement sans écriture. Les écritures réelles utilisent les API Moodle de cours et de modules ; aucun contournement direct des séquences Moodle n'est autorisé.
+
+Chaque dossier profond conserve son `ref_id`, de sorte qu'un second import retrouve le même mapping `targettype=subsection` et effectue un UPDATE au lieu de créer un doublon.
+
+## Test automatisé
+
+Le test exécutable :
 
 ```bash
-php admin/cli/upgrade.php --non-interactive
+php tests/php/test_folder_flattener.php
 ```
 
-Vérifier ensuite :
+valide notamment :
 
-```bash
-php local/iliasmigration/cli/categories.php
-```
+- profondeur 3 et 4 ;
+- promotion en sous-sections sœurs ;
+- titres hiérarchiques ;
+- conservation des enfants directs ;
+- conservation des parents/profondeurs source dans les métadonnées ;
+- résumé déterministe de la transformation.
 
-## Exécution du dry-run
+La CI GitHub exécute ce test en plus de la syntaxe PHP, de Ruff et de Pytest.
 
-Le fichier `migration.json` peut être copié seul sur le serveur Moodle pour ce premier test.
+## Point Phase 2 restant après validation du POC profondeur
 
-```bash
-php local/iliasmigration/cli/import.php \
-  --source=/opt/ilias2moodle-data/course-31250/migration.json \
-  --category=ID \
-  --dry-run
-```
-
-Le résultat est du JSON et doit indiquer `writes_performed: false`.
-
-## Règles d'arborescence
-
-- dossier ILIAS de niveau 1 → section Moodle ;
-- dossier ILIAS de niveau 2 → activité `subsection` Moodle ;
-- profondeur supérieure à 2 → `FLATTEN_REQUIRED` dans le plan ;
-- ressources → `DEFER` jusqu'à leur phase fonctionnelle.
-
-## Étape suivante
-
-Après validation du dry-run sur Moodle 5.0.2, le second incrément Phase 2 activera les écritures pour :
-
-1. créer le cours ;
-2. enregistrer son mapping ;
-3. créer la section ;
-4. créer la sous-section ;
-5. rejouer l'import sans doublon.
+Une fois cette politique validée sur le vrai cours ILIAS enrichi et sur Moodle 5.0.2, le dernier chantier de la Phase 2 sera la création/sélection automatique des catégories et sous-catégories Moodle. Le paramètre `--category=<id>` reste pour l'instant obligatoire.
