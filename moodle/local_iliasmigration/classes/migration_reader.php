@@ -5,14 +5,18 @@ namespace local_iliasmigration;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Reads and validates the neutral ILIAS2Moodle migration document.
+ * Reads, validates and Moodle-normalises the neutral ILIAS2Moodle document.
  */
 final class migration_reader {
     /**
      * Load a migration.json file.
      *
+     * The source file is never modified. After contract validation, unsupported
+     * folder nesting is normalised in memory for Moodle so every downstream phase
+     * consumes the same deterministic structure.
+     *
      * @param string $path Absolute path to migration.json.
-     * @return array Decoded and validated document.
+     * @return array Decoded, validated and Moodle-normalised document.
      */
     public function read(string $path): array {
         if (!is_file($path) || !is_readable($path)) {
@@ -35,7 +39,9 @@ final class migration_reader {
         }
 
         $this->validate($document);
-        return $document;
+
+        $flattener = new folder_flattener();
+        return $flattener->flatten($document);
     }
 
     /**
