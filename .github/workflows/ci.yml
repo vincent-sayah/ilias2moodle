@@ -53,3 +53,6 @@ jobs:
 
       - name: Phase 3 synthetic-section update regression
         run: php tests/php/test_phase3_section_policy.php
+
+      - name: Phase 3 internal-link rewrite regression
+        run: php tests/php/test_phase3_internal_link_policy.php
