@@ -108,10 +108,6 @@ final class plan_builder {
             ];
         }
 
-        if ($this->phase >= 3) {
-            $this->append_root_order_warning($course['items'], $warnings);
-        }
-
         $source = $document['source'];
         $source['instance'] = $this->sourceinstance;
 
@@ -372,45 +368,6 @@ final class plan_builder {
         }
 
         return 'unknown-ilias-instance';
-    }
-
-    /**
-     * Warn when the ILIAS root order cannot be represented exactly with the
-     * current mapping of first-level folders to Moodle sections.
-     *
-     * Moodle activities in section 0 are displayed before regular sections.
-     * Therefore a root-level resource positioned after an ILIAS folder cannot
-     * remain visually after that folder without introducing a synthetic section.
-     *
-     * @param array $items Root ILIAS course items.
-     * @param array $warnings Collected warnings.
-     */
-    private function append_root_order_warning(array $items, array &$warnings): void {
-        $seenfolder = false;
-        $affected = [];
-
-        foreach ($items as $item) {
-            if (!is_array($item)) {
-                continue;
-            }
-            $type = (string) ($item['type'] ?? 'unknown');
-            if ($type === 'folder') {
-                $seenfolder = true;
-                continue;
-            }
-            if ($seenfolder && in_array($type, ['file', 'url', 'html_module'], true)) {
-                $affected[] = (string) ($item['source_id'] ?? '');
-            }
-        }
-
-        if ($affected) {
-            $warnings[] = [
-                'code' => 'ROOT_RESOURCE_ORDER_APPROXIMATION',
-                'source_ref_ids' => $affected,
-                'message' => 'Root-level Moodle resources live in section 0 and therefore display before regular sections. '
-                    . 'Exact interleaving with ILIAS first-level folders requires a later ordering policy.',
-            ];
-        }
     }
 
     /**
