@@ -116,7 +116,7 @@ Voir [`docs/migration-format.md`](docs/migration-format.md).
 | Dossier niveau 1 | Section | Validé Phase 2 |
 | Dossier niveau 2 | `mod_subsection` | Validé Phase 2 |
 | Dossier niveau 3+ | Sous-section sœur avec titre hiérarchique | Validé Phase 2 |
-| Fichier / PDF / URL / HTML simple | Ressource Moodle | Socle validé Phase 3 |
+| Fichier / PDF / URL / HTML simple | Ressource Moodle | Validé Phase 3 |
 | SCORM | Activité SCORM | Validé Phase 4 |
 | Module d’apprentissage ILIAS | Moodle Book | Validé Phase 5 |
 | Test | Quiz Moodle | Validé Phase 6 |
@@ -166,6 +166,36 @@ php local/iliasmigration/cli/import.php \
 
 Les catégories créées automatiquement sont masquées pendant le POC. Les catégories existantes ne sont ni renommées, ni déplacées, ni masquées par le résolveur.
 
+## Phase 3 — Ressources simples : terminée
+
+La Phase 3 est clôturée depuis le **14 septembre 2026**.
+
+Les validations réelles couvrent :
+
+- URL externes → `mod_url` ;
+- fichiers génériques, PDF, DOCX, PPTX, images, vidéos et audio → `mod_resource` ;
+- modules HTML exportés → `mod_resource` avec paquet complet et fichier de démarrage ;
+- conservation des descriptions non vides dans l’introduction Moodle ;
+- placement dans section 0, section, sous-section déléguée et section synthétique ;
+- validation des fichiers manquants et des chemins de package ;
+- mapping persistant et idempotence `CREATE` / `UPDATE` ;
+- réécriture des liens internes ILIAS `type|ref_id` vers une cible Moodle migrée lorsqu’un mapping unique et sûr existe ;
+- conservation du lien ILIAS d’origine comme fallback si la cible Moodle est absente ou ambiguë.
+
+POC final de lien interne :
+
+```text
+ILIAS ref 132 : htlm|240
+        ↓
+ILIAS ref 240 migré
+        ↓
+Moodle mod_resource CMID 20
+        ↓
+/mod/resource/view.php?id=20
+```
+
+Le clic sur l’activité Moodle `lien` ouvre bien la ressource `chimie`. Le dry-run après apply reste idempotent et le package Phase 3 termine avec `blocked_resources=0` et `ready=true`.
+
 ## Installation développeur
 
 Pré-requis :
@@ -210,11 +240,11 @@ Le plugin Moodle est situé dans :
 moodle/local_iliasmigration
 ```
 
-Version courante après clôture de la Phase 2 :
+Version courante après clôture de la Phase 3 :
 
 ```text
-0.15.0-alpha
-2026091302
+0.15.2-alpha
+2026091402
 ```
 
 ## Idempotence
@@ -226,6 +256,8 @@ ILIAS ref_id 128  → Moodle course 5
 ILIAS ref_id 230  → Moodle section 22
 ILIAS ref_id 237  → Moodle subsection CMID 14
 ILIAS ref_id 246  → Moodle subsection CMID 38
+ILIAS ref_id 240  → Moodle resource CMID 20
+ILIAS ref_id 269  → Moodle resource CMID 43
 ```
 
 Les plans utilisent notamment les états :
@@ -244,7 +276,7 @@ ERROR_STALE_MAPPING
 ```text
 Phase 1  [x] Inventaire et analyse
 Phase 2  [x] Structure
-Phase 3  [~] Ressources simples — socle validé, couverture étendue à poursuivre
+Phase 3  [x] Ressources simples
 Phase 4  [x] SCORM
 Phase 5  [x] Modules d’apprentissage ILIAS
 Phase 6  [x] Tests et banques de questions
@@ -253,9 +285,9 @@ Phase 7  [ ] Utilisateurs, inscriptions et progression
 
 ## État actuel
 
-**Phase 2 terminée et clôturée.**
+**Phases 1 à 6 terminées et validées sur le POC de référence.**
 
-Les validations réelles couvrent désormais la structure Moodle complète du POC, y compris les catégories, les profondeurs de dossiers supérieures à 2 et l’idempotence. La Phase 3 reste ouverte pour sa couverture étendue, et la Phase 7 n’a pas encore démarré.
+La structure, les ressources simples, les SCORM, les modules d’apprentissage ILIAS, les tests et les banques de questions sont maintenant validés sur le POC. La Phase 7, consacrée aux utilisateurs, inscriptions, groupes et à la progression, n’a pas encore démarré.
 
 ## Licence
 
