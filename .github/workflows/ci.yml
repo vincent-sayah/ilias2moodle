@@ -50,3 +50,6 @@ jobs:
 
       - name: Phase 2 category-path policy regression
         run: php tests/php/test_category_path_resolver.php
+
+      - name: Phase 3 synthetic-section update regression
+        run: php tests/php/test_phase3_section_policy.php

@@ -75,9 +75,9 @@ final class resource_executor {
                     $kind = (string) ($operation['kind'] ?? '');
 
                     if (in_array($kind, ['url', 'file', 'html_module'], true)) {
-                        $sectionnumber = $this->resolve_parent_section_number(
+                        $sectionnumber = $this->resolve_operation_section_number(
                             $course,
-                            (string) ($operation['parent_source_ref_id'] ?? ''),
+                            $operation,
                             $sourcecourseid
                         );
 
@@ -435,6 +435,59 @@ final class resource_executor {
     }
 
     /**
+     * Resolve the effective Moodle section number for one Phase 3 operation.
+     *
+     * Parented resources always follow the section resolved from their ILIAS
+     * parent. Root resources normally use section 0. If a root UPDATE has already
+     * been moved by the Phase 2 order reconciler into an ILIAS2Moodle-owned
+     * synthetic section, that current section is accepted and preserved.
+     */
+    private function resolve_operation_section_number(
+        \stdClass $course,
+        array $operation,
+        string $sourcecourseid
+    ): int {
+        global $DB;
+
+        $parentsourceref = (string) ($operation['parent_source_ref_id'] ?? '');
+        $expected = $this->resolve_parent_section_number($course, $parentsourceref, $sourcecourseid);
+
+        if ($parentsourceref !== '' || (string) ($operation['action'] ?? '') !== 'UPDATE') {
+            return $expected;
+        }
+
+        $targetid = (int) ($operation['target_id'] ?? 0);
+        if ($targetid <= 0) {
+            return $expected;
+        }
+
+        $cm = $DB->get_record(
+            'course_modules',
+            ['id' => $targetid, 'course' => (int) $course->id],
+            'id,section',
+            MUST_EXIST
+        );
+        $currentsection = $DB->get_record(
+            'course_sections',
+            ['id' => (int) $cm->section, 'course' => (int) $course->id],
+            'id,section',
+            MUST_EXIST
+        );
+
+        $ownedsynthetic = $this->is_owned_synthetic_section(
+            $sourcecourseid,
+            (int) $currentsection->id
+        );
+
+        return phase3_section_policy::effective_update_section(
+            $parentsourceref,
+            $expected,
+            (int) $currentsection->section,
+            $ownedsynthetic
+        );
+    }
+
+    /**
      * Resolve the Moodle section number for a resource parent.
      */
     private function resolve_parent_section_number(
@@ -507,6 +560,31 @@ final class resource_executor {
                 'Moving an existing Phase 3 resource to another Moodle section is not supported yet.'
             );
         }
+    }
+
+    /**
+     * Whether a section is a synthetic section owned by this migration source.
+     */
+    private function is_owned_synthetic_section(string $sourcecourse, int $sectionid): bool {
+        global $DB;
+
+        $conditions = [
+            'sourcelms' => 'ILIAS',
+            'sourceinstance' => $this->sourceinstance,
+            'sourcecourse' => $sourcecourse,
+            'targettype' => 'synthetic_section',
+            'targetid' => $sectionid,
+        ];
+        if ($DB->record_exists('local_iliasmigration_map', $conditions)) {
+            return true;
+        }
+
+        if ($this->sourceinstance === '') {
+            return false;
+        }
+
+        $conditions['sourceinstance'] = '';
+        return $DB->record_exists('local_iliasmigration_map', $conditions);
     }
 
     /**
