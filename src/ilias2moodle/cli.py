@@ -224,11 +224,6 @@ def _prepare_export(
 
     package["exercise_irss_recovery"] = {
         "enabled": exercise_irss_recovery is not None,
-        "directory": (
-            str(exercise_irss_recovery)
-            if exercise_irss_recovery is not None
-            else None
-        ),
         "collections_recovered": (
             irss_result["recovered"]["collections_recovered"]
         ),

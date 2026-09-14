@@ -754,3 +754,163 @@ def test_exercise_irss_symlink_is_rejected(
     assert assignment["migration_constraints"] == [
         "instruction_collection_not_embedded"
     ]
+
+
+
+def _build_unresolved_irss_document(
+    uuid: str,
+) -> tuple[MigrationDocument, dict]:
+    structure = {
+        "schema_version": "1.0",
+        "source": {
+            "lms": "ILIAS",
+            "object_id": "806",
+            "ref_id": "274",
+            "export_base": "set_31/example__0__exc_806",
+        },
+        "title": "Exercise IRSS",
+        "description": "",
+        "assignments": [
+            {
+                "source_id": "1",
+                "title": "Tâche IRSS",
+                "instruction_collection": uuid,
+                "instruction_collection_kind": (
+                    "resource_collection_uuid"
+                ),
+                "instruction_files": [],
+                "instruction_files_embedded": False,
+                "type": {
+                    "key": "file_upload",
+                    "migration_support": "supported",
+                },
+                "automatic_ready": False,
+                "migration_constraints": [
+                    "instruction_collection_not_embedded"
+                ],
+                "phase7_dependencies": [],
+            }
+        ],
+        "blocking_features": [
+            {
+                "assignment_id": "1",
+                "feature": "instruction_collection_not_embedded",
+            }
+        ],
+        "export_issues": [
+            {
+                "assignment_id": "1",
+                "feature": "instruction_collection_not_embedded",
+            }
+        ],
+    }
+
+    item = MigrationItem(
+        source_id="274",
+        type="exercise",
+        title="Exercise IRSS",
+        metadata={
+            "ilias_type": "exc",
+            "obj_id": "806",
+            "exercise_structure": structure,
+        },
+    )
+
+    document = MigrationDocument(
+        course=CourseExport(
+            source_id="128",
+            title="cours test migration",
+            items=[item],
+        )
+    )
+
+    return document, structure
+
+
+def test_exercise_irss_empty_collection_is_blocked(
+    tmp_path: Path,
+) -> None:
+    uuid = "44444444-5555-6666-7777-888888888888"
+
+    recovery_root = tmp_path / "irss"
+    collection_root = recovery_root / uuid
+    collection_root.mkdir(parents=True)
+
+    (collection_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "collection_uuid": uuid,
+                "client_id": "ilias10",
+                "files": [],
+                "resource_count": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    document, structure = _build_unresolved_irss_document(uuid)
+
+    result = recover_exercise_instruction_files(
+        document,
+        recovery_root,
+    )
+
+    assert result["recovered"]["collections_recovered"] == 0
+    assert result["recovered"]["instruction_files_recovered"] == 0
+
+    assert len(result["missing"]) == 1
+    assert (
+        result["missing"][0]["kind"]
+        == "exercise_irss_empty_collection"
+    )
+
+    assignment = structure["assignments"][0]
+
+    assert assignment["automatic_ready"] is False
+    assert assignment["instruction_files"] == []
+    assert assignment["migration_constraints"] == [
+        "instruction_collection_not_embedded"
+    ]
+
+    assert len(structure["blocking_features"]) == 1
+    assert len(structure["export_issues"]) == 1
+
+
+def test_exercise_package_reports_unresolved_irss_collection(
+    tmp_path: Path,
+) -> None:
+    uuid = "55555555-6666-7777-8888-999999999999"
+
+    archive_path = tmp_path / "course.zip"
+
+    with zipfile.ZipFile(archive_path, "w"):
+        pass
+
+    document, structure = _build_unresolved_irss_document(uuid)
+
+    output = tmp_path / "package"
+
+    result = extract_exercise_assets(
+        document,
+        archive_path,
+        output,
+    )
+
+    assert len(result["missing"]) == 1
+
+    missing = result["missing"][0]
+
+    assert (
+        missing["kind"]
+        == "exercise_instruction_collection_unresolved"
+    )
+    assert missing["source_id"] == "274"
+    assert missing["assignment_id"] == "1"
+    assert missing["source_path"] == uuid
+
+    assignment = structure["assignments"][0]
+
+    assert assignment["automatic_ready"] is False
+    assert assignment["migration_constraints"] == [
+        "instruction_collection_not_embedded"
+    ]

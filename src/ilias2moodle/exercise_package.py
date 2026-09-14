@@ -136,6 +136,17 @@ def recover_exercise_instruction_files(
             except (TypeError, ValueError):
                 resource_count = -1
 
+            if resource_count == 0:
+                missing.append(
+                    {
+                        "source_id": item.source_id,
+                        "assignment_id": assignment_id,
+                        "kind": "exercise_irss_empty_collection",
+                        "source_path": str(manifest_path),
+                    }
+                )
+                continue
+
             if (
                 resource_count < 0
                 or resource_count != len(manifest_files)
@@ -508,6 +519,29 @@ def extract_exercise_assets(
                 if not isinstance(assignment, dict):
                     continue
                 assignment_id = str(assignment.get("source_id", ""))
+
+                if (
+                    assignment.get("instruction_collection_kind")
+                    == "resource_collection_uuid"
+                    and assignment.get("recovery_status")
+                    != "RECOVERED"
+                ):
+                    missing.append(
+                        {
+                            "source_id": item.source_id,
+                            "assignment_id": assignment_id,
+                            "kind": (
+                                "exercise_instruction_collection_unresolved"
+                            ),
+                            "source_path": str(
+                                assignment.get(
+                                    "instruction_collection",
+                                    "",
+                                )
+                            ),
+                        }
+                    )
+
                 for file_item in assignment.get("instruction_files", []):
                     if not isinstance(file_item, dict):
                         continue
