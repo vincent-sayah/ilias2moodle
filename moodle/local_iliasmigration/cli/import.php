@@ -11,7 +11,7 @@ require_once($CFG->libdir . '/clilib.php');
         'source' => '',
         'category' => 0,
         'category-path' => '',
-        'phase' => 2,
+        'phase' => '2',
         'dry-run' => false,
         'apply' => false,
         'help' => false,
@@ -106,6 +106,13 @@ Phase 6 real Question Bank + Quiz write:
       --phase=6 \\
       --apply
 
+Phase 6.5 Content Page -> Moodle Page preview:
+  php local/iliasmigration/cli/import.php \\
+      --source=/path/to/migration.json \\
+      --category=ID \\
+      --phase=6.5 \\
+      --dry-run
+
 Options:
   --source         Absolute path to migration.json.
   --category       Existing Moodle course category id.
@@ -114,12 +121,13 @@ Options:
                    / is also accepted. New categories are created hidden.
                    If duplicate sibling names make the path ambiguous, the import is blocked.
   --phase          Migration phase: 2 (structure), 3 (simple resources),
-                   4 (SCORM), 5 (Learning Module -> Moodle Book), or
-                   6 (Question Bank + Quiz). Default: 2.
+                   4 (SCORM), 5 (Learning Module -> Moodle Book),
+                   6 (Question Bank + Quiz), or 6.5 (Content Page -> Moodle Page).
+                   Default: 2.
   --dry-run        Build and validate the import plan; performs no Moodle content writes.
   --apply          Apply the selected supported phase.
                    Phase 2 can use either --category=ID or --category-path.
-                   Phases 3 to 6 require --category=ID.
+                   Phases 3 to 6.5 require --category=ID.
                    Phase 3 requires Phase 2 structure to exist and package validation to pass.
                    Phase 4 requires Phases 2/3 to be synchronized and SCORM validation to pass.
                    Phase 5 requires Phases 2/3/4 to be synchronized and the Learning Module package
@@ -129,11 +137,13 @@ Options:
                    qtype and scoring-policy checks to be ready. Score-preserving transforms are used
                    for unequal-weight Matching and Multiple Choice with unselected-option credit.
                    An already-mapped Quiz whose question fingerprint/order/marks changed is refused.
+                   Phase 6.5 apply is intentionally disabled until the real Content Page dry-run
+                   has been reviewed and approved.
   -h, --help       Display this help.
 
 Exactly one of --dry-run or --apply is required.
 For Phase 2 choose exactly one of --category or --category-path.
-For Phases 3 to 6 use --category=ID.
+For Phases 3 to 6.5 use --category=ID.
 
 EOF;
 
@@ -146,9 +156,13 @@ if (trim((string) $options['source']) === '') {
     cli_error("Missing --source.\n\n" . $help);
 }
 
-$phase = (int) $options['phase'];
-if (!in_array($phase, [2, 3, 4, 5, 6], true)) {
-    cli_error("Invalid --phase. Use 2, 3, 4, 5 or 6.\n\n" . $help);
+$phaseinput = trim((string) $options['phase']);
+if ($phaseinput === '6.5' || $phaseinput === '65') {
+    $phase = 65;
+} else if (preg_match('/^[2-6]$/', $phaseinput)) {
+    $phase = (int) $phaseinput;
+} else {
+    cli_error("Invalid --phase. Use 2, 3, 4, 5, 6 or 6.5.\n\n" . $help);
 }
 
 $categoryid = (int) $options['category'];
@@ -162,7 +176,7 @@ if ($phase === 2) {
     }
 } else {
     if (!$hascategoryid || $hascategorypath) {
-        cli_error("Phases 3 to 6 require --category=ID and do not accept --category-path.\n\n" . $help);
+        cli_error("Phases 3 to 6.5 require --category=ID and do not accept --category-path.\n\n" . $help);
     }
 }
 
@@ -170,6 +184,10 @@ $dryrun = (bool) $options['dry-run'];
 $apply = (bool) $options['apply'];
 if ($dryrun === $apply) {
     cli_error("Choose exactly one of --dry-run or --apply.\n\n" . $help);
+}
+
+if ($phase === 65 && $apply) {
+    cli_error("Phase 6.5 apply is intentionally disabled. Use --dry-run only.\n\n" . $help);
 }
 
 $importer = new \local_iliasmigration\importer();
