@@ -260,7 +260,7 @@ final class importer {
             'course' => [
                 'source_id' => $sourcecourseid,
                 'title' => (string) $course['title'],
-                'shortname' => $shortname = 'ILIAS-' . $sourcecourseid,
+                'shortname' => 'ILIAS-' . $sourcecourseid,
             ],
             'operations' => $operations,
             'warnings' => $warnings,
