@@ -1,24 +1,31 @@
 # Mapping ILIAS 10 → Moodle 4.5
 
-Cette matrice est le contrat fonctionnel de la migration. Elle sera affinée avec le cours POC réel.
+Cette matrice constitue le contrat fonctionnel de la migration. Les mappings sont validés progressivement sur le cours POC réel ILIAS 10.8 → Moodle 5.0.2, tout en conservant une compatibilité minimale du plugin avec Moodle 4.5.
 
 | Type ILIAS | Code indicatif ILIAS | Cible Moodle | Phase | Statut |
 |---|---|---|---:|---|
-| Catégorie | `cat` | Catégorie | 2 | prévu |
-| Cours | `crs` | Cours | 2 | prévu |
-| Dossier | `fold` | Section / Sous-section | 2 | prévu |
-| Fichier | `file` | Resource | 3 | prévu |
-| URL | `webr` | URL | 3 | prévu |
-| Page / contenu | selon contexte | Page / Label | 3 | à préciser |
-| SCORM | `sahs` | SCORM | 4 | prévu |
-| Learning Module ILIAS | `lm` | Book | 5 | prévu |
-| Test | `tst` | Quiz | 6 | prévu |
-| Question pool | `qpl` | Question bank | 6 | prévu |
-| Forum | `frm` | Forum | ultérieur | à étudier |
-| Wiki | `wiki` | Wiki | ultérieur | à étudier |
-| Exercice | `exc` | Assignment | ultérieur | à étudier |
-| Groupe | `grp` | Groupe / Groupement | 7 | à étudier |
-| Learning Progress | — | Completion | 7 | complexe |
+| Catégorie | `cat` | Catégorie | 2 | validé |
+| Cours | `crs` | Cours | 2 | validé |
+| Dossier | `fold` | Section / Sous-section | 2 | validé |
+| Fichier | `file` | `mod_resource` | 3 | validé |
+| URL | `webr` | `mod_url` | 3 | validé |
+| Module HTML | `htlm` | `mod_resource` | 3 | validé |
+| SCORM | `sahs` | `mod_scorm` | 4 | validé |
+| Learning Module ILIAS | `lm` | `mod_book` | 5 | validé |
+| Test | `tst` | `mod_quiz` | 6 | validé |
+| Question pool | `qpl` | Banque de questions / `qbank` | 6 | validé |
+| Content Page | `copa`* | `mod_page` | 6.5 | planifié — #14 |
+| Glossaire | `glo`* | `mod_glossary` | 6.5 | planifié — #15 |
+| Wiki | `wiki`* | `mod_wiki` | 6.5 | planifié — #16 |
+| Exercice | `exc`* | `mod_assign` | 6.5 | planifié — #17 |
+| Forum | `frm`* | `mod_forum` | 6.5 | planifié — #18 |
+| Mediacast | `mcst`* | `mod_data` ou collection de ressources | 6.5 | étude/POC — #19 |
+| Blog | `blog`* | `mod_data` privilégié | 6.5 | étude/POC — #20 |
+| Media Pool / galerie média | `mep`* / selon export | ressources, `mod_data` ou `mod_page` | 6.5 | étude/POC — #21 |
+| Groupe | `grp`* | Groupe / Groupement + structure/restrictions si nécessaire | 7 | planifié — #7 |
+| Learning Progress | — | Completion / historique | 7 | complexe |
+
+\* Les codes des nouveaux objets sont indicatifs tant qu’ils n’ont pas été confirmés sur le nouvel export POC utilisé pour leur implémentation.
 
 ## Règle pour les dossiers
 
@@ -30,8 +37,49 @@ Un dossier ILIAS n’est pas systématiquement converti en ressource « Folder �
 
 ## Liens internes
 
-Les liens contenant des identifiants ILIAS devront être résolus après création des objets Moodle grâce à une table de correspondance.
+La Phase 3 valide désormais la réécriture des liens internes ILIAS lorsqu’une cible Moodle unique et sûre existe.
 
 ```text
-ILIAS source_id → Moodle component + instance/course_module id
+ILIAS type|ref_id
+      ↓
+mapping persistant
+      ↓
+Moodle component + course_module id
 ```
+
+Si aucune cible Moodle n’existe encore, ou si plusieurs cibles distinctes sont possibles, le lien permanent ILIAS est conservé comme fallback au lieu de produire une réécriture approximative.
+
+## Phase 6.5 — extension des objets pédagogiques
+
+La Phase 6.5 est suivie par l’issue #13 et par les tickets #14 à #21.
+
+Ordre de développement retenu :
+
+1. Content Page → `mod_page` ;
+2. Glossaire → `mod_glossary` ;
+3. Wiki → `mod_wiki` ;
+4. Exercice → `mod_assign` ;
+5. Forum → `mod_forum` ;
+6. Mediacast → cible à figer après POC ;
+7. Blog → `mod_data` privilégié ;
+8. Media Pool / galerie média → cible à figer après POC.
+
+Pour les objets dépendants des identités utilisateurs, la structure pédagogique peut être traitée en Phase 6.5, tandis que les auteurs, membres, remises, notes ou contributions sont reportés à la Phase 7 lorsqu’un rapprochement utilisateur fiable est nécessaire.
+
+## Objet Groupe
+
+L’objet ILIAS Groupe reste volontairement en Phase 7. Sa migration complète peut nécessiter plusieurs éléments Moodle :
+
+```text
+ILIAS Group
+   ↓
+Moodle Group / Grouping
++
+structure de cours éventuelle
++
+restriction d’accès
++
+membres rapprochés
+```
+
+Le contenu éventuel du groupe pourra être analysé lors de la Phase 6.5, mais le rattachement des membres et la sémantique de groupe restent pilotés par l’issue #7.
