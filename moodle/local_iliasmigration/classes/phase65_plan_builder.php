@@ -59,6 +59,7 @@ final class phase65_plan_builder {
                     $targetcourseid
                 );
 
+                $operation['phase'] = '6.5';
                 $operation['action'] = $pageavailable ? $mapping['action'] : 'BLOCKED';
                 $operation['target_id'] = $mapping['target_id'];
                 $operation['moodle_module'] = 'page';
