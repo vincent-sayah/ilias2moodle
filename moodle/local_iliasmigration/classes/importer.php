@@ -19,7 +19,7 @@ final class importer {
      * Phase 6.5 (internal code 65) supports Content Page -> Moodle Page dry-run and guarded writes.
      *
      * @param string $migrationjson Absolute path to migration.json.
-     * @param int $categoryid Existing Moodle target category id, or 0 when categorypath is used.
+     * @param int $categoryid Existing Moodle target course category id, or 0 when categorypath is used.
      * @param bool $dryrun Whether Moodle writes are forbidden.
      * @param int $phase Requested project phase (2, 3, 4, 5, 6 or internal 65 for 6.5).
      * @param string $categorypath Optional Phase 2 category path to resolve/create.
@@ -161,6 +161,13 @@ final class importer {
         }
 
         if ($phase === 65) {
+            global $CFG;
+
+            // page_get_editor_options() is defined in mod/page/locallib.php.
+            // The CLI apply does not instantiate mod_page's form, so load the
+            // helper explicitly before the executor persists draft-area files.
+            require_once($CFG->dirroot . '/mod/page/locallib.php');
+
             $executor = new phase65_executor($migrationjson);
             return $executor->execute($document, $categoryid);
         }
@@ -253,7 +260,7 @@ final class importer {
             'course' => [
                 'source_id' => $sourcecourseid,
                 'title' => (string) $course['title'],
-                'shortname' => 'ILIAS-' . $sourcecourseid,
+                'shortname' => $shortname = 'ILIAS-' . $sourcecourseid,
             ],
             'operations' => $operations,
             'warnings' => $warnings,
