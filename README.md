@@ -121,8 +121,17 @@ Voir [`docs/migration-format.md`](docs/migration-format.md).
 | Module d’apprentissage ILIAS | Moodle Book | Validé Phase 5 |
 | Test | Quiz Moodle | Validé Phase 6 |
 | Banque de questions | Banque Moodle | Validé Phase 6 |
-| Utilisateurs / inscriptions / groupes | À définir | Phase 7 |
-| Progression / historique | À étudier | Phase 7 |
+| Content Page | `mod_page` | Planifié Phase 6.5 |
+| Glossaire | `mod_glossary` | Planifié Phase 6.5 |
+| Wiki | `mod_wiki` | Planifié Phase 6.5 |
+| Exercice | `mod_assign` | Planifié Phase 6.5 |
+| Forum | `mod_forum` | Planifié Phase 6.5 |
+| Mediacast | `mod_data` ou ressources | À figer sur POC Phase 6.5 |
+| Blog | `mod_data` privilégié | À figer sur POC Phase 6.5 |
+| Media Pool / galerie média | ressources / `mod_data` / `mod_page` | À figer sur POC Phase 6.5 |
+| Groupe | Groupe / Groupement + restrictions si nécessaire | Phase 7 |
+| Utilisateurs / inscriptions | Comptes / inscriptions / rôles | Phase 7 |
+| Progression / historique | Completion / historique | Phase 7 |
 
 La matrice détaillée est maintenue dans [`docs/mapping.md`](docs/mapping.md).
 
@@ -196,6 +205,27 @@ Moodle mod_resource CMID 20
 
 Le clic sur l’activité Moodle `lien` ouvre bien la ressource `chimie`. Le dry-run après apply reste idempotent et le package Phase 3 termine avec `blocked_resources=0` et `ready=true`.
 
+## Phase 6.5 — Extension des objets pédagogiques : planifiée
+
+Avant de démarrer la Phase 7, le projet ajoute une étape d’extension pour migrer des objets ILIAS supplémentaires.
+
+Issue maître : [#13 — Phase 6.5 — Extension des objets pédagogiques ILIAS](https://github.com/vincent-sayah/ilias2moodle/issues/13).
+
+Ordre retenu :
+
+1. [#14 Content Page](https://github.com/vincent-sayah/ilias2moodle/issues/14) → `mod_page` ;
+2. [#15 Glossaire](https://github.com/vincent-sayah/ilias2moodle/issues/15) → `mod_glossary` ;
+3. [#16 Wiki](https://github.com/vincent-sayah/ilias2moodle/issues/16) → `mod_wiki` ;
+4. [#17 Exercice](https://github.com/vincent-sayah/ilias2moodle/issues/17) → `mod_assign` ;
+5. [#18 Forum](https://github.com/vincent-sayah/ilias2moodle/issues/18) → `mod_forum` ;
+6. [#19 Mediacast](https://github.com/vincent-sayah/ilias2moodle/issues/19) → `mod_data` ou ressources selon le POC ;
+7. [#20 Blog](https://github.com/vincent-sayah/ilias2moodle/issues/20) → `mod_data` privilégié ;
+8. [#21 Media Pool / galerie média](https://github.com/vincent-sayah/ilias2moodle/issues/21) → stratégie à figer sur POC.
+
+L’objet ILIAS Groupe reste volontairement dans la Phase 7 (#7), car sa migration complète dépend des utilisateurs, des membres, des inscriptions et des groupements.
+
+La stratégie détaillée est documentée dans [`docs/phase6-5-extended-objects.md`](docs/phase6-5-extended-objects.md).
+
 ## Installation développeur
 
 Pré-requis :
@@ -247,6 +277,8 @@ Version courante après clôture de la Phase 3 :
 2026091402
 ```
 
+La planification de la Phase 6.5 ne modifie pas la version du plugin tant qu’aucune nouvelle implémentation fonctionnelle n’est intégrée.
+
 ## Idempotence
 
 Les correspondances persistantes permettent de rejouer les imports sans dupliquer les objets :
@@ -274,20 +306,21 @@ ERROR_STALE_MAPPING
 ## Roadmap
 
 ```text
-Phase 1  [x] Inventaire et analyse
-Phase 2  [x] Structure
-Phase 3  [x] Ressources simples
-Phase 4  [x] SCORM
-Phase 5  [x] Modules d’apprentissage ILIAS
-Phase 6  [x] Tests et banques de questions
-Phase 7  [ ] Utilisateurs, inscriptions et progression
+Phase 1    [x] Inventaire et analyse
+Phase 2    [x] Structure
+Phase 3    [x] Ressources simples
+Phase 4    [x] SCORM
+Phase 5    [x] Modules d’apprentissage ILIAS
+Phase 6    [x] Tests et banques de questions
+Phase 6.5  [ ] Extension des objets pédagogiques
+Phase 7    [ ] Utilisateurs, inscriptions, groupes et progression
 ```
 
 ## État actuel
 
 **Phases 1 à 6 terminées et validées sur le POC de référence.**
 
-La structure, les ressources simples, les SCORM, les modules d’apprentissage ILIAS, les tests et les banques de questions sont maintenant validés sur le POC. La Phase 7, consacrée aux utilisateurs, inscriptions, groupes et à la progression, n’a pas encore démarré.
+La prochaine étape active est la **Phase 6.5**, consacrée à l’extension des objets pédagogiques. Elle commence par Content Page, puis Glossaire et Wiki. La Phase 7 reste ouverte mais sera reprise après cette extension, notamment pour les utilisateurs, inscriptions, groupes, auteurs, remises et historique nécessitant un rapprochement d’identité fiable.
 
 ## Licence
 
