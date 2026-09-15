@@ -85,6 +85,12 @@ final class phase65_package_validator {
         $phase6ready = !isset($plan['phase6_package']) || !empty($plan['phase6_package']['ready']);
         $prerequisitesready = !empty($plan['phase65_prerequisites']['ready']);
         $packagechecksready = $checked > 0 && $blocked === 0;
+        $ready = $packagechecksready
+            && $prerequisitesready
+            && $phase3ready
+            && $phase4ready
+            && $phase5ready
+            && $phase6ready;
 
         $plan['phase65_package'] = [
             'root' => $this->packageroot,
@@ -96,22 +102,10 @@ final class phase65_package_validator {
             'previous_packages_ready' => $phase3ready && $phase4ready && $phase5ready && $phase6ready,
             'prerequisites_ready' => $prerequisitesready,
             'package_checks_ready' => $packagechecksready,
-            'ready' => $packagechecksready
-                && $prerequisitesready
-                && $phase3ready
-                && $phase4ready
-                && $phase5ready
-                && $phase6ready,
-            'apply_implemented' => false,
-            'apply_ready' => false,
+            'ready' => $ready,
+            'apply_implemented' => true,
+            'apply_ready' => $ready,
         ];
-
-        if (!empty($plan['phase65_package']['ready'])) {
-            $plan['warnings'][] = [
-                'code' => 'PHASE65_APPLY_NOT_IMPLEMENTED',
-                'message' => 'The Content Page package is valid for dry-run; mod_page writes remain intentionally disabled until the real preview is approved.',
-            ];
-        }
 
         return $plan;
     }
