@@ -113,6 +113,13 @@ Phase 6.5 Content Page -> Moodle Page preview:
       --phase=6.5 \\
       --dry-run
 
+Phase 6.5 Content Page -> Moodle Page write:
+  php local/iliasmigration/cli/import.php \\
+      --source=/path/to/migration.json \\
+      --category=ID \\
+      --phase=6.5 \\
+      --apply
+
 Options:
   --source         Absolute path to migration.json.
   --category       Existing Moodle course category id.
@@ -128,17 +135,9 @@ Options:
   --apply          Apply the selected supported phase.
                    Phase 2 can use either --category=ID or --category-path.
                    Phases 3 to 6.5 require --category=ID.
-                   Phase 3 requires Phase 2 structure to exist and package validation to pass.
-                   Phase 4 requires Phases 2/3 to be synchronized and SCORM validation to pass.
-                   Phase 5 requires Phases 2/3/4 to be synchronized and the Learning Module package
-                   validation to pass. A changed already-mapped Book is refused until safe chapter
-                   replacement is implemented; unchanged replays are idempotent.
-                   Phase 6 requires Phases 2-5 to be synchronized and the Phase 6 dry-run package,
-                   qtype and scoring-policy checks to be ready. Score-preserving transforms are used
-                   for unequal-weight Matching and Multiple Choice with unselected-option credit.
-                   An already-mapped Quiz whose question fingerprint/order/marks changed is refused.
-                   Phase 6.5 apply is intentionally disabled until the real Content Page dry-run
-                   has been reviewed and approved.
+                   Phase 6.5 revalidates Phases 3-6 and Content Page assets immediately
+                   before writing. The apply reuses the approved internal-link decisions
+                   and refuses the write if the rendered HTML fingerprint changes.
   -h, --help       Display this help.
 
 Exactly one of --dry-run or --apply is required.
@@ -174,20 +173,14 @@ if ($phase === 2) {
     if ($hascategoryid === $hascategorypath) {
         cli_error("For Phase 2 choose exactly one of --category or --category-path.\n\n" . $help);
     }
-} else {
-    if (!$hascategoryid || $hascategorypath) {
-        cli_error("Phases 3 to 6.5 require --category=ID and do not accept --category-path.\n\n" . $help);
-    }
+} else if (!$hascategoryid || $hascategorypath) {
+    cli_error("Phases 3 to 6.5 require --category=ID and do not accept --category-path.\n\n" . $help);
 }
 
 $dryrun = (bool) $options['dry-run'];
 $apply = (bool) $options['apply'];
 if ($dryrun === $apply) {
     cli_error("Choose exactly one of --dry-run or --apply.\n\n" . $help);
-}
-
-if ($phase === 65 && $apply) {
-    cli_error("Phase 6.5 apply is intentionally disabled. Use --dry-run only.\n\n" . $help);
 }
 
 $importer = new \local_iliasmigration\importer();
