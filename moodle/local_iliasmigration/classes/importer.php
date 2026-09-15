@@ -16,11 +16,12 @@ final class importer {
      * Phase 4 supports dry-run/package validation and real SCORM writes.
      * Phase 5 supports dry-run/package validation and real Learning Module -> Moodle Book writes.
      * Phase 6 supports Question Bank + Quiz dry-run validation and guarded real writes.
+     * Phase 6.5 (internal code 65) supports Content Page -> Moodle Page dry-run only.
      *
      * @param string $migrationjson Absolute path to migration.json.
      * @param int $categoryid Existing Moodle target category id, or 0 when categorypath is used.
      * @param bool $dryrun Whether Moodle writes are forbidden.
-     * @param int $phase Requested project phase (2, 3, 4, 5 or 6).
+     * @param int $phase Requested project phase (2, 3, 4, 5, 6 or internal 65 for 6.5).
      * @param string $categorypath Optional Phase 2 category path to resolve/create.
      * @return array Plan or execution report.
      */
@@ -31,9 +32,9 @@ final class importer {
         int $phase = 2,
         string $categorypath = ''
     ): array {
-        if (!in_array($phase, [2, 3, 4, 5, 6], true)) {
+        if (!in_array($phase, [2, 3, 4, 5, 6, 65], true)) {
             throw new \coding_exception(
-                'Only migration phases 2, 3, 4, 5 and 6 are supported by this plugin version.'
+                'Only migration phases 2, 3, 4, 5, 6 and 6.5 are supported by this plugin version.'
             );
         }
 
@@ -50,7 +51,7 @@ final class importer {
             if ($phase !== 2) {
                 throw new \coding_exception(
                     'Automatic category-path resolution/creation is intentionally limited to Phase 2. '
-                    . 'Use --category=ID for Phases 3 to 6.'
+                    . 'Use --category=ID for Phases 3 to 6.5.'
                 );
             }
 
@@ -76,6 +77,31 @@ final class importer {
         }
 
         if ($dryrun) {
+            if ($phase === 65) {
+                $planner = new phase65_plan_builder($categoryid);
+                $plan = $planner->build($document);
+
+                // Phase 6.5 uses the newest complete export. Revalidate every
+                // earlier package family before Content Page is considered ready.
+                $phase3validator = new phase3_package_validator($migrationjson);
+                $plan = $phase3validator->validate($plan);
+
+                $phase4validator = new phase4_package_validator($migrationjson);
+                $plan = $phase4validator->validate($plan);
+
+                $phase5validator = new phase5_package_validator($migrationjson);
+                $plan = $phase5validator->validate($plan);
+
+                $phase6validator = new phase6_package_validator($migrationjson);
+                $plan = $phase6validator->validate($plan);
+
+                $scoringvalidator = new phase6_scoring_policy_validator($migrationjson);
+                $plan = $scoringvalidator->validate($plan);
+
+                $phase65validator = new phase65_package_validator($migrationjson);
+                return $phase65validator->validate($plan);
+            }
+
             if ($phase === 6) {
                 $planner = new phase6_plan_builder($categoryid);
                 $plan = $planner->build($document);
@@ -146,6 +172,12 @@ final class importer {
             }
 
             return $plan;
+        }
+
+        if ($phase === 65) {
+            throw new \coding_exception(
+                'Phase 6.5 apply is intentionally disabled until the real Content Page dry-run is approved.'
+            );
         }
 
         if ($phase === 6) {
