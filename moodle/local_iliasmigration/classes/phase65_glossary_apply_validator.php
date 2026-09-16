@@ -127,14 +127,40 @@ final class phase65_glossary_apply_validator {
         }
         unset($operation);
 
-        $ready = !empty($plan['phase65_glossary_package']['ready']) && $entryblocked === 0;
+        $phase3ready = !isset($plan['phase3_package'])
+            || !empty($plan['phase3_package']['ready']);
+        $phase4ready = !isset($plan['phase4_package'])
+            || !empty($plan['phase4_package']['ready']);
+        $phase5ready = !isset($plan['phase5_package'])
+            || !empty($plan['phase5_package']['ready']);
+        $phase6ready = !isset($plan['phase6_package'])
+            || !empty($plan['phase6_package']['ready']);
+        $phase6prerequisitesready = !isset($plan['phase6_prerequisites'])
+            || !empty($plan['phase6_prerequisites']['ready']);
+        $previousready = $phase3ready
+            && $phase4ready
+            && $phase5ready
+            && $phase6ready
+            && $phase6prerequisitesready;
+
+        $ready = !empty($plan['phase65_glossary_package']['ready'])
+            && $previousready
+            && $entryblocked === 0;
+        $plan['phase65_glossary_package']['previous_packages_ready'] = $previousready;
         $plan['phase65_glossary_package']['entry_create_count'] = $entrycreates;
         $plan['phase65_glossary_package']['entry_update_count'] = $entryupdates;
         $plan['phase65_glossary_package']['entry_blocked_count'] = $entryblocked;
         $plan['phase65_glossary_package']['apply_implemented'] = true;
         $plan['phase65_glossary_package']['apply_ready'] = $ready;
-        if ($entryblocked > 0) {
+        if (!$ready) {
             $plan['phase65_glossary_package']['ready'] = false;
+        }
+
+        if (!$previousready) {
+            $plan['warnings'][] = [
+                'code' => 'GLOSSARY_PREVIOUS_PHASES_NOT_READY',
+                'message' => 'Phase 3-6 package validation must be ready before Glossary apply can run.',
+            ];
         }
 
         $plan['warnings'] = array_values(array_filter(
