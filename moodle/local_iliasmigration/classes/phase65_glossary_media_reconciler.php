@@ -14,8 +14,9 @@ defined('MOODLE_INTERNAL') || die();
  *
  * This reconciler persists the validated assets directly through Moodle's file
  * storage API in mod_glossary/entry using those exact paths, then verifies that
- * every reference is backed by a stored file. It performs no direct writes to
- * mdl_files and is designed to run inside the outer Glossary apply transaction.
+ * every reference is backed by the exact source bytes. It performs no direct
+ * writes to mdl_files and is designed to run inside the outer Glossary apply
+ * transaction.
  */
 final class phase65_glossary_media_reconciler {
     /** @var string Canonical migration package root. */
@@ -43,6 +44,7 @@ final class phase65_glossary_media_reconciler {
         $entries = 0;
         $expectedfiles = 0;
         $storedfiles = 0;
+        $verifiedfiles = 0;
 
         foreach ($result['operations'] as &$operation) {
             if (!is_array($operation) || (string) ($operation['kind'] ?? '') !== 'glossary') {
@@ -106,14 +108,21 @@ final class phase65_glossary_media_reconciler {
                 );
 
                 $assets = $assetsbyterm[$termid] ?? [];
-                $count = $this->replace_entry_files($context, $entryid, $entry, $assets);
+                $replacement = $this->replace_entry_files($context, $entryid, $entry, $assets);
+                $count = (int) ($replacement['count'] ?? 0);
+                $checks = is_array($replacement['files'] ?? null) ? $replacement['files'] : [];
 
                 $operation['entries'][$resultindex]['file_count'] = $count;
                 $operation['entries'][$resultindex]['media_reconciled'] = true;
+                $operation['entries'][$resultindex]['media_verification'] = $checks;
 
                 $entries++;
                 $expectedfiles += count($assets);
                 $storedfiles += $count;
+                $verifiedfiles += count(array_filter(
+                    $checks,
+                    static fn(array $check): bool => !empty($check['verified'])
+                ));
             }
 
             $operation['moodle_file_count'] = array_sum(array_map(
@@ -128,9 +137,10 @@ final class phase65_glossary_media_reconciler {
         }
         unset($operation);
 
-        if ($expectedfiles !== $storedfiles) {
+        if ($expectedfiles !== $storedfiles || $expectedfiles !== $verifiedfiles) {
             throw new \coding_exception(
-                "Glossary media reconciliation stored {$storedfiles} files but expected {$expectedfiles}."
+                "Glossary media reconciliation expected {$expectedfiles} files, stored {$storedfiles}, "
+                . "and verified {$verifiedfiles}."
             );
         }
 
@@ -139,6 +149,8 @@ final class phase65_glossary_media_reconciler {
             'entries' => $entries,
             'expected_files' => $expectedfiles,
             'stored_files' => $storedfiles,
+            'verified_files' => $verifiedfiles,
+            'binary_identity_verified' => true,
             'ready' => true,
         ];
 
@@ -147,13 +159,15 @@ final class phase65_glossary_media_reconciler {
 
     /**
      * Replace one entry file area with the exact validated embedded assets.
+     *
+     * @return array{count:int,files:array}
      */
     private function replace_entry_files(
         \context_module $context,
         int $entryid,
         \stdClass $entry,
         array $assets
-    ): int {
+    ): array {
         $fs = get_file_storage();
         $destinations = [];
 
@@ -178,8 +192,20 @@ final class phase65_glossary_media_reconciler {
             if (isset($destinations[$key])) {
                 throw new \coding_exception('Glossary media assets collide on the same Moodle file path.');
             }
+
+            $source = $this->resolve_relative_file($migrationpath);
+            $sourcehash = sha1_file($source);
+            $sourcesize = filesize($source);
+            if ($sourcehash === false || $sourcesize === false) {
+                throw new \coding_exception('Unable to fingerprint a validated Glossary source asset.');
+            }
+
             $destinations[$key] = [
-                'source' => $this->resolve_relative_file($migrationpath),
+                'source' => $source,
+                'source_sha1' => $sourcehash,
+                'source_size' => (int) $sourcesize,
+                'migration_path' => $migrationpath,
+                'pluginfile_path' => $pluginfile,
                 'filepath' => $filepath,
                 'filename' => $filename,
             ];
@@ -189,8 +215,24 @@ final class phase65_glossary_media_reconciler {
         // area deterministically so removed or renamed source assets cannot linger.
         $fs->delete_area_files($context->id, 'mod_glossary', 'entry', $entryid);
 
+        $checks = [];
         foreach ($destinations as $destination) {
-            $fs->create_file_from_pathname(
+            // Defensive per-path deletion: create_file_from_pathname() never
+            // overwrites an existing pathname. If an earlier editor save recreated
+            // the same destination, remove it explicitly before writing source bytes.
+            $existing = $fs->get_file(
+                $context->id,
+                'mod_glossary',
+                'entry',
+                $entryid,
+                $destination['filepath'],
+                $destination['filename']
+            );
+            if ($existing) {
+                $existing->delete();
+            }
+
+            $created = $fs->create_file_from_pathname(
                 [
                     'contextid' => $context->id,
                     'component' => 'mod_glossary',
@@ -201,9 +243,36 @@ final class phase65_glossary_media_reconciler {
                 ],
                 $destination['source']
             );
+
+            $this->assert_binary_identity($created, $destination);
+
+            $stored = $fs->get_file(
+                $context->id,
+                'mod_glossary',
+                'entry',
+                $entryid,
+                $destination['filepath'],
+                $destination['filename']
+            );
+            if (!$stored) {
+                throw new \coding_exception('A reconciled Glossary embedded file is missing after creation.');
+            }
+            $this->assert_binary_identity($stored, $destination);
+
+            $checks[] = [
+                'migration_path' => $destination['migration_path'],
+                'pluginfile_path' => $destination['pluginfile_path'],
+                'filepath' => $destination['filepath'],
+                'filename' => $destination['filename'],
+                'source_size' => $destination['source_size'],
+                'stored_size' => (int) $stored->get_filesize(),
+                'source_sha1' => $destination['source_sha1'],
+                'stored_sha1' => (string) $stored->get_contenthash(),
+                'verified' => true,
+            ];
         }
 
-        $stored = $fs->get_area_files(
+        $storedarea = $fs->get_area_files(
             $context->id,
             'mod_glossary',
             'entry',
@@ -211,26 +280,30 @@ final class phase65_glossary_media_reconciler {
             'id',
             false
         );
-        if (count($stored) !== count($destinations)) {
+        if (count($storedarea) !== count($destinations)) {
             throw new \coding_exception(
                 'Glossary embedded-file count differs from the validated source asset count.'
             );
         }
 
-        foreach ($destinations as $destination) {
-            if (!$fs->file_exists(
-                $context->id,
-                'mod_glossary',
-                'entry',
-                $entryid,
-                $destination['filepath'],
-                $destination['filename']
-            )) {
-                throw new \coding_exception('A reconciled Glossary embedded file is missing after creation.');
-            }
-        }
+        return ['count' => count($storedarea), 'files' => $checks];
+    }
 
-        return count($stored);
+    /** Require exact source/stored size and SHA1 identity. */
+    private function assert_binary_identity(\stored_file $stored, array $destination): void {
+        $sourcehash = (string) ($destination['source_sha1'] ?? '');
+        $sourcesize = (int) ($destination['source_size'] ?? -1);
+        $storedhash = (string) $stored->get_contenthash();
+        $storedsize = (int) $stored->get_filesize();
+
+        if ($sourcehash === ''
+                || $sourcesize < 0
+                || !hash_equals($sourcehash, $storedhash)
+                || $sourcesize !== $storedsize) {
+            throw new \coding_exception(
+                'Glossary embedded file differs from the validated package source bytes.'
+            );
+        }
     }
 
     /**
