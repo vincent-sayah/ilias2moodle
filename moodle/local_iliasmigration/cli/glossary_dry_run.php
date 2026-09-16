@@ -35,17 +35,17 @@ if ($categoryid <= 0) {
 
 $reader = new \local_iliasmigration\migration_reader();
 $document = $reader->read($source);
-$plan = (new \local_iliasmigration\phase65_plan_builder($categoryid))->build($document);
+
+// Start from Phase 6 directly: Glossary is an independent Phase 6.5 object
+// family and must not depend on the Content Page module/readiness checks.
+$plan = (new \local_iliasmigration\phase6_plan_builder($categoryid))->build($document);
+$plan['phase'] = '6.5';
 $plan = (new \local_iliasmigration\phase3_package_validator($source))->validate($plan);
 $plan = (new \local_iliasmigration\phase4_package_validator($source))->validate($plan);
 $plan = (new \local_iliasmigration\phase5_package_validator($source))->validate($plan);
 $plan = (new \local_iliasmigration\phase6_package_validator($source))->validate($plan);
 $plan = (new \local_iliasmigration\phase6_scoring_policy_validator($source))->validate($plan);
-
-// Glossary has its own Phase 6.5 validator. Do not couple its readiness to
-// the Content Page package validator: both are independent Phase 6.5 object
-// families. Earlier Phase 3-6 package checks above remain mandatory.
-$plan = (new \local_iliasmigration\phase65_glossary_package_validator($source))->validate($plan);
+$plan = (new \local_iliasmigration\phase65_glossary_apply_validator($source))->validate($plan);
 $plan['mode'] = 'dry-run';
 $plan['writes_performed'] = false;
 $plan['phase'] = '6.5';
