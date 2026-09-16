@@ -15,6 +15,7 @@ SUPPORTED_PHASE1_TYPES = {
     "url",
     "page",
     "content_page",
+    "glossary",
     "scorm",
     "html_module",
     "learning_module",
