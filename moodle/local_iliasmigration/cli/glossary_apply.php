@@ -36,7 +36,19 @@ if ($categoryid <= 0) {
 $reader = new \local_iliasmigration\migration_reader();
 $document = $reader->read($source);
 $executor = new \local_iliasmigration\phase65_glossary_executor($source);
-$result = $executor->execute($document, $categoryid);
+$reconciler = new \local_iliasmigration\phase65_glossary_media_reconciler($source);
+
+// Keep the executor and the embedded-media reconciliation under one outer
+// delegated transaction. The executor has its own delegated transaction; Moodle
+// defers the final commit until this outer transaction is allowed to commit.
+$transaction = $DB->start_delegated_transaction();
+try {
+    $result = $executor->execute($document, $categoryid);
+    $result = $reconciler->reconcile($result);
+    $transaction->allow_commit();
+} catch (\Throwable $exception) {
+    $transaction->rollback($exception);
+}
 
 echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 echo PHP_EOL;
