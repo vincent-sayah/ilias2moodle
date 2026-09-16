@@ -75,6 +75,8 @@ Cible : `mod_page`.
 - fichiers intégrés ;
 - liens internes réécrits quand une cible Moodle existe.
 
+État : validé et fusionné via #14 / PR #23.
+
 ### Glossaire
 
 Cible : `mod_glossary`.
@@ -87,6 +89,8 @@ Cible : `mod_glossary`.
 - catégories ;
 - médias et pièces jointes ;
 - paramètres utiles du glossaire.
+
+État : analyse réelle en cours sur #15. Le premier POC exporté confirme `glo` + définitions `COPage` + `MediaObjects`; la taxonomie et les pièces jointes ne sont pas encore validées dans l’export réel observé.
 
 ### Wiki
 
