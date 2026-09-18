@@ -14,6 +14,10 @@ from ilias2moodle.glossary_package import (
 )
 from ilias2moodle.ilias.export_parser import IliasExportParser
 from ilias2moodle.model import MigrationDocument
+from ilias2moodle.wiki_package import (
+    enrich_document_wikis,
+    extract_wiki_assets,
+)
 from ilias2moodle.package_builder import MigrationPackageBuilder
 from ilias2moodle.report import write_reports
 
@@ -122,6 +126,7 @@ def _parse_export_document(zip_path: Path, ilias_version: str) -> MigrationDocum
     )
     enrich_document_content_pages(document, zip_path)
     enrich_document_glossaries(document, zip_path)
+    enrich_document_wikis(document, zip_path)
     return document
 
 
@@ -150,11 +155,12 @@ def _prepare_export(zip_path: Path, output: Path, ilias_version: str) -> int:
     document = _parse_export_document(zip_path, ilias_version)
     content_page_result = extract_content_page_assets(document, zip_path, output)
     glossary_result = extract_glossary_assets(document, zip_path, output)
+    wiki_result = extract_wiki_assets(document, zip_path, output)
     result = MigrationPackageBuilder(zip_path, output).build(document)
     package = result["package"]
     report = result["report"]
 
-    extension_results = (content_page_result, glossary_result)
+    extension_results = (content_page_result, glossary_result, wiki_result)
     for extension_result in extension_results:
         managed_directory = str(extension_result["managed_directory"])
         if managed_directory not in package["managed_directories"]:
