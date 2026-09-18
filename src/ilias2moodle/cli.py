@@ -205,3 +205,7 @@ def main(argv: list[str] | None = None) -> int:
 
     parser.error("Commande inconnue")
     return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
