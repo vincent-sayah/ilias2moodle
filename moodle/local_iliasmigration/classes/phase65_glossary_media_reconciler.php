@@ -14,9 +14,9 @@ defined('MOODLE_INTERNAL') || die();
  *
  * This reconciler persists the validated assets directly through Moodle's file
  * storage API in mod_glossary/entry using those exact paths, then verifies that
- * every reference is backed by the exact source bytes. It performs no direct
- * writes to mdl_files and is designed to run inside the outer Glossary apply
- * transaction.
+ * every reference is backed either by the exact source bytes or by the exact
+ * output of Moodle's active file-redaction policy. It performs no direct writes
+ * to mdl_files and is designed to run inside the outer Glossary apply transaction.
  */
 final class phase65_glossary_media_reconciler {
     /** @var string Canonical migration package root. */
@@ -45,6 +45,8 @@ final class phase65_glossary_media_reconciler {
         $expectedfiles = 0;
         $storedfiles = 0;
         $verifiedfiles = 0;
+        $sourceidentityfiles = 0;
+        $moodleredactedfiles = 0;
 
         foreach ($result['operations'] as &$operation) {
             if (!is_array($operation) || (string) ($operation['kind'] ?? '') !== 'glossary') {
@@ -123,6 +125,14 @@ final class phase65_glossary_media_reconciler {
                     $checks,
                     static fn(array $check): bool => !empty($check['verified'])
                 ));
+                $sourceidentityfiles += count(array_filter(
+                    $checks,
+                    static fn(array $check): bool => ($check['verification_mode'] ?? '') === 'source'
+                ));
+                $moodleredactedfiles += count(array_filter(
+                    $checks,
+                    static fn(array $check): bool => ($check['verification_mode'] ?? '') === 'moodle_redactor'
+                ));
             }
 
             $operation['moodle_file_count'] = array_sum(array_map(
@@ -150,7 +160,10 @@ final class phase65_glossary_media_reconciler {
             'expected_files' => $expectedfiles,
             'stored_files' => $storedfiles,
             'verified_files' => $verifiedfiles,
-            'binary_identity_verified' => true,
+            'source_identity_files' => $sourceidentityfiles,
+            'moodle_redacted_files' => $moodleredactedfiles,
+            'storage_policy_verified' => true,
+            'binary_identity_verified' => $moodleredactedfiles === 0,
             'ready' => true,
         ];
 
@@ -244,7 +257,10 @@ final class phase65_glossary_media_reconciler {
                 $destination['source']
             );
 
-            $this->assert_binary_identity($created, $destination);
+            // Moodle may legitimately transform supported files through the
+            // before_file_created redaction hook. Validate against either the
+            // source bytes or that exact policy output.
+            $this->verify_storage_policy($created, $destination);
 
             $stored = $fs->get_file(
                 $context->id,
@@ -257,7 +273,7 @@ final class phase65_glossary_media_reconciler {
             if (!$stored) {
                 throw new \coding_exception('A reconciled Glossary embedded file is missing after creation.');
             }
-            $this->assert_binary_identity($stored, $destination);
+            $verification = $this->verify_storage_policy($stored, $destination);
 
             $checks[] = [
                 'migration_path' => $destination['migration_path'],
@@ -268,6 +284,9 @@ final class phase65_glossary_media_reconciler {
                 'stored_size' => (int) $stored->get_filesize(),
                 'source_sha1' => $destination['source_sha1'],
                 'stored_sha1' => (string) $stored->get_contenthash(),
+                'verification_mode' => $verification['mode'],
+                'expected_size' => $verification['expected_size'],
+                'expected_sha1' => $verification['expected_sha1'],
                 'verified' => true,
             ];
         }
@@ -289,25 +308,67 @@ final class phase65_glossary_media_reconciler {
         return ['count' => count($storedarea), 'files' => $checks];
     }
 
-    /** Require exact source/stored size and SHA1 identity. */
-    private function assert_binary_identity(\stored_file $stored, array $destination): void {
+    /**
+     * Verify a stored file against the source or Moodle's exact redaction output.
+     *
+     * Moodle 5 can transform supported files through the core_files
+     * before_file_created hook (for example JPEG EXIF redaction). That is a
+     * legitimate storage policy, not migration corruption, but only the exact
+     * policy output is accepted.
+     *
+     * @return array{mode:string,expected_size:int,expected_sha1:string}
+     */
+    private function verify_storage_policy(\stored_file $stored, array $destination): array {
         $sourcehash = (string) ($destination['source_sha1'] ?? '');
         $sourcesize = (int) ($destination['source_size'] ?? -1);
         $storedhash = (string) $stored->get_contenthash();
         $storedsize = (int) $stored->get_filesize();
 
-        if ($sourcehash === ''
-                || $sourcesize < 0
-                || !hash_equals($sourcehash, $storedhash)
-                || $sourcesize !== $storedsize) {
-            throw new \coding_exception(
-                'Glossary embedded file differs from the validated package source bytes.'
-            );
+        if ($sourcehash !== ''
+                && $sourcesize >= 0
+                && hash_equals($sourcehash, $storedhash)
+                && $sourcesize === $storedsize) {
+            return [
+                'mode' => 'source',
+                'expected_size' => $sourcesize,
+                'expected_sha1' => $sourcehash,
+            ];
         }
+
+        $source = (string) ($destination['source'] ?? '');
+        $filename = (string) ($destination['filename'] ?? '');
+        if ($source !== ''
+                && is_file($source)
+                && class_exists('\core_files\redactor\manager')
+                && class_exists('\core\di')) {
+            $mimetype = \file_storage::mimetype($source, $filename);
+            $manager = \core\di::get(\core_files\redactor\manager::class);
+            $redacted = $manager->redact_file($mimetype, $source);
+
+            if ($redacted !== null && is_file($redacted)) {
+                $redactedhash = sha1_file($redacted);
+                $redactedsize = filesize($redacted);
+
+                if ($redactedhash !== false
+                        && $redactedsize !== false
+                        && hash_equals($redactedhash, $storedhash)
+                        && (int) $redactedsize === $storedsize) {
+                    return [
+                        'mode' => 'moodle_redactor',
+                        'expected_size' => (int) $redactedsize,
+                        'expected_sha1' => $redactedhash,
+                    ];
+                }
+            }
+        }
+
+        throw new \coding_exception(
+            'Glossary embedded file matches neither the package source nor Moodle redaction output.'
+        );
     }
 
     /**
-     * Convert @@PLUGINFILE@@/path/to/file.ext into Moodle filepath + filename.
+     * Convert @@PLUGINFILE@@//path/to/file.ext into Moodle filepath + filename.
      *
      * @return array{0:string,1:string}
      */
