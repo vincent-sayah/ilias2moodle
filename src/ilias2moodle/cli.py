@@ -8,6 +8,10 @@ from ilias2moodle.content_page_package import (
     enrich_document_content_pages,
     extract_content_page_assets,
 )
+from ilias2moodle.glossary_package import (
+    enrich_document_glossaries,
+    extract_glossary_assets,
+)
 from ilias2moodle.ilias.export_parser import IliasExportParser
 from ilias2moodle.model import MigrationDocument
 from ilias2moodle.package_builder import MigrationPackageBuilder
@@ -117,6 +121,7 @@ def _parse_export_document(zip_path: Path, ilias_version: str) -> MigrationDocum
         source={"lms": "ILIAS", "version": ilias_version},
     )
     enrich_document_content_pages(document, zip_path)
+    enrich_document_glossaries(document, zip_path)
     return document
 
 
@@ -144,16 +149,19 @@ def _analyse_export(
 def _prepare_export(zip_path: Path, output: Path, ilias_version: str) -> int:
     document = _parse_export_document(zip_path, ilias_version)
     content_page_result = extract_content_page_assets(document, zip_path, output)
+    glossary_result = extract_glossary_assets(document, zip_path, output)
     result = MigrationPackageBuilder(zip_path, output).build(document)
     package = result["package"]
     report = result["report"]
 
-    managed_directory = str(content_page_result["managed_directory"])
-    if managed_directory not in package["managed_directories"]:
-        package["managed_directories"].append(managed_directory)
+    extension_results = (content_page_result, glossary_result)
+    for extension_result in extension_results:
+        managed_directory = str(extension_result["managed_directory"])
+        if managed_directory not in package["managed_directories"]:
+            package["managed_directories"].append(managed_directory)
+        package["extracted"].update(extension_result["extracted"])
+        package["missing"].extend(extension_result["missing"])
 
-    package["extracted"].update(content_page_result["extracted"])
-    package["missing"].extend(content_page_result["missing"])
     package["missing_count"] = len(package["missing"])
     (output / "package.json").write_text(
         json.dumps(package, ensure_ascii=False, indent=2), encoding="utf-8"
