@@ -368,7 +368,7 @@ final class phase65_glossary_media_reconciler {
     }
 
     /**
-     * Convert @@PLUGINFILE@@//path/to/file.ext into Moodle filepath + filename.
+     * Convert @@PLUGINFILE@@/path/to/file.ext into Moodle filepath + filename.
      *
      * @return array{0:string,1:string}
      */
