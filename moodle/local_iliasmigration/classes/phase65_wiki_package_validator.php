@@ -472,6 +472,16 @@ final class phase65_wiki_package_validator {
                         'message' => "Mapped Moodle Wiki page for {$mappingref} is missing.",
                     ];
                 }
+                if ((string) $targetpage->title !== $title) {
+                    return [
+                        'blocked' => true,
+                        'blocked_count' => 1,
+                        'create_count' => $creates,
+                        'update_count' => $updates,
+                        'pages' => $planned,
+                        'message' => "Wiki page title changes are not yet supported for {$mappingref}.",
+                    ];
+                }
                 $action = 'UPDATE';
                 $updates++;
             } else {
