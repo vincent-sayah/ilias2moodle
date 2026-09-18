@@ -14,12 +14,12 @@ from ilias2moodle.glossary_package import (
 )
 from ilias2moodle.ilias.export_parser import IliasExportParser
 from ilias2moodle.model import MigrationDocument
+from ilias2moodle.package_builder import MigrationPackageBuilder
+from ilias2moodle.report import write_reports
 from ilias2moodle.wiki_package import (
     enrich_document_wikis,
     extract_wiki_assets,
 )
-from ilias2moodle.package_builder import MigrationPackageBuilder
-from ilias2moodle.report import write_reports
 
 
 def _build_parser() -> argparse.ArgumentParser:
