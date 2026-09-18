@@ -14,6 +14,10 @@ final class phase65_wiki_package_validator {
     /** @var string Canonical migration package root. */
     private string $packageroot;
 
+    /** Source instance/course identity used by persistent page mappings. */
+    private string $sourceinstance = '';
+    private string $sourcecourse = '';
+
     public function __construct(string $migrationjson) {
         $root = realpath(dirname($migrationjson));
         if ($root === false || !is_dir($root)) {
@@ -32,6 +36,8 @@ final class phase65_wiki_package_validator {
 
         $sourceinstance = (string) ($plan['source']['instance'] ?? '');
         $sourcecourse = (string) ($plan['course']['source_id'] ?? '');
+        $this->sourceinstance = $sourceinstance;
+        $this->sourcecourse = $sourcecourse;
         $targetcourseid = (int) ($plan['operations'][0]['target_id'] ?? 0);
 
         $checked = 0;
@@ -40,6 +46,9 @@ final class phase65_wiki_package_validator {
         $assetcount = 0;
         $wikipagelinks = 0;
         $repositorylinks = 0;
+        $pagecreates = 0;
+        $pageupdates = 0;
+        $pageblocked = 0;
 
         foreach ($plan['operations'] as &$operation) {
             if ((string) ($operation['kind'] ?? '') !== 'wiki') {
@@ -89,6 +98,9 @@ final class phase65_wiki_package_validator {
             $assetcount += (int) ($summary['assets'] ?? 0);
             $wikipagelinks += (int) ($summary['wiki_page_links'] ?? 0);
             $repositorylinks += (int) ($summary['repository_links'] ?? 0);
+            $pagecreates += (int) ($summary['page_creates'] ?? 0);
+            $pageupdates += (int) ($summary['page_updates'] ?? 0);
+            $pageblocked += (int) ($summary['page_blocked'] ?? 0);
             if (($operation['action'] ?? '') === 'BLOCKED') {
                 $blocked++;
             }
@@ -122,6 +134,9 @@ final class phase65_wiki_package_validator {
             'asset_count' => $assetcount,
             'wiki_page_link_count' => $wikipagelinks,
             'repository_link_count' => $repositorylinks,
+            'page_create_count' => $pagecreates,
+            'page_update_count' => $pageupdates,
+            'page_blocked_count' => $pageblocked,
             'wiki_available' => $wikiavailable,
             'previous_packages_ready' => $previousready,
             'history_policy' => 'current_pages_only',
@@ -319,6 +334,28 @@ final class phase65_wiki_package_validator {
             }
         }
 
+        $pageplan = $this->plan_page_actions(
+            $operation,
+            $pages,
+            $renderedpages
+        );
+        if (!empty($pageplan['blocked'])) {
+            $this->block(
+                $operation,
+                'WIKI_PAGE_MAPPING_INVALID',
+                (string) ($pageplan['message'] ?? 'At least one Wiki page mapping is invalid.')
+            );
+            return [
+                'pages' => count($pages),
+                'assets' => count($assetpaths),
+                'wiki_page_links' => $wikipagelinks,
+                'repository_links' => $repositorylinks,
+                'page_creates' => (int) ($pageplan['create_count'] ?? 0),
+                'page_updates' => (int) ($pageplan['update_count'] ?? 0),
+                'page_blocked' => (int) ($pageplan['blocked_count'] ?? 1),
+            ];
+        }
+
         $operation['wiki_validation'] = [
             'status' => 'OK',
             'code' => 'WIKI_READY',
@@ -332,19 +369,10 @@ final class phase65_wiki_package_validator {
             'history_policy' => 'current_pages_only',
             'authors_migrated' => false,
             'fingerprint_sha256' => (string) ($render['fingerprint_sha256'] ?? ''),
-            'pages' => array_values(array_map(
-                static function(array $page): array {
-                    return [
-                        'source_id' => (string) ($page['source_id'] ?? ''),
-                        'title' => (string) ($page['title'] ?? ''),
-                        'html_bytes' => (int) ($page['html_bytes'] ?? 0),
-                        'html_sha256' => (string) ($page['html_sha256'] ?? ''),
-                        'asset_count' => (int) ($page['asset_count'] ?? 0),
-                        'internal_link_count' => (int) ($page['internal_link_count'] ?? 0),
-                    ];
-                },
-                $renderedpages
-            )),
+            'page_create_count' => (int) ($pageplan['create_count'] ?? 0),
+            'page_update_count' => (int) ($pageplan['update_count'] ?? 0),
+            'page_blocked_count' => 0,
+            'pages' => $pageplan['pages'],
         ];
 
         return [
@@ -352,7 +380,164 @@ final class phase65_wiki_package_validator {
             'assets' => count($assetpaths),
             'wiki_page_links' => $wikipagelinks,
             'repository_links' => $repositorylinks,
+            'page_creates' => (int) ($pageplan['create_count'] ?? 0),
+            'page_updates' => (int) ($pageplan['update_count'] ?? 0),
+            'page_blocked' => 0,
         ];
+    }
+
+    /**
+     * Plan stable CREATE/UPDATE actions for every Wiki page.
+     *
+     * Page mappings use <wiki-ref>:page:<page-id> -> targettype wiki_page.
+     * No content write is performed here.
+     */
+    private function plan_page_actions(
+        array $operation,
+        array $pages,
+        array $renderedpages
+    ): array {
+        global $DB;
+
+        $wikiref = (string) ($operation['source_ref_id'] ?? '');
+        $parentaction = (string) ($operation['action'] ?? '');
+        $parentcmid = (int) ($operation['target_id'] ?? 0);
+
+        $subwikiid = 0;
+        if ($parentaction === 'UPDATE') {
+            $cm = $DB->get_record('course_modules', ['id' => $parentcmid], 'id,instance');
+            if (!$cm) {
+                return [
+                    'blocked' => true,
+                    'blocked_count' => count($pages),
+                    'create_count' => 0,
+                    'update_count' => 0,
+                    'pages' => [],
+                    'message' => 'The mapped Moodle Wiki course module no longer exists.',
+                ];
+            }
+            $subwiki = $DB->get_record(
+                'wiki_subwikis',
+                ['wikiid' => (int) $cm->instance, 'groupid' => 0, 'userid' => 0],
+                'id'
+            );
+            $subwikiid = $subwiki ? (int) $subwiki->id : 0;
+        }
+
+        $renderedbyid = [];
+        foreach ($renderedpages as $rendered) {
+            if (is_array($rendered)) {
+                $renderedbyid[(string) ($rendered['source_id'] ?? '')] = $rendered;
+            }
+        }
+
+        $planned = [];
+        $creates = 0;
+        $updates = 0;
+        foreach ($pages as $page) {
+            if (!is_array($page)) {
+                continue;
+            }
+            $pageid = (string) ($page['source_id'] ?? '');
+            $title = (string) ($page['title'] ?? '');
+            $mappingref = $wikiref . ':page:' . $pageid;
+            $mapping = $this->find_page_mapping($mappingref);
+
+            $action = 'CREATE';
+            $targetpageid = null;
+            if ($mapping) {
+                $targetpageid = (int) ($mapping->targetid ?? 0);
+                if ($parentaction !== 'UPDATE' || $subwikiid <= 0 || $targetpageid <= 0) {
+                    return [
+                        'blocked' => true,
+                        'blocked_count' => 1,
+                        'create_count' => $creates,
+                        'update_count' => $updates,
+                        'pages' => $planned,
+                        'message' => "Stale Wiki page mapping {$mappingref}.",
+                    ];
+                }
+                $targetpage = $DB->get_record(
+                    'wiki_pages',
+                    ['id' => $targetpageid, 'subwikiid' => $subwikiid],
+                    'id,title'
+                );
+                if (!$targetpage) {
+                    return [
+                        'blocked' => true,
+                        'blocked_count' => 1,
+                        'create_count' => $creates,
+                        'update_count' => $updates,
+                        'pages' => $planned,
+                        'message' => "Mapped Moodle Wiki page for {$mappingref} is missing.",
+                    ];
+                }
+                $action = 'UPDATE';
+                $updates++;
+            } else {
+                if ($parentaction === 'UPDATE' && $subwikiid > 0) {
+                    $collision = $DB->get_record(
+                        'wiki_pages',
+                        ['subwikiid' => $subwikiid, 'title' => $title],
+                        'id'
+                    );
+                    if ($collision) {
+                        return [
+                            'blocked' => true,
+                            'blocked_count' => 1,
+                            'create_count' => $creates,
+                            'update_count' => $updates,
+                            'pages' => $planned,
+                            'message' => "Unmapped Moodle Wiki page title collision for {$title}.",
+                        ];
+                    }
+                }
+                $creates++;
+            }
+
+            $rendered = $renderedbyid[$pageid] ?? [];
+            $planned[] = [
+                'source_id' => $pageid,
+                'title' => $title,
+                'mapping_ref' => $mappingref,
+                'action' => $action,
+                'target_page_id' => $targetpageid,
+                'html_bytes' => (int) ($rendered['html_bytes'] ?? 0),
+                'html_sha256' => (string) ($rendered['html_sha256'] ?? ''),
+                'asset_count' => (int) ($rendered['asset_count'] ?? 0),
+                'internal_link_count' => (int) ($rendered['internal_link_count'] ?? 0),
+            ];
+        }
+
+        return [
+            'blocked' => false,
+            'blocked_count' => 0,
+            'create_count' => $creates,
+            'update_count' => $updates,
+            'pages' => $planned,
+        ];
+    }
+
+    /** Find a persistent Wiki page mapping, including legacy empty sourceinstance mappings. */
+    private function find_page_mapping(string $mappingref): \stdClass|false {
+        global $DB;
+
+        $conditions = [
+            'sourcelms' => 'ILIAS',
+            'sourceinstance' => $this->sourceinstance,
+            'sourcecourse' => $this->sourcecourse,
+            'sourceref' => $mappingref,
+            'targettype' => 'wiki_page',
+        ];
+        $mapping = $DB->get_record('local_iliasmigration_map', $conditions);
+        if ($mapping) {
+            return $mapping;
+        }
+        if ($this->sourceinstance === '') {
+            return false;
+        }
+        $conditions['sourceinstance'] = '';
+        return $DB->get_record('local_iliasmigration_map', $conditions);
     }
 
     /** Earlier phases must already be stable before a Wiki can be applied. */
@@ -457,7 +642,15 @@ final class phase65_wiki_package_validator {
     }
 
     private function empty_summary(): array {
-        return ['pages' => 0, 'assets' => 0, 'wiki_page_links' => 0, 'repository_links' => 0];
+        return [
+            'pages' => 0,
+            'assets' => 0,
+            'wiki_page_links' => 0,
+            'repository_links' => 0,
+            'page_creates' => 0,
+            'page_updates' => 0,
+            'page_blocked' => 0,
+        ];
     }
 
     /** Resolve one package-relative file while preventing path traversal. */
