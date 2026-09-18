@@ -37,7 +37,12 @@ def _source_id_from_identifier(value: str) -> str:
 
 
 def _ilias_type_from_target(value: str) -> str:
-    match = re.search(r"_([a-z0-9]+)_\d+_\d+$", value)
+    # Native exports have used both il_<type>_<installation>_<id> and
+    # il_<installation>_<type>_<id> target layouts across components/releases.
+    match = re.search(r"_([a-z][a-z0-9]*)_\d+_\d+$", value)
+    if match:
+        return match.group(1)
+    match = re.search(r"_\d+_([a-z][a-z0-9]*)_\d+$", value)
     return match.group(1) if match else ""
 
 
