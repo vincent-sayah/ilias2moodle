@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import zipfile
 from pathlib import PurePosixPath
 from typing import Any
 from xml.etree import ElementTree as ET
-import zipfile
 
 from ilias2moodle.ilias.content_page import _local_name, _text_descendant
 
