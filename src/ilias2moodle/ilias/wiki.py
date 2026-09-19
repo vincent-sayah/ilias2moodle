@@ -25,6 +25,65 @@ def _records(root: ET.Element, entity: str) -> list[ET.Element]:
     return result
 
 
+def _rewrite_wiki_markup_links(
+    value: Any,
+    title_to_id: dict[str, str],
+) -> Any:
+    """Convert native Wiki [[Page title]] markup embedded in COPage text nodes.
+
+    ILIAS Wiki exports keep cross-page links as literal wiki markup inside
+    Paragraph text rather than serializing them as COPage IntLink elements.
+    """
+    if isinstance(value, list):
+        rewritten: list[Any] = []
+        for item in value:
+            if isinstance(item, dict) and item.get("type") == "text":
+                text = str(item.get("text", ""))
+                cursor = 0
+                matches = list(re.finditer(r"\[\[([^\[\]\n]+)\]\]", text))
+                if not matches:
+                    rewritten.append(item)
+                    continue
+
+                for match in matches:
+                    if match.start() > cursor:
+                        rewritten.append(
+                            {"type": "text", "text": text[cursor : match.start()]}
+                        )
+
+                    title = match.group(1).strip()
+                    source_id = title_to_id.get(title, "")
+                    rewritten.append(
+                        {
+                            "type": "internal_link",
+                            "text": title,
+                            "target": f"wiki:{title}",
+                            "target_type": "wpg",
+                            "source_ref_id": source_id,
+                            "wiki_page_title": title,
+                            "syntax": "wiki_markup",
+                            "children": [{"type": "text", "text": title}],
+                        }
+                    )
+                    cursor = match.end()
+
+                if cursor < len(text):
+                    rewritten.append({"type": "text", "text": text[cursor:]})
+                continue
+
+            rewritten.append(_rewrite_wiki_markup_links(item, title_to_id))
+        return rewritten
+
+    if isinstance(value, dict):
+        result = dict(value)
+        for key, nested in value.items():
+            if isinstance(nested, (dict, list)):
+                result[key] = _rewrite_wiki_markup_links(nested, title_to_id)
+        return result
+
+    return value
+
+
 def _collect_internal_links(value: Any, page_id: str) -> list[dict[str, str]]:
     links: list[dict[str, str]] = []
     if isinstance(value, dict):
@@ -122,11 +181,18 @@ class WikiParser:
                 "indent": int(_text_descendant(record, "Indent", "0") or 0),
             }
 
+        page_records = _records(wiki_root, "wpg")
+        title_to_id = {
+            _text_descendant(record, "Title"): _text_descendant(record, "Id")
+            for record in page_records
+            if _text_descendant(record, "Title") and _text_descendant(record, "Id")
+        }
+
         pages: list[dict[str, Any]] = []
         unsupported: list[dict[str, str]] = []
         all_links: list[dict[str, str]] = []
 
-        for record in _records(wiki_root, "wpg"):
+        for record in page_records:
             page_id = _text_descendant(record, "Id")
             export_item = copages.get(page_id)
 
@@ -165,6 +231,7 @@ class WikiParser:
                 continue
 
             blocks = self.page_parser._parse_page_children(page_object, media, files)
+            blocks = _rewrite_wiki_markup_links(blocks, title_to_id)
             page_unsupported = self.page_parser._collect_unsupported(blocks)
             links = _collect_internal_links(blocks, page_id)
             page["content"] = {
