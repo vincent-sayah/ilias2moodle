@@ -51,12 +51,39 @@ $structure = [
                             'items' => [[
                                 'purpose' => 'Standard',
                                 'mime_type' => 'image/png',
-                                'migration_path' => 'wikis/273/media/901/wiki-image.png',
                             ]],
                         ],
                     ],
+                    [
+                        'type' => 'file_list',
+                        'title' => 'Documents',
+                        'files' => [[
+                            'source_id' => '902',
+                            'filename' => 'document.pdf',
+                            'file' => null,
+                        ]],
+                    ],
                 ],
             ],
+        ],
+    ],
+    'media' => [
+        '901' => [
+            'source_id' => '901',
+            'title' => 'wiki-image.png',
+            'items' => [[
+                'purpose' => 'Standard',
+                'mime_type' => 'image/png',
+                'migration_path' => 'wikis/273/media/901/wiki-image.png',
+            ]],
+        ],
+    ],
+    'files' => [
+        '902' => [
+            'source_id' => '902',
+            'filename' => 'document.pdf',
+            'mime_type' => 'application/pdf',
+            'migration_path' => 'wikis/273/files/902/document.pdf',
         ],
     ],
 ];
@@ -66,8 +93,8 @@ if (count($result['pages']) !== 2) {
     fwrite(STDERR, "Expected 2 Wiki pages.\n");
     exit(1);
 }
-if (count($result['assets']) !== 1) {
-    fwrite(STDERR, "Expected 1 Wiki asset.\n");
+if (count($result['assets']) !== 2) {
+    fwrite(STDERR, "Expected 2 rehydrated Wiki assets.\n");
     exit(1);
 }
 if (count($result['internal_link_resolutions']) !== 1) {
@@ -84,6 +111,10 @@ if (!str_contains($accueil, '#ilias-wiki-page-11')) {
 }
 if (!str_contains($page2, '@@PLUGINFILE@@/wikis/273/media/901/wiki-image.png')) {
     fwrite(STDERR, "Wiki media rendering mismatch.\n");
+    exit(1);
+}
+if (!str_contains($page2, '@@PLUGINFILE@@/wikis/273/files/902/document.pdf')) {
+    fwrite(STDERR, "Wiki file-list rendering mismatch.\n");
     exit(1);
 }
 if (!preg_match('/^[a-f0-9]{64}$/', (string) $result['fingerprint_sha256'])) {
