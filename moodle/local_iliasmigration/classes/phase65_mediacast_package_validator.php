@@ -179,8 +179,8 @@ final class phase65_mediacast_package_validator {
             'incremental_object_policy' => 'VALIDATE_ONLY_NORMALIZED_MEDIACASTS_IN_PACKAGE',
             'prerequisite_policy' => 'PERSISTED_TARGET_STATE',
             'ready' => $ready,
-            'apply_implemented' => false,
-            'apply_ready' => false,
+            'apply_implemented' => true,
+            'apply_ready' => $ready,
         ];
 
         return $plan;
@@ -447,6 +447,7 @@ final class phase65_mediacast_package_validator {
             'record_policy' => 'ONE_RECORD_PER_MEDIACAST_ENTRY',
             'planned_fields' => [
                 'source_entry_id',
+                'position',
                 'title',
                 'description',
                 'source_type',
@@ -454,6 +455,7 @@ final class phase65_mediacast_package_validator {
                 'media_file',
                 'external_url',
             ],
+            'preview_policy' => 'PACKAGE_ONLY_NOT_IMPORTED',
         ];
 
         return [
