@@ -24,6 +24,7 @@ final class phase65_mediacast_executor {
         'source_type' => ['type' => 'text', 'description' => 'local_file or external_url'],
         'duration' => ['type' => 'text', 'description' => 'Source playtime'],
         'media_file' => ['type' => 'file', 'description' => 'Recovered local MP4'],
+        'media_player' => ['type' => 'textarea', 'description' => 'Inline HTML5 player for local MP4'],
         'external_url' => ['type' => 'url', 'description' => 'External media URL'],
     ];
 
@@ -262,7 +263,7 @@ final class phase65_mediacast_executor {
 
         $fields = $this->ensure_fields(
             $data,
-            $requested === 'CREATE'
+            true
         );
 
         $DB->set_field(
@@ -278,9 +279,7 @@ final class phase65_mediacast_executor {
             ['id' => $instanceid]
         );
 
-        if ($requested === 'CREATE') {
-            $this->configure_templates($data);
-        }
+        $this->configure_templates($data);
 
         $context = \context_module::instance($cmid);
         $recordscreated = 0;
@@ -374,12 +373,18 @@ final class phase65_mediacast_executor {
                 $filename = basename(
                     (string) ($entry['location'] ?? '')
                 );
-                $this->write_file_content(
+                $playerurl = $this->write_file_content(
                     $context,
                     (int) $fields['media_file']->id,
                     $recordid,
                     $sourcefile,
                     $filename
+                );
+                $this->upsert_content(
+                    (int) $fields['media_player']->id,
+                    $recordid,
+                    $this->video_player_html($playerurl),
+                    (string) FORMAT_HTML
                 );
                 $this->upsert_content(
                     (int) $fields['external_url']->id,
@@ -393,6 +398,12 @@ final class phase65_mediacast_executor {
                     $context,
                     (int) $fields['media_file']->id,
                     $recordid
+                );
+                $this->upsert_content(
+                    (int) $fields['media_player']->id,
+                    $recordid,
+                    '',
+                    (string) FORMAT_HTML
                 );
                 $this->upsert_content(
                     (int) $fields['external_url']->id,
@@ -537,7 +548,7 @@ final class phase65_mediacast_executor {
   <h4>[[title]]</h4>
   <div>[[description]]</div>
   <div><strong>Durée :</strong> [[duration]]</div>
-  <div>[[media_file]]</div>
+  <div>[[media_player]]</div>
   <div>[[external_url]]</div>
 </div>
 <hr>
@@ -548,7 +559,7 @@ HTML;
   <h3>[[title]]</h3>
   <div>[[description]]</div>
   <p><strong>Durée :</strong> [[duration]]</p>
-  <div>[[media_file]]</div>
+  <div>[[media_player]]</div>
   <div>[[external_url]]</div>
 </div>
 HTML;
@@ -651,7 +662,7 @@ HTML;
         int $recordid,
         string $sourcefile,
         string $filename
-    ): void {
+    ): string {
         global $DB;
 
         if ($filename === '' || basename($filename) !== $filename) {
@@ -700,6 +711,35 @@ HTML;
             'content',
             $filename,
             ['id' => $contentid]
+        );
+
+        return \moodle_url::make_pluginfile_url(
+            $stored->get_contextid(),
+            $stored->get_component(),
+            $stored->get_filearea(),
+            $stored->get_itemid(),
+            $stored->get_filepath(),
+            $stored->get_filename()
+        )->out(false);
+    }
+
+    private function video_player_html(string $url): string {
+        $source = \html_writer::empty_tag(
+            'source',
+            [
+                'src' => $url,
+                'type' => 'video/mp4',
+            ]
+        );
+
+        return \html_writer::tag(
+            'video',
+            $source . get_string('mediafallbacklink'),
+            [
+                'controls' => 'controls',
+                'preload' => 'metadata',
+                'style' => 'max-width:100%;height:auto;',
+            ]
         );
     }
 
