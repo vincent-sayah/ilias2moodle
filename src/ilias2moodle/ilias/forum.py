@@ -225,7 +225,7 @@ class ForumParser:
                         for post in posts
                     ],
                 ]
-                if value
+                if value and value != "0"
             }
         )
 
