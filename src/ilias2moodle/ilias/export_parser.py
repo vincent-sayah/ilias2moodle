@@ -21,6 +21,7 @@ TYPE_MAP = {
     "qpl": "question_pool",
     "wiki": "wiki",
     "exc": "exercise",
+    "frm": "forum",
 }
 
 
