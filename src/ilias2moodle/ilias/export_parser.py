@@ -22,6 +22,7 @@ TYPE_MAP = {
     "wiki": "wiki",
     "exc": "exercise",
     "frm": "forum",
+    "mcst": "mediacast",
 }
 
 
