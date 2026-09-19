@@ -14,18 +14,18 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Learning Module ILIAS | `lm` | `mod_book` | 5 | validé |
 | Test | `tst` | `mod_quiz` | 6 | validé |
 | Question pool | `qpl` | Banque de questions / `qbank` | 6 | validé |
-| Content Page | `copa`* | `mod_page` | 6.5 | planifié — #14 |
-| Glossaire | `glo`* | `mod_glossary` | 6.5 | planifié — #15 |
-| Wiki | `wiki`* | `mod_wiki` | 6.5 | planifié — #16 |
+| Content Page | `copa` | `mod_page` | 6.5 | validé — #14 |
+| Glossaire | `glo` | `mod_glossary` | 6.5 | validé — #15 |
+| Wiki | `wiki` | `mod_wiki` | 6.5 | validé — #16 |
 | Exercice | `exc` | `mod_assign` | 6.5 | validé — #17 |
-| Forum | `frm`* | `mod_forum` | 6.5 | planifié — #18 |
+| Forum | `frm` | `mod_forum` | 6.5 | validé structure — #18 ; contributions Phase 7 |
 | Mediacast | `mcst`* | `mod_data` ou collection de ressources | 6.5 | étude/POC — #19 |
 | Blog | `blog`* | `mod_data` privilégié | 6.5 | étude/POC — #20 |
 | Media Pool / galerie média | `mep`* / selon export | ressources, `mod_data` ou `mod_page` | 6.5 | étude/POC — #21 |
 | Groupe | `grp`* | Groupe / Groupement + structure/restrictions si nécessaire | 7 | planifié — #7 |
 | Learning Progress | — | Completion / historique | 7 | complexe |
 
-\* Les codes des nouveaux objets sont indicatifs tant qu’ils n’ont pas été confirmés sur le nouvel export POC utilisé pour leur implémentation.
+\* Les codes encore marqués d’un astérisque restent indicatifs tant qu’ils n’ont pas été confirmés sur leur POC réel.
 
 ## Règle pour les dossiers
 
@@ -64,7 +64,7 @@ Ordre de développement retenu :
 7. Blog → `mod_data` privilégié ;
 8. Media Pool / galerie média → cible à figer après POC.
 
-Pour les objets dépendants des identités utilisateurs, la structure pédagogique peut être traitée en Phase 6.5, tandis que les auteurs, membres, remises, notes ou contributions sont reportés à la Phase 7 lorsqu’un rapprochement utilisateur fiable est nécessaire.
+Pour les objets dépendants des identités utilisateurs, la structure pédagogique peut être traitée en Phase 6.5, tandis que les auteurs, membres, remises, notes ou contributions sont reportés à la Phase 7 lorsqu’un rapprochement utilisateur fiable est nécessaire. C’est la politique validée pour le Forum : le `mod_forum` est créé/mis à jour en Phase 6.5.5, tandis que les threads, posts et assets de contributions restent conservés dans le package jusqu’au rapprochement des auteurs.
 
 ## Objet Groupe
 
