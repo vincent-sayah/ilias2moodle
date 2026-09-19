@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import re
 import zipfile
 from pathlib import PurePosixPath
 from typing import Any
 from xml.etree import ElementTree as ET
 
 from ilias2moodle.ilias.content_page import _local_name, _text_descendant
+
+RESOURCE_COLLECTION_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
 
 ASSIGNMENT_TYPES: dict[int, dict[str, Any]] = {
     1: {
@@ -232,6 +238,17 @@ class ExerciseParser:
             )
 
             instruction_collection = _text_descendant(record, "InstructionCollection")
+            instruction_collection_is_uuid = bool(
+                RESOURCE_COLLECTION_UUID_RE.fullmatch(instruction_collection)
+            )
+            instruction_files = (
+                []
+                if instruction_collection_is_uuid
+                else self._collection_files(
+                    instruction_collection,
+                    file_orders.get(assignment_id, {}),
+                )
+            )
             max_files = _int(record, "MaxFile", 0)
             assignment = {
                 "source_id": assignment_id,
@@ -254,10 +271,13 @@ class ExerciseParser:
                 "max_files_unlimited": bool(type_info.get("uses_files")) and max_files == 0,
                 "team_tutor": _bool(record, "TeamTutor"),
                 "instruction_collection": instruction_collection,
-                "instruction_files": self._collection_files(
-                    instruction_collection,
-                    file_orders.get(assignment_id, {}),
+                "instruction_collection_kind": (
+                    "resource_collection_uuid"
+                    if instruction_collection_is_uuid
+                    else ("archive_path" if instruction_collection else "none")
                 ),
+                "instruction_files": instruction_files,
+                "instruction_files_embedded": not instruction_collection_is_uuid,
                 "peer_review": {
                     "enabled": _bool(record, "Peer"),
                     "minimum_reviews": _int(record, "PeerMin", 0),
@@ -293,6 +313,8 @@ class ExerciseParser:
                 reasons.append("non_absolute_deadline")
             if assignment["reminders"]:
                 reasons.append("assignment_reminders")
+            if instruction_collection_is_uuid:
+                reasons.append("instruction_collection_not_embedded")
 
             assignment["automatic_ready"] = not reasons and support == "supported"
             assignment["migration_constraints"] = reasons + phase7_dependencies
@@ -335,6 +357,11 @@ class ExerciseParser:
             "criteria_categories": criteria_categories,
             "criteria": criteria,
             "blocking_features": blocking_features,
+            "export_issues": [
+                feature
+                for feature in blocking_features
+                if feature.get("feature") == "instruction_collection_not_embedded"
+            ],
             "components": self._components(),
             "target_strategy": {
                 "one_moodle_assignment_per_unit": True,
