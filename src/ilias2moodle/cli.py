@@ -22,6 +22,11 @@ from ilias2moodle.glossary_package import (
     extract_glossary_assets,
 )
 from ilias2moodle.ilias.export_parser import IliasExportParser
+from ilias2moodle.mediacast_package import (
+    enrich_document_mediacasts,
+    extract_mediacast_assets,
+    recover_mediacast_local_files,
+)
 from ilias2moodle.model import MigrationDocument
 from ilias2moodle.package_builder import MigrationPackageBuilder
 from ilias2moodle.report import write_reports
@@ -76,6 +81,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Répertoire contenant les collections IRSS récupérées "
             "depuis ILIAS, indexées par UUID."
+        ),
+    )
+    prepare_export.add_argument(
+        "--mediacast-media-recovery",
+        type=Path,
+        default=None,
+        help=(
+            "Répertoire contenant les MediaObjects locaux récupérés "
+            "depuis ILIAS, indexés par mob_<id>."
         ),
     )
     return parser
@@ -147,6 +161,7 @@ def _parse_export_document(zip_path: Path, ilias_version: str) -> MigrationDocum
     enrich_document_wikis(document, zip_path)
     enrich_document_exercises(document, zip_path)
     enrich_document_forums(document, zip_path)
+    enrich_document_mediacasts(document, zip_path)
     return document
 
 
@@ -176,6 +191,7 @@ def _prepare_export(
     output: Path,
     ilias_version: str,
     exercise_irss_recovery: Path | None = None,
+    mediacast_media_recovery: Path | None = None,
 ) -> int:
     document = _parse_export_document(zip_path, ilias_version)
 
@@ -198,11 +214,33 @@ def _prepare_export(
             document,
             exercise_irss_recovery,
         )
+
+    mediacast_recovery_result = {
+        "recovered": {
+            "local_media_files_recovered": 0,
+        },
+        "missing": [],
+    }
+
+    if mediacast_media_recovery is not None:
+        if not mediacast_media_recovery.is_dir():
+            raise FileNotFoundError(
+                "Répertoire MediaCast recovery introuvable : "
+                f"{mediacast_media_recovery}"
+            )
+
+        mediacast_recovery_result = recover_mediacast_local_files(
+            document,
+            mediacast_media_recovery,
+        )
     content_page_result = extract_content_page_assets(document, zip_path, output)
     glossary_result = extract_glossary_assets(document, zip_path, output)
     wiki_result = extract_wiki_assets(document, zip_path, output)
     exercise_result = extract_exercise_assets(document, zip_path, output)
     forum_result = extract_forum_assets(document, zip_path, output)
+    mediacast_result = extract_mediacast_assets(
+        document, zip_path, output
+    )
     result = MigrationPackageBuilder(zip_path, output).build(document)
     package = result["package"]
     report = result["report"]
@@ -213,6 +251,7 @@ def _prepare_export(
         wiki_result,
         exercise_result,
         forum_result,
+        mediacast_result,
     )
     for extension_result in extension_results:
         managed_directory = str(extension_result["managed_directory"])
@@ -229,6 +268,15 @@ def _prepare_export(
     )
     package["missing"].extend(irss_result["missing"])
 
+    package["extracted"]["mediacast_local_media_files_recovered"] = (
+        mediacast_recovery_result["recovered"][
+            "local_media_files_recovered"
+        ]
+    )
+    package["missing"].extend(
+        mediacast_recovery_result["missing"]
+    )
+
     package["exercise_irss_recovery"] = {
         "enabled": exercise_irss_recovery is not None,
         "collections_recovered": (
@@ -238,6 +286,18 @@ def _prepare_export(
             irss_result["recovered"]["instruction_files_recovered"]
         ),
         "missing_count": len(irss_result["missing"]),
+    }
+
+    package["mediacast_media_recovery"] = {
+        "enabled": mediacast_media_recovery is not None,
+        "local_media_files_recovered": (
+            mediacast_recovery_result["recovered"][
+                "local_media_files_recovered"
+            ]
+        ),
+        "missing_count": len(
+            mediacast_recovery_result["missing"]
+        ),
     }
 
     package["missing_count"] = len(package["missing"])
@@ -255,6 +315,9 @@ def _prepare_export(
         "extracted": package["extracted"],
         "missing_count": package["missing_count"],
         "exercise_irss_recovery": package["exercise_irss_recovery"],
+        "mediacast_media_recovery": package[
+            "mediacast_media_recovery"
+        ],
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
@@ -279,6 +342,7 @@ def main(argv: list[str] | None = None) -> int:
             args.output,
             args.ilias_version,
             args.exercise_irss_recovery,
+            args.mediacast_media_recovery,
         )
 
     parser.error("Commande inconnue")
