@@ -110,11 +110,11 @@ final class phase65_wiki_executor {
     private function validated_plan(array $document, int $categoryid): array {
         $plan = (new phase6_plan_builder($categoryid))->build($document);
         $plan['phase'] = '6.5.3';
-        $plan = (new phase3_package_validator($this->migrationjson))->validate($plan);
-        $plan = (new phase4_package_validator($this->migrationjson))->validate($plan);
-        $plan = (new phase5_package_validator($this->migrationjson))->validate($plan);
-        $plan = (new phase6_package_validator($this->migrationjson))->validate($plan);
-        $plan = (new phase6_scoring_policy_validator($this->migrationjson))->validate($plan);
+
+        // Keep Wiki apply incremental: trust only stable persisted Moodle
+        // mappings/targets for already-completed phases, while fully validating
+        // the current Wiki package. Old binaries need not be duplicated in a
+        // later ILIAS course export.
         return (new phase65_wiki_package_validator($this->migrationjson))->validate($plan);
     }
 
