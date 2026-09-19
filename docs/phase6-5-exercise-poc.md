@@ -65,3 +65,20 @@ L'apply Moodle reste désactivé tant que le POC réel ILIAS 10.8 n'a pas confir
 - les échéances ;
 - les types de remise ;
 - la stratégie multi-unités.
+
+
+## Anomalie confirmée sur ILIAS 10.8
+
+Le POC réel sur ILIAS 10.8 a mis en évidence un défaut d’export des fichiers d’instruction des Exercise.
+
+`ilExerciseExporter::getValidSchemaVersions()` borne le schéma Exercise `9.0` à `max = 9.99`, alors que `ilXmlExporter::determineSchemaVersion()` compare les contraintes avec `ILIAS_VERSION_NUMERIC` (10.8). L’export sélectionne donc le schéma `5.3.0`.
+
+Conséquence observée :
+
+- `getXmlRecord()` ajoute encore `InstructionCollection` sous forme d’UUID de collection Resource Storage ;
+- le schéma 5.3.0 ne déclare pas ce champ comme `rscollection` ;
+- `ilDataSet::addRecordsXml()` ne remplace donc pas l’UUID par `dsDir_N` ;
+- `writeFilesByResourceCollection()` n’est jamais appelé ;
+- les fichiers existent dans le Resource Storage ILIAS mais sont absents du ZIP.
+
+Ilias2Moodle détecte désormais ce cas par `instruction_collection_kind = resource_collection_uuid` et ajoute la contrainte `instruction_collection_not_embedded`. Aucun apply ne doit être autorisé tant que la collection n’a pas été résolue par une extraction read-only depuis l’instance ILIAS source.
