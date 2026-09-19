@@ -7,8 +7,8 @@ defined('MOODLE_INTERNAL') || die();
 /**
  * Read-only validator for ILIAS Wiki -> Moodle mod_wiki Phase 6.5.3.
  *
- * No Moodle content write is performed. Apply intentionally stays disabled
- * until the real ILIAS 10.8 POC has confirmed export/link/media semantics.
+ * Dry-run performs no Moodle content write. Apply is enabled only when the
+ * complete real-package validation and persisted-target prerequisites are ready.
  */
 final class phase65_wiki_package_validator {
     /** @var string Canonical migration package root. */
@@ -161,14 +161,14 @@ final class phase65_wiki_package_validator {
             'previous_packages_ready' => $previousready,
             'history_policy' => 'current_pages_only',
             'ready' => $ready,
-            'apply_implemented' => false,
-            'apply_ready' => false,
+            'apply_implemented' => true,
+            'apply_ready' => $ready,
         ];
 
-        if ($checked > 0) {
+        if ($checked > 0 && !$ready) {
             $plan['warnings'][] = [
-                'code' => 'WIKI_APPLY_NOT_IMPLEMENTED',
-                'message' => 'Wiki dry-run is available, but CREATE/UPDATE remains disabled until validation on the real ILIAS 10.8 POC.',
+                'code' => 'WIKI_APPLY_BLOCKED',
+                'message' => 'Wiki CREATE/UPDATE is implemented but remains blocked because the current package or persisted Moodle prerequisites are not ready.',
             ];
         }
 
