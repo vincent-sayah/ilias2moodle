@@ -11,6 +11,7 @@ from ilias2moodle.content_page_package import (
 from ilias2moodle.exercise_package import (
     enrich_document_exercises,
     extract_exercise_assets,
+    recover_exercise_instruction_files,
 )
 from ilias2moodle.glossary_package import (
     enrich_document_glossaries,
@@ -64,6 +65,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Construire un package normalisé avec les ressources extraites de l'export ILIAS",
     )
     _add_export_arguments(prepare_export)
+    prepare_export.add_argument(
+        "--exercise-irss-recovery",
+        type=Path,
+        default=None,
+        help=(
+            "Répertoire contenant les collections IRSS récupérées "
+            "depuis ILIAS, indexées par UUID."
+        ),
+    )
     return parser
 
 
@@ -156,8 +166,33 @@ def _analyse_export(
     return 0
 
 
-def _prepare_export(zip_path: Path, output: Path, ilias_version: str) -> int:
+def _prepare_export(
+    zip_path: Path,
+    output: Path,
+    ilias_version: str,
+    exercise_irss_recovery: Path | None = None,
+) -> int:
     document = _parse_export_document(zip_path, ilias_version)
+
+    irss_result = {
+        "recovered": {
+            "collections_recovered": 0,
+            "instruction_files_recovered": 0,
+        },
+        "missing": [],
+    }
+
+    if exercise_irss_recovery is not None:
+        if not exercise_irss_recovery.is_dir():
+            raise FileNotFoundError(
+                "Répertoire IRSS introuvable : "
+                f"{exercise_irss_recovery}"
+            )
+
+        irss_result = recover_exercise_instruction_files(
+            document,
+            exercise_irss_recovery,
+        )
     content_page_result = extract_content_page_assets(document, zip_path, output)
     glossary_result = extract_glossary_assets(document, zip_path, output)
     wiki_result = extract_wiki_assets(document, zip_path, output)
@@ -179,6 +214,25 @@ def _prepare_export(zip_path: Path, output: Path, ilias_version: str) -> int:
         package["extracted"].update(extension_result["extracted"])
         package["missing"].extend(extension_result["missing"])
 
+    package["extracted"]["exercise_irss_collections_recovered"] = (
+        irss_result["recovered"]["collections_recovered"]
+    )
+    package["extracted"]["exercise_irss_files_recovered"] = (
+        irss_result["recovered"]["instruction_files_recovered"]
+    )
+    package["missing"].extend(irss_result["missing"])
+
+    package["exercise_irss_recovery"] = {
+        "enabled": exercise_irss_recovery is not None,
+        "collections_recovered": (
+            irss_result["recovered"]["collections_recovered"]
+        ),
+        "instruction_files_recovered": (
+            irss_result["recovered"]["instruction_files_recovered"]
+        ),
+        "missing_count": len(irss_result["missing"]),
+    }
+
     package["missing_count"] = len(package["missing"])
     (output / "package.json").write_text(
         json.dumps(package, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -193,6 +247,7 @@ def _prepare_export(zip_path: Path, output: Path, ilias_version: str) -> int:
         "total_items": report["total_items"],
         "extracted": package["extracted"],
         "missing_count": package["missing_count"],
+        "exercise_irss_recovery": package["exercise_irss_recovery"],
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
@@ -212,7 +267,12 @@ def main(argv: list[str] | None = None) -> int:
             args.dry_run,
         )
     if args.command == "prepare-export":
-        return _prepare_export(args.zip_path, args.output, args.ilias_version)
+        return _prepare_export(
+            args.zip_path,
+            args.output,
+            args.ilias_version,
+            args.exercise_irss_recovery,
+        )
 
     parser.error("Commande inconnue")
     return 2

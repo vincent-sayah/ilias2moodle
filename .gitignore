@@ -32,3 +32,4 @@ exports/*
 !exports/.gitkeep
 tmp/
 logs/
+irss_recovery/
