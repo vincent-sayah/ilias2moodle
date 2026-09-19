@@ -453,6 +453,7 @@ final class phase65_mediacast_package_validator {
                 'source_type',
                 'duration',
                 'media_file',
+                'media_player',
                 'external_url',
             ],
             'preview_policy' => 'PACKAGE_ONLY_NOT_IMPORTED',
