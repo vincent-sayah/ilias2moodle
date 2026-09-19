@@ -232,6 +232,7 @@ class ExerciseParser:
             )
 
             instruction_collection = _text_descendant(record, "InstructionCollection")
+            max_files = _int(record, "MaxFile", 0)
             assignment = {
                 "source_id": assignment_id,
                 "exercise_id": _text_descendant(record, "ExerciseId"),
@@ -249,7 +250,8 @@ class ExerciseParser:
                 ),
                 "mandatory": _bool(record, "Mandatory"),
                 "order": _int(record, "OrderNr", 0),
-                "max_files": _int(record, "MaxFile", 0),
+                "max_files": max_files,
+                "max_files_unlimited": bool(type_info.get("uses_files")) and max_files == 0,
                 "team_tutor": _bool(record, "TeamTutor"),
                 "instruction_collection": instruction_collection,
                 "instruction_files": self._collection_files(
@@ -279,9 +281,12 @@ class ExerciseParser:
             }
 
             reasons: list[str] = []
+            phase7_dependencies: list[str] = []
             support = str(type_info.get("migration_support", "unsupported"))
             if support not in {"supported", "phase7_group_dependency"}:
                 reasons.append(f"assignment_type:{type_info.get('key', type_id)}")
+            if support == "phase7_group_dependency":
+                phase7_dependencies.append("team_membership_phase7_dependency")
             if assignment["peer_review"]["enabled"]:
                 reasons.append("peer_review")
             if assignment["deadline_mode"] != 0:
@@ -290,7 +295,8 @@ class ExerciseParser:
                 reasons.append("assignment_reminders")
 
             assignment["automatic_ready"] = not reasons and support == "supported"
-            assignment["migration_constraints"] = reasons
+            assignment["migration_constraints"] = reasons + phase7_dependencies
+            assignment["phase7_dependencies"] = phase7_dependencies
             for reason in reasons:
                 blocking_features.append(
                     {
