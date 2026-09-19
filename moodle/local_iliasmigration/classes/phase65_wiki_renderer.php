@@ -20,6 +20,8 @@ final class phase65_wiki_renderer {
      */
     public function render(array $structure): array {
         $pages = is_array($structure['pages'] ?? null) ? $structure['pages'] : [];
+        $media = is_array($structure['media'] ?? null) ? $structure['media'] : [];
+        $files = is_array($structure['files'] ?? null) ? $structure['files'] : [];
         $rendered = [];
         $assets = [];
         $links = [];
@@ -34,6 +36,7 @@ final class phase65_wiki_renderer {
             $title = (string) ($page['title'] ?? '');
             $content = is_array($page['content'] ?? null) ? $page['content'] : [];
             $blocks = is_array($content['blocks'] ?? null) ? $content['blocks'] : [];
+            $blocks = $this->hydrate_assets($blocks, $media, $files);
 
             // Empty ref_id keeps the complete normalized Wiki asset path in
             // @@PLUGINFILE@@. The future executor must persist the same path.
@@ -119,5 +122,100 @@ final class phase65_wiki_renderer {
             'internal_link_resolutions' => $links,
             'fingerprint_sha256' => hash('sha256', implode("\n", $fingerprintparts)),
         ];
+    }
+
+    /**
+     * Rehydrate page-local asset references from the canonical top-level maps.
+     *
+     * Package extraction adds migration_path to structure.media/files after the
+     * parser has built page blocks. Depending on model serialization, nested
+     * copies may not receive those later mutations. Rendering must therefore
+     * resolve every media/file block again by its stable source id.
+     */
+    private function hydrate_assets(array $blocks, array $media, array $files): array {
+        $result = [];
+
+        foreach ($blocks as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+
+            $type = (string) ($block['type'] ?? '');
+
+            if ($type === 'media') {
+                $sourceid = (string) ($block['source_id'] ?? '');
+                if ($sourceid !== '' && is_array($media[$sourceid] ?? null)) {
+                    $block['media'] = $media[$sourceid];
+                }
+            } else if ($type === 'file_list') {
+                $items = [];
+                foreach ((array) ($block['files'] ?? []) as $item) {
+                    if (!is_array($item)) {
+                        continue;
+                    }
+                    $sourceid = (string) ($item['source_id'] ?? '');
+                    if ($sourceid !== '' && is_array($files[$sourceid] ?? null)) {
+                        $item['file'] = $files[$sourceid];
+                    }
+                    $items[] = $item;
+                }
+                $block['files'] = $items;
+            } else if ($type === 'section') {
+                $block['blocks'] = $this->hydrate_assets(
+                    is_array($block['blocks'] ?? null) ? $block['blocks'] : [],
+                    $media,
+                    $files
+                );
+            } else if ($type === 'tabs') {
+                $tabs = [];
+                foreach ((array) ($block['tabs'] ?? []) as $tab) {
+                    if (!is_array($tab)) {
+                        continue;
+                    }
+                    $tab['blocks'] = $this->hydrate_assets(
+                        is_array($tab['blocks'] ?? null) ? $tab['blocks'] : [],
+                        $media,
+                        $files
+                    );
+                    $tabs[] = $tab;
+                }
+                $block['tabs'] = $tabs;
+            } else if ($type === 'grid') {
+                $cells = [];
+                foreach ((array) ($block['cells'] ?? []) as $cell) {
+                    if (!is_array($cell)) {
+                        continue;
+                    }
+                    $cell['blocks'] = $this->hydrate_assets(
+                        is_array($cell['blocks'] ?? null) ? $cell['blocks'] : [],
+                        $media,
+                        $files
+                    );
+                    $cells[] = $cell;
+                }
+                $block['cells'] = $cells;
+            } else if ($type === 'table') {
+                $rows = [];
+                foreach ((array) ($block['rows'] ?? []) as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $cells = [];
+                    foreach ($row as $cell) {
+                        $cells[] = $this->hydrate_assets(
+                            is_array($cell) ? $cell : [],
+                            $media,
+                            $files
+                        );
+                    }
+                    $rows[] = $cells;
+                }
+                $block['rows'] = $rows;
+            }
+
+            $result[] = $block;
+        }
+
+        return $result;
     }
 }
