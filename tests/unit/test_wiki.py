@@ -43,10 +43,12 @@ def test_wiki_parser_preserves_pages_links_media_and_history_policy(tmp_path: Pa
             """<Export>
 <ExportItem Id='wpg:10'><PageObject Language='fr' Active='1'>
 <PageContent><Paragraph Language='fr' Characteristic='Headline1'>Accueil</Paragraph></PageContent>
-<PageContent><Paragraph Language='fr' Characteristic='Standard'>Aller vers <IntLink Target='il__wpg_11'>Page 2</IntLink></Paragraph></PageContent>
+<PageContent><Paragraph Language='fr' Characteristic='Standard'>Aller vers [[Page 2]]</Paragraph></PageContent>
+<PageContent><Paragraph Language='fr' Characteristic='Standard'><ExtLink Href='https://'>www.google.com</ExtLink></Paragraph></PageContent>
 </PageObject></ExportItem>
 <ExportItem Id='wpg:11'><PageObject Language='fr' Active='1'>
-<PageContent><Paragraph Language='fr' Characteristic='Standard'>Retour <IntLink Target='il__wpg_10'>Accueil</IntLink></Paragraph></PageContent>
+<PageContent><Paragraph Language='fr' Characteristic='Standard'>Retour [[Accueil]] et aller vers [[Media]]</Paragraph></PageContent>
+<PageContent><Paragraph Language='fr' Characteristic='Standard'>Lien externe <ExtLink Href='https://'>https://www.youtube.com</ExtLink></Paragraph></PageContent>
 </PageObject></ExportItem>
 <ExportItem Id='wpg:12'><PageObject Language='fr' Active='1'>
 <PageContent><MediaObject><MediaAlias OriginId='il_0_mob_901'/><MediaAliasItem Purpose='Standard'><Layout HorizontalAlign='Left'/></MediaAliasItem></MediaObject></PageContent>
@@ -85,9 +87,18 @@ def test_wiki_parser_preserves_pages_links_media_and_history_policy(tmp_path: Pa
     assert accueil["content"]["status"] == "ok"
     assert accueil["internal_links"][0]["scope"] == "wiki_page"
     assert accueil["internal_links"][0]["source_id"] == "11"
+    assert accueil["internal_links"][0]["target"] == "wiki:Page 2"
+
+    accueil_blocks = accueil["content"]["blocks"]
+    external = accueil_blocks[2]["inline"][0]
+    assert external["type"] == "external_link"
+    assert external["href"] == "https://www.google.com"
 
     page2 = wiki["pages"][1]
-    assert page2["internal_links"][0]["source_id"] == "10"
+    assert [link["source_id"] for link in page2["internal_links"]] == ["10", "12"]
+    page2_external = page2["content"]["blocks"][1]["inline"][1]
+    assert page2_external["type"] == "external_link"
+    assert page2_external["href"] == "https://www.youtube.com"
 
     media = wiki["pages"][2]
     assert media["content"]["blocks"][0]["type"] == "media"
@@ -98,5 +109,5 @@ def test_wiki_parser_preserves_pages_links_media_and_history_policy(tmp_path: Pa
     assert wiki["history"]["migration_policy"] == "current_pages_only"
     assert wiki["history"]["authors_migrated"] is False
     assert wiki["unsupported_components"] == []
-    assert len(wiki["internal_links"]) == 2
+    assert len(wiki["internal_links"]) == 3
     json.dumps(wiki, ensure_ascii=False)
