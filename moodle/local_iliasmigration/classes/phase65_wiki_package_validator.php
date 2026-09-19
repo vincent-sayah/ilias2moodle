@@ -17,6 +17,7 @@ final class phase65_wiki_package_validator {
     /** Source instance/course identity used by persistent page mappings. */
     private string $sourceinstance = '';
     private string $sourcecourse = '';
+    private int $targetcourseid = 0;
 
     public function __construct(string $migrationjson) {
         $root = realpath(dirname($migrationjson));
@@ -39,6 +40,12 @@ final class phase65_wiki_package_validator {
         $this->sourceinstance = $sourceinstance;
         $this->sourcecourse = $sourcecourse;
         $targetcourseid = (int) ($plan['operations'][0]['target_id'] ?? 0);
+        $this->targetcourseid = $targetcourseid;
+
+        $plan['warnings'][] = [
+            'code' => 'WIKI_INCREMENTAL_PREREQUISITE_POLICY',
+            'message' => 'Phase 6.5.3 validates completed earlier phases through persistent Moodle mappings/targets; old binary payloads are not required to be re-exported for Wiki migration.',
+        ];
 
         $checked = 0;
         $blocked = 0;
@@ -93,6 +100,18 @@ final class phase65_wiki_package_validator {
                 continue;
             }
 
+            $parentvalidation = $this->validate_parent_target($operation);
+            if (empty($parentvalidation['ready'])) {
+                $this->block(
+                    $operation,
+                    'WIKI_PARENT_MAPPING_INVALID',
+                    (string) ($parentvalidation['message'] ?? 'The Wiki parent mapping is invalid.')
+                );
+                $blocked++;
+                continue;
+            }
+            $operation['wiki_parent_validation'] = $parentvalidation;
+
             $summary = $this->validate_wiki($operation);
             $pagecount += (int) ($summary['pages'] ?? 0);
             $assetcount += (int) ($summary['assets'] ?? 0);
@@ -138,6 +157,7 @@ final class phase65_wiki_package_validator {
             'page_update_count' => $pageupdates,
             'page_blocked_count' => $pageblocked,
             'wiki_available' => $wikiavailable,
+            'prerequisite_policy' => 'PERSISTED_TARGET_STATE',
             'previous_packages_ready' => $previousready,
             'history_policy' => 'current_pages_only',
             'ready' => $ready,
@@ -550,20 +570,139 @@ final class phase65_wiki_package_validator {
         return $DB->get_record('local_iliasmigration_map', $conditions);
     }
 
-    /** Earlier phases must already be stable before a Wiki can be applied. */
+    /** Earlier phases must already be represented by stable Moodle mappings. */
     private function previous_packages_ready(array $plan): bool {
-        foreach ([
-            'phase3_package',
-            'phase4_package',
-            'phase5_package',
-            'phase6_package',
-            'phase6_prerequisites',
-        ] as $key) {
-            if (isset($plan[$key]) && empty($plan[$key]['ready'])) {
-                return false;
-            }
+        return !isset($plan['phase6_prerequisites'])
+            || !empty($plan['phase6_prerequisites']['ready']);
+    }
+
+    /**
+     * Validate the exact Moodle parent section/subsection required by this Wiki.
+     *
+     * This is the only structural dependency needed from earlier phases.
+     *
+     * @return array{ready:bool,parent_ref:string,targettype?:string,targetid?:int,section_number?:int,message?:string}
+     */
+    private function validate_parent_target(array $operation): array {
+        global $DB;
+
+        $parentref = trim((string) ($operation['parent_source_ref_id'] ?? ''));
+        if ($parentref === '') {
+            return [
+                'ready' => true,
+                'parent_ref' => '',
+                'targettype' => 'course_section_zero',
+                'section_number' => 0,
+            ];
         }
-        return true;
+
+        foreach (['section', 'subsection'] as $targettype) {
+            $mapping = $this->find_mapping($parentref, $targettype);
+            if (!$mapping) {
+                continue;
+            }
+
+            $targetid = (int) ($mapping->targetid ?? 0);
+            if ($targetid <= 0) {
+                return [
+                    'ready' => false,
+                    'parent_ref' => $parentref,
+                    'message' => "Parent {$parentref} has an invalid {$targettype} target id.",
+                ];
+            }
+
+            if ($targettype === 'section') {
+                $section = $DB->get_record(
+                    'course_sections',
+                    ['id' => $targetid, 'course' => $this->targetcourseid],
+                    'id,section'
+                );
+                if (!$section) {
+                    return [
+                        'ready' => false,
+                        'parent_ref' => $parentref,
+                        'message' => "Mapped Moodle section for parent {$parentref} is missing.",
+                    ];
+                }
+                return [
+                    'ready' => true,
+                    'parent_ref' => $parentref,
+                    'targettype' => 'section',
+                    'targetid' => $targetid,
+                    'section_number' => (int) $section->section,
+                ];
+            }
+
+            $cm = $DB->get_record_sql(
+                'SELECT cm.id, cm.instance, cm.course, m.name AS modulename
+                   FROM {course_modules} cm
+                   JOIN {modules} m ON m.id = cm.module
+                  WHERE cm.id = ?',
+                [$targetid]
+            );
+            if (!$cm
+                    || (int) $cm->course !== $this->targetcourseid
+                    || (string) $cm->modulename !== 'subsection') {
+                return [
+                    'ready' => false,
+                    'parent_ref' => $parentref,
+                    'message' => "Mapped Moodle subsection for parent {$parentref} is missing or invalid.",
+                ];
+            }
+
+            $delegated = $DB->get_record(
+                'course_sections',
+                [
+                    'course' => $this->targetcourseid,
+                    'component' => 'mod_subsection',
+                    'itemid' => (int) $cm->instance,
+                ],
+                'id,section'
+            );
+            if (!$delegated) {
+                return [
+                    'ready' => false,
+                    'parent_ref' => $parentref,
+                    'message' => "Delegated Moodle section for parent {$parentref} is missing.",
+                ];
+            }
+
+            return [
+                'ready' => true,
+                'parent_ref' => $parentref,
+                'targettype' => 'subsection',
+                'targetid' => $targetid,
+                'section_number' => (int) $delegated->section,
+            ];
+        }
+
+        return [
+            'ready' => false,
+            'parent_ref' => $parentref,
+            'message' => "No persistent Moodle section/subsection mapping exists for Wiki parent {$parentref}.",
+        ];
+    }
+
+    /** Find a persistent parent mapping, including legacy empty sourceinstance mappings. */
+    private function find_mapping(string $sourceref, string $targettype): \stdClass|false {
+        global $DB;
+
+        $conditions = [
+            'sourcelms' => 'ILIAS',
+            'sourceinstance' => $this->sourceinstance,
+            'sourcecourse' => $this->sourcecourse,
+            'sourceref' => $sourceref,
+            'targettype' => $targettype,
+        ];
+        $mapping = $DB->get_record('local_iliasmigration_map', $conditions);
+        if ($mapping) {
+            return $mapping;
+        }
+        if ($this->sourceinstance === '') {
+            return false;
+        }
+        $conditions['sourceinstance'] = '';
+        return $DB->get_record('local_iliasmigration_map', $conditions);
     }
 
     /** Collect every normalized media/file package path. */
