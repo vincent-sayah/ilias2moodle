@@ -244,11 +244,23 @@ def recover_mediacast_local_files(
             actual_size = recovered_path.stat().st_size
             actual_sha256 = _sha256_file(recovered_path)
 
+            copy_result_raw = manifest.get("stream_copy_result")
+            try:
+                copy_result = int(copy_result_raw)
+            except (TypeError, ValueError):
+                copy_result = -1
+
+            stream_size_valid = (
+                status != "OK_SIZE_UNAVAILABLE"
+                or copy_result == actual_size
+            )
+
             if (
                 expected_size <= 0
                 or not expected_sha256
                 or actual_size != expected_size
                 or actual_sha256 != expected_sha256
+                or not stream_size_valid
             ):
                 missing.append(
                     {
