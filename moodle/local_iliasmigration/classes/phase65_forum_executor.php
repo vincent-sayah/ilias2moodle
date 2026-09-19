@@ -79,6 +79,12 @@ final class phase65_forum_executor {
                         continue;
                     }
 
+                    if (($operation['forum_validation']['status'] ?? '')
+                            === 'SKIPPED_INCREMENTAL') {
+                        $results[] = $operation;
+                        continue;
+                    }
+
                     $results[] = $this->apply_forum(
                         $course,
                         $operation,
@@ -124,6 +130,11 @@ final class phase65_forum_executor {
             }
 
             $validation = $operation['forum_validation'] ?? [];
+
+            if (($validation['status'] ?? '') === 'SKIPPED_INCREMENTAL') {
+                continue;
+            }
+
             if (($validation['status'] ?? '')
                     !== 'READY_WITH_PHASE7_DEPENDENCY'
                     || ($validation['code'] ?? '')
