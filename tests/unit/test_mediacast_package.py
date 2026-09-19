@@ -40,6 +40,7 @@ def test_mediacast_package_recovers_mp4_and_keeps_external_url(
                 "output_name": "clip1.mp4",
                 "size": len(media),
                 "sha256": sha256,
+                "stream_copy_result": len(media),
                 "status": "OK_SIZE_UNAVAILABLE",
                 "source": "ilias_mediaobject_api",
                 "read_only": True,
