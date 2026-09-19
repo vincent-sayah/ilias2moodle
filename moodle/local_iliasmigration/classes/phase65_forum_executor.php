@@ -242,7 +242,12 @@ final class phase65_forum_executor {
             $moduleinfo->assessed = 0;
             $moduleinfo->grade_forum = 0;
 
-            update_module($moduleinfo);
+            // Do not use update_module() for mod_forum here: Moodle's
+            // convenience wrapper overwrites $moduleinfo->type with the
+            // generic value "mod", which corrupts forum.type. Calling the
+            // lower-level update_moduleinfo() preserves the validated
+            // Forum type "general" while still running forum_update_instance().
+            update_moduleinfo($cm, $moduleinfo, $course, null);
 
             $instanceid = (int) $cm->instance;
             $performed = 'UPDATED';
