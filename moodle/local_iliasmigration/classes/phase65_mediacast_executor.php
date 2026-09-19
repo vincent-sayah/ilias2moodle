@@ -383,7 +383,7 @@ final class phase65_mediacast_executor {
                 $this->upsert_content(
                     (int) $fields['media_player']->id,
                     $recordid,
-                    $this->video_player_html($playerurl),
+                    $this->video_player_html($playerurl, $filename),
                     (string) FORMAT_HTML
                 );
                 $this->upsert_content(
@@ -723,7 +723,10 @@ HTML;
         )->out(false);
     }
 
-    private function video_player_html(string $url): string {
+    private function video_player_html(
+        string $url,
+        string $filename
+    ): string {
         $source = \html_writer::empty_tag(
             'source',
             [
@@ -734,7 +737,11 @@ HTML;
 
         return \html_writer::tag(
             'video',
-            $source . get_string('mediafallbacklink'),
+            $source . \html_writer::link(
+                $url,
+                s($filename),
+                ['class' => 'mediafallbacklink']
+            ),
             [
                 'controls' => 'controls',
                 'preload' => 'metadata',
