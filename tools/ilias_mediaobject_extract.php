@@ -163,11 +163,21 @@ try {
         throw new RuntimeException('DIC ILIAS non initialisé.');
     }
 
-    $manager = $DIC
-        ->mediaObjects()
-        ->internal()
-        ->domain()
-        ->mediaObject();
+    /*
+     * Ne pas passer par $DIC->mediaObjects()->internal() ici :
+     * InternalService construit aussi InternalGUIService, qui attend
+     * des constantes HTTP absentes dans un contexte CLI.
+     *
+     * Pour cette extraction read-only, le repository MediaObject
+     * suffit. Il donne accès au conteneur IRSS et au flux du fichier
+     * sans initialiser la couche GUI.
+     */
+    $mediaData = new \ILIAS\MediaObjects\InternalDataService();
+    $mediaRepos = new \ILIAS\MediaObjects\InternalRepoService(
+        $mediaData,
+        $DIC->database()
+    );
+    $manager = $mediaRepos->mediaObject();
 
     echo "============================================\n";
     echo " Ilias2Moodle - Extraction MediaObject\n";
