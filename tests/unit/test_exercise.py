@@ -73,6 +73,7 @@ def test_exercise_parser_reads_units_types_files_and_constraints(tmp_path: Path)
     assert upload["type"]["key"] == "file_upload"
     assert upload["automatic_ready"] is True
     assert upload["max_files"] == 2
+    assert upload["max_files_unlimited"] is False
     assert upload["instruction_files"][0]["filename"] == "consigne.pdf"
     assert upload["instruction_files"][0]["archive_path"].endswith("consigne.pdf")
 
@@ -85,6 +86,8 @@ def test_exercise_parser_reads_units_types_files_and_constraints(tmp_path: Path)
     assert team["type"]["key"] == "team_file_upload"
     assert team["type"]["migration_support"] == "phase7_group_dependency"
     assert team["automatic_ready"] is False
+    assert team["migration_constraints"] == ["team_membership_phase7_dependency"]
+    assert team["phase7_dependencies"] == ["team_membership_phase7_dependency"]
 
     assert exercise["user_data_policy"]["submissions_migrated"] is False
     assert exercise["target_strategy"]["confirmed_by_real_poc"] is False
