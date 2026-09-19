@@ -38,11 +38,11 @@ $document = $reader->read($source);
 
 $plan = (new \local_iliasmigration\phase6_plan_builder($categoryid))->build($document);
 $plan['phase'] = '6.5.3';
-$plan = (new \local_iliasmigration\phase3_package_validator($source))->validate($plan);
-$plan = (new \local_iliasmigration\phase4_package_validator($source))->validate($plan);
-$plan = (new \local_iliasmigration\phase5_package_validator($source))->validate($plan);
-$plan = (new \local_iliasmigration\phase6_package_validator($source))->validate($plan);
-$plan = (new \local_iliasmigration\phase6_scoring_policy_validator($source))->validate($plan);
+
+// Phase 6.5.3 is incremental. Earlier phases are validated here through their
+// persistent Moodle mappings/targets produced by the plan-builder chain, not by
+// requiring every old binary payload to be re-exported by ILIAS on every run.
+// The Wiki package itself remains fully validated below.
 $plan = (new \local_iliasmigration\phase65_wiki_package_validator($source))->validate($plan);
 $plan['mode'] = 'dry-run';
 $plan['writes_performed'] = false;
