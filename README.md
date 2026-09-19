@@ -121,11 +121,11 @@ Voir [`docs/migration-format.md`](docs/migration-format.md).
 | Module d’apprentissage ILIAS | Moodle Book | Validé Phase 5 |
 | Test | Quiz Moodle | Validé Phase 6 |
 | Banque de questions | Banque Moodle | Validé Phase 6 |
-| Content Page | `mod_page` | Planifié Phase 6.5 |
-| Glossaire | `mod_glossary` | Planifié Phase 6.5 |
-| Wiki | `mod_wiki` | Planifié Phase 6.5 |
+| Content Page | `mod_page` | Validé Phase 6.5 |
+| Glossaire | `mod_glossary` | Validé Phase 6.5 |
+| Wiki | `mod_wiki` | Validé Phase 6.5 |
 | Exercice | `mod_assign` | Validé Phase 6.5 |
-| Forum | `mod_forum` | Planifié Phase 6.5 |
+| Forum | `mod_forum` | Validé Phase 6.5 — structure ; contributions Phase 7 |
 | Mediacast | `mod_data` ou ressources | À figer sur POC Phase 6.5 |
 | Blog | `mod_data` privilégié | À figer sur POC Phase 6.5 |
 | Media Pool / galerie média | ressources / `mod_data` / `mod_page` | À figer sur POC Phase 6.5 |
@@ -273,11 +273,11 @@ moodle/local_iliasmigration
 Version courante :
 
 ```text
-0.16.15-alpha
-2026091904
+0.16.16-alpha
+2026091905
 ```
 
-La Phase 6.5 dispose désormais d’implémentations fonctionnelles validées sur le POC réel, dont l’Exercise ILIAS vers Moodle Assignment.
+La Phase 6.5 dispose désormais d’implémentations fonctionnelles validées sur le POC réel pour Content Page, Glossaire, Wiki, Exercice et Forum. Pour le Forum, le conteneur `mod_forum` est migré en Phase 6.5 tandis que discussions, messages et pièces jointes de contributions restent conservés dans le package neutre et reportés à la Phase 7 tant que les auteurs ne sont pas rapprochés de façon fiable.
 
 ## Idempotence
 
@@ -290,6 +290,7 @@ ILIAS ref_id 237  → Moodle subsection CMID 14
 ILIAS ref_id 246  → Moodle subsection CMID 38
 ILIAS ref_id 240  → Moodle resource CMID 20
 ILIAS ref_id 269  → Moodle resource CMID 43
+ILIAS ref_id 275  → Moodle forum CMID 59
 ```
 
 Les plans utilisent notamment les états :
@@ -320,7 +321,7 @@ Phase 7    [ ] Utilisateurs, inscriptions, groupes et progression
 
 **Phases 1 à 6 terminées et validées sur le POC de référence.**
 
-La prochaine étape active est la **Phase 6.5**, consacrée à l’extension des objets pédagogiques. Elle commence par Content Page, puis Glossaire et Wiki. La Phase 7 reste ouverte mais sera reprise après cette extension, notamment pour les utilisateurs, inscriptions, groupes, auteurs, remises et historique nécessitant un rapprochement d’identité fiable.
+La prochaine étape active de la **Phase 6.5** est **#19 Mediacast**. Content Page, Glossaire, Wiki, Exercice et Forum sont validés sur le POC réel. La Phase 7 reste ouverte et reprendra notamment les utilisateurs, inscriptions, groupes, auteurs, remises et contributions nécessitant un rapprochement d’identité fiable.
 
 ## Licence
 
