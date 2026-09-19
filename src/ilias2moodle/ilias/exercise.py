@@ -7,7 +7,6 @@ from xml.etree import ElementTree as ET
 
 from ilias2moodle.ilias.content_page import _local_name, _text_descendant
 
-
 ASSIGNMENT_TYPES: dict[int, dict[str, Any]] = {
     1: {
         "key": "file_upload",
