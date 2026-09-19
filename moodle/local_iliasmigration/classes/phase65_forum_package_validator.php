@@ -42,7 +42,9 @@ final class phase65_forum_package_validator {
         $this->sourcecourse = (string) ($plan['course']['source_id'] ?? '');
         $this->targetcourseid = (int) ($plan['operations'][0]['target_id'] ?? 0);
 
+        $discovered = 0;
         $checked = 0;
+        $skipped = 0;
         $blocked = 0;
         $threads = 0;
         $posts = 0;
@@ -58,16 +60,37 @@ final class phase65_forum_package_validator {
                 continue;
             }
 
-            $checked++;
+            $discovered++;
             $sourceref = (string) ($operation['source_ref_id'] ?? '');
-            $mapping = $this->resolve_action($sourceref);
 
             $operation['phase'] = '6.5.5';
-            $operation['action'] = $available ? $mapping['action'] : 'BLOCKED';
-            $operation['target_id'] = $mapping['target_id'];
             $operation['moodle_module'] = 'forum';
             $operation['migration_structure_path'] =
                 'forums/' . $sourceref . '/structure.json';
+
+            // Phase 6.5.5 is incremental. A course Container can reference
+            // Forums intentionally omitted from a targeted export fixture.
+            // Missing normalized structure therefore means "not selected in
+            // this incremental package", not a broken Forum package.
+            if ($this->resolve_relative_file(
+                (string) $operation['migration_structure_path']
+            ) === null) {
+                $operation['action'] = 'DEFER';
+                $operation['target_id'] = null;
+                $operation['reason'] = 'FORUM_NOT_IN_INCREMENTAL_PACKAGE';
+                $operation['forum_validation'] = [
+                    'status' => 'SKIPPED_INCREMENTAL',
+                    'code' => 'FORUM_NOT_IN_INCREMENTAL_PACKAGE',
+                    'message' => 'Forum is referenced by the course Container but has no normalized structure in this targeted Phase 6.5.5 package.',
+                ];
+                $skipped++;
+                continue;
+            }
+
+            $checked++;
+            $mapping = $this->resolve_action($sourceref);
+            $operation['action'] = $available ? $mapping['action'] : 'BLOCKED';
+            $operation['target_id'] = $mapping['target_id'];
 
             if (!empty($mapping['legacy_mapping'])) {
                 $operation['legacy_sourceinstance_mapping'] = true;
@@ -133,8 +156,16 @@ final class phase65_forum_package_validator {
 
         if ($checked === 0) {
             $plan['warnings'][] = [
-                'code' => 'NO_FORUM_FOUND',
-                'message' => 'No ILIAS Forum operation was found in this migration package.',
+                'code' => 'NO_FORUM_SELECTED',
+                'message' => 'No normalized ILIAS Forum structure was selected in this incremental Phase 6.5.5 package.',
+            ];
+        }
+
+        if ($skipped > 0) {
+            $plan['warnings'][] = [
+                'code' => 'FORUM_INCREMENTAL_OBJECTS_SKIPPED',
+                'count' => $skipped,
+                'message' => 'Forum objects referenced by the course Container but absent from the targeted normalized package were deferred without blocking selected Forums.',
             ];
         }
 
@@ -152,7 +183,9 @@ final class phase65_forum_package_validator {
 
         $plan['phase65_forum_package'] = [
             'root' => $this->packageroot,
+            'discovered_forums' => $discovered,
             'checked_forums' => $checked,
+            'skipped_forums' => $skipped,
             'blocked_forums' => $blocked,
             'forum_create_count' => $creates,
             'forum_update_count' => $updates,
@@ -164,6 +197,7 @@ final class phase65_forum_package_validator {
             'phase7_dependency_count' => $phase7dependencies,
             'forum_available' => $available,
             'prerequisite_policy' => 'PERSISTED_TARGET_STATE',
+            'incremental_object_policy' => 'VALIDATE_ONLY_NORMALIZED_FORUMS_IN_PACKAGE',
             'contribution_policy' => 'DEFER_TO_PHASE7_AUTHOR_RESOLUTION',
             'ready' => $ready,
             'apply_implemented' => true,
