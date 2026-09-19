@@ -46,7 +46,7 @@ def test_forum_parser_preserves_threads_posts_authors_and_assets(
 <Moderator>0</Moderator>
 <CreateDate>2026-09-19 15:39:05</CreateDate>
 <UpdateDate>2026-09-19 15:39:31</UpdateDate>
-<UpdateUserId>6</UpdateUserId>
+<UpdateUserId>0</UpdateUserId>
 <UserId>6</UserId>
 <Thread>
 <Id>5</Id>
