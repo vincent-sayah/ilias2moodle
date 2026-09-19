@@ -90,13 +90,13 @@ Cible : `mod_glossary`.
 - médias et pièces jointes ;
 - paramètres utiles du glossaire.
 
-État : analyse réelle en cours sur #15. Le premier POC exporté confirme `glo` + définitions `COPage` + `MediaObjects`; la taxonomie et les pièces jointes ne sont pas encore validées dans l’export réel observé.
+État : validé sur le POC réel via #15. Les termes, définitions riches et médias sont migrés vers `mod_glossary` avec mappings persistants et idempotence.
 
 ### Wiki
 
 Cible : `mod_wiki`.
 
-Première cible fonctionnelle : pages actuelles, navigation, liens et médias. L’historique des révisions et les auteurs ne seront migrés que si cela peut être fait de façon fiable.
+État : validé sur le POC réel via #16. Les pages courantes, liens internes, médias et fichiers sont migrés vers `mod_wiki`. L’historique des révisions et les auteurs restent explicitement hors périmètre lorsque leur rattachement n’est pas fiable.
 
 ### Exercice
 
@@ -112,7 +112,28 @@ Les remises, notes, feedbacks utilisateurs et appartenances aux équipes restent
 
 Cible : `mod_forum`.
 
-La structure du forum peut être migrée en Phase 6.5. Les discussions et messages seront migrés avec leurs auteurs uniquement si les identités sont disponibles de manière sûre ; sinon la politique sera explicitement reportée à la Phase 7.
+État : validé sur le POC réel ILIAS 10.8 / Moodle 5.0.2.
+
+POC validé :
+
+- ILIAS Forum `ref_id=275`, `obj_id=807` ;
+- 2 discussions ;
+- 7 messages ;
+- 3 pièces jointes ;
+- auteurs source observés : `6`, `401`, `402` ;
+- Moodle : `CMID=59`, instance `6`, type `general`.
+
+La Phase 6.5.5 crée et met à jour uniquement le conteneur `mod_forum`. Les discussions, messages, hiérarchie `ParentId/Depth`, dates, auteurs source, pièces jointes et médias sont conservés dans `forums/<ref_id>/structure.json` et dans le package de migration, mais leur injection dans Moodle est reportée à la Phase 7 tant que les auteurs ne sont pas rapprochés de façon fiable.
+
+Le dry-run applique une politique incrémentale : un autre Forum référencé par le Container mais absent du package ciblé est `DEFER / SKIPPED_INCREMENTAL` et ne bloque pas le Forum sélectionné.
+
+L’apply réel a validé :
+
+- `CREATE` puis `UPDATE` sur le même CMID 59 ;
+- un mapping unique `275 -> forum -> 59` en statut `READY` ;
+- aucun doublon ;
+- aucune discussion ni aucun post créé artificiellement ;
+- conservation du type Moodle `general` après UPDATE.
 
 ### Mediacast
 
