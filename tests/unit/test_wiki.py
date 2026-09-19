@@ -43,10 +43,10 @@ def test_wiki_parser_preserves_pages_links_media_and_history_policy(tmp_path: Pa
             """<Export>
 <ExportItem Id='wpg:10'><PageObject Language='fr' Active='1'>
 <PageContent><Paragraph Language='fr' Characteristic='Headline1'>Accueil</Paragraph></PageContent>
-<PageContent><Paragraph Language='fr' Characteristic='Standard'>Aller vers <IntLink Target='il_0_wpg_11'>Page 2</IntLink></Paragraph></PageContent>
+<PageContent><Paragraph Language='fr' Characteristic='Standard'>Aller vers <IntLink Target='il__wpg_11'>Page 2</IntLink></Paragraph></PageContent>
 </PageObject></ExportItem>
 <ExportItem Id='wpg:11'><PageObject Language='fr' Active='1'>
-<PageContent><Paragraph Language='fr' Characteristic='Standard'>Retour <IntLink Target='il_0_wpg_10'>Accueil</IntLink></Paragraph></PageContent>
+<PageContent><Paragraph Language='fr' Characteristic='Standard'>Retour <IntLink Target='il__wpg_10'>Accueil</IntLink></Paragraph></PageContent>
 </PageObject></ExportItem>
 <ExportItem Id='wpg:12'><PageObject Language='fr' Active='1'>
 <PageContent><MediaObject><MediaAlias OriginId='il_0_mob_901'/><MediaAliasItem Purpose='Standard'><Layout HorizontalAlign='Left'/></MediaAliasItem></MediaObject></PageContent>
