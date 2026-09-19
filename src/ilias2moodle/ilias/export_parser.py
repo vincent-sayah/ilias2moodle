@@ -20,6 +20,7 @@ TYPE_MAP = {
     "tst": "test",
     "qpl": "question_pool",
     "wiki": "wiki",
+    "exc": "exercise",
 }
 
 
