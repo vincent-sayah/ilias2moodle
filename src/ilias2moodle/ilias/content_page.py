@@ -36,8 +36,30 @@ def _source_id_from_identifier(value: str) -> str:
     return value.rsplit(":", 1)[-1].strip()
 
 
+def _normalized_external_href(href: str, text: str) -> str:
+    """Rebuild native COPage ExtLink URLs when only the scheme is in Href."""
+    href = href.strip()
+    text = text.strip()
+
+    if href in {"http://", "https://"}:
+        if text.startswith(("http://", "https://")):
+            return text
+        if text:
+            return href + text
+    return href
+
+
 def _ilias_type_from_target(value: str) -> str:
-    match = re.search(r"_([a-z0-9]+)_\d+_\d+$", value)
+    # Native COPage exports commonly use il__<type>_<id> (for example
+    # il__wpg_12), while other components/releases may include an installation
+    # id before or after the object type. Accept all observed layouts.
+    match = re.search(r"^il__([a-z][a-z0-9]*)_\d+$", value)
+    if match:
+        return match.group(1)
+    match = re.search(r"_([a-z][a-z0-9]*)_\d+_\d+$", value)
+    if match:
+        return match.group(1)
+    match = re.search(r"_\d+_([a-z][a-z0-9]*)_\d+$", value)
     return match.group(1) if match else ""
 
 
@@ -228,7 +250,10 @@ class ContentPageParser:
                     {
                         "type": "external_link",
                         "text": text,
-                        "href": child.attrib.get("Href", ""),
+                        "href": _normalized_external_href(
+                            child.attrib.get("Href", ""),
+                            text,
+                        ),
                         "children": children,
                     }
                 )

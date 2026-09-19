@@ -1,7 +1,7 @@
 <?php
 
 $plugin->component = 'local_iliasmigration';
-$plugin->version = 2026091800;
+$plugin->version = 2026091902;
 $plugin->requires = 2024100700; // Moodle 4.5 minimum; POC validated on Moodle 5.0.2.
 $plugin->maturity = MATURITY_ALPHA;
-$plugin->release = '0.16.8-alpha';
+$plugin->release = '0.16.13-alpha';

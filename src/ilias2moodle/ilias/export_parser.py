@@ -19,6 +19,7 @@ TYPE_MAP = {
     "lm": "learning_module",
     "tst": "test",
     "qpl": "question_pool",
+    "wiki": "wiki",
 }
 
 

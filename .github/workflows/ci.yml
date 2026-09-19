@@ -62,3 +62,6 @@ jobs:
 
       - name: Phase 6.5 Glossary renderer regression
         run: php tests/php/test_phase65_glossary_renderer.php
+
+      - name: Phase 6.5 Wiki renderer regression
+        run: php tests/php/test_phase65_wiki_renderer.php
