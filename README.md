@@ -126,7 +126,7 @@ Voir [`docs/migration-format.md`](docs/migration-format.md).
 | Wiki | `mod_wiki` | Validé Phase 6.5 |
 | Exercice | `mod_assign` | Validé Phase 6.5 |
 | Forum | `mod_forum` | Validé Phase 6.5 — structure ; contributions Phase 7 |
-| Mediacast | `mod_data` ou ressources | À figer sur POC Phase 6.5 |
+| Mediacast | `mod_data` | Validé Phase 6.5 — MP4 local + URL externe |
 | Blog | `mod_data` privilégié | À figer sur POC Phase 6.5 |
 | Media Pool / galerie média | ressources / `mod_data` / `mod_page` | À figer sur POC Phase 6.5 |
 | Groupe | Groupe / Groupement + restrictions si nécessaire | Phase 7 |
@@ -218,7 +218,7 @@ Ordre retenu :
 3. [#16 Wiki](https://github.com/vincent-sayah/ilias2moodle/issues/16) → `mod_wiki` ;
 4. [#17 Exercice](https://github.com/vincent-sayah/ilias2moodle/issues/17) → `mod_assign` ;
 5. [#18 Forum](https://github.com/vincent-sayah/ilias2moodle/issues/18) → `mod_forum` ;
-6. [#19 Mediacast](https://github.com/vincent-sayah/ilias2moodle/issues/19) → `mod_data` ou ressources selon le POC ;
+6. [#19 Mediacast](https://github.com/vincent-sayah/ilias2moodle/issues/19) → `mod_data` ;
 7. [#20 Blog](https://github.com/vincent-sayah/ilias2moodle/issues/20) → `mod_data` privilégié ;
 8. [#21 Media Pool / galerie média](https://github.com/vincent-sayah/ilias2moodle/issues/21) → stratégie à figer sur POC.
 
@@ -273,11 +273,11 @@ moodle/local_iliasmigration
 Version courante :
 
 ```text
-0.16.16-alpha
-2026091905
+0.16.17-alpha
+2026091906
 ```
 
-La Phase 6.5 dispose désormais d’implémentations fonctionnelles validées sur le POC réel pour Content Page, Glossaire, Wiki, Exercice et Forum. Pour le Forum, le conteneur `mod_forum` est migré en Phase 6.5 tandis que discussions, messages et pièces jointes de contributions restent conservés dans le package neutre et reportés à la Phase 7 tant que les auteurs ne sont pas rapprochés de façon fiable.
+La Phase 6.5 dispose désormais d’implémentations fonctionnelles validées sur le POC réel pour Content Page, Glossaire, Wiki, Exercice, Forum et Mediacast. Pour le Forum, le conteneur `mod_forum` est migré en Phase 6.5 tandis que discussions, messages et pièces jointes de contributions restent conservés dans le package neutre et reportés à la Phase 7 tant que les auteurs ne sont pas rapprochés de façon fiable. Pour le Mediacast, le périmètre validé couvre les MP4 locaux et les URL externes : un Mediacast devient un `mod_data`, chaque entrée devient un record, les MP4 sont stockés via la Files API et lus dans un lecteur HTML5 intégré.
 
 ## Idempotence
 
@@ -291,6 +291,7 @@ ILIAS ref_id 246  → Moodle subsection CMID 38
 ILIAS ref_id 240  → Moodle resource CMID 20
 ILIAS ref_id 269  → Moodle resource CMID 43
 ILIAS ref_id 275  → Moodle forum CMID 59
+ILIAS ref_id 276  → Moodle database CMID 60
 ```
 
 Les plans utilisent notamment les états :
@@ -321,7 +322,7 @@ Phase 7    [ ] Utilisateurs, inscriptions, groupes et progression
 
 **Phases 1 à 6 terminées et validées sur le POC de référence.**
 
-La prochaine étape active de la **Phase 6.5** est **#19 Mediacast**. Content Page, Glossaire, Wiki, Exercice et Forum sont validés sur le POC réel. La Phase 7 reste ouverte et reprendra notamment les utilisateurs, inscriptions, groupes, auteurs, remises et contributions nécessitant un rapprochement d’identité fiable.
+Dans la **Phase 6.5**, Content Page, Glossaire, Wiki, Exercice, Forum et Mediacast sont validés sur le POC réel. La prochaine étape active est **#20 Blog**. La Phase 7 reste ouverte et reprendra notamment les utilisateurs, inscriptions, groupes, auteurs, remises et contributions nécessitant un rapprochement d’identité fiable.
 
 ## Licence
 

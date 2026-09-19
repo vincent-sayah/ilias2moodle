@@ -19,7 +19,7 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Wiki | `wiki` | `mod_wiki` | 6.5 | validé — #16 |
 | Exercice | `exc` | `mod_assign` | 6.5 | validé — #17 |
 | Forum | `frm` | `mod_forum` | 6.5 | validé structure — #18 ; contributions Phase 7 |
-| Mediacast | `mcst`* | `mod_data` ou collection de ressources | 6.5 | étude/POC — #19 |
+| Mediacast | `mcst` | `mod_data` | 6.5 | validé — #19 ; MP4 local + URL externe |
 | Blog | `blog`* | `mod_data` privilégié | 6.5 | étude/POC — #20 |
 | Media Pool / galerie média | `mep`* / selon export | ressources, `mod_data` ou `mod_page` | 6.5 | étude/POC — #21 |
 | Groupe | `grp`* | Groupe / Groupement + structure/restrictions si nécessaire | 7 | planifié — #7 |
@@ -60,11 +60,13 @@ Ordre de développement retenu :
 3. Wiki → `mod_wiki` ;
 4. Exercice → `mod_assign` ;
 5. Forum → `mod_forum` ;
-6. Mediacast → cible à figer après POC ;
+6. Mediacast → `mod_data` ;
 7. Blog → `mod_data` privilégié ;
 8. Media Pool / galerie média → cible à figer après POC.
 
 Pour les objets dépendants des identités utilisateurs, la structure pédagogique peut être traitée en Phase 6.5, tandis que les auteurs, membres, remises, notes ou contributions sont reportés à la Phase 7 lorsqu’un rapprochement utilisateur fiable est nécessaire. C’est la politique validée pour le Forum : le `mod_forum` est créé/mis à jour en Phase 6.5.5, tandis que les threads, posts et assets de contributions restent conservés dans le package jusqu’au rapprochement des auteurs.
+
+Pour le Mediacast, le mapping validé est `mcst` → `mod_data` : un `mod_data` par Mediacast et un record par entrée. Le périmètre POC validé couvre `video/mp4` local et les références externes HTTP/HTTPS. Les MP4 absents du ZIP natif peuvent être récupérés en lecture seule via MediaObjects/IRSS, puis contrôlés par taille et SHA-256 avant packaging. Le fichier est stocké via Moodle Files API et rendu dans un lecteur HTML5 ; les previews restent conservées dans le package sans être injectées dans Moodle.
 
 ## Objet Groupe
 

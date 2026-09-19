@@ -27,7 +27,7 @@ Cette phase conserve les principes déjà appliqués au projet :
 | 3 | Wiki | `mod_wiki` | #16 | automatique / semi-automatique |
 | 4 | Exercice | `mod_assign` | #17 | semi-automatique |
 | 5 | Forum | `mod_forum` | #18 | semi-automatique |
-| 6 | Mediacast | `mod_data` ou ressources | #19 | transformation contrôlée |
+| 6 | Mediacast | `mod_data` | #19 | transformation contrôlée |
 | 7 | Blog | `mod_data` privilégié | #20 | transformation contrôlée |
 | 8 | Media Pool / galerie média | ressources / `mod_data` / `mod_page` | #21 | transformation contrôlée |
 
@@ -137,12 +137,29 @@ L’apply réel a validé :
 
 ### Mediacast
 
-Pas d’équivalence stricte retenue avant POC.
+Cible : `mod_data`.
 
-Deux stratégies seront comparées :
+État : validé sur le POC réel ILIAS 10.8 / Moodle 5.0.2.
 
-- `mod_data` pour conserver une collection/galerie ;
-- plusieurs `mod_resource` lorsque la fidélité média est prioritaire.
+POC validé :
+
+- ILIAS Mediacast `ref_id=276`, `obj_id=809`, type `mcst` ;
+- 2 entrées : 1 MP4 local et 1 URL externe YouTube ;
+- récupération en lecture seule du MP4 via MediaObjects/IRSS lorsque le ZIP natif ne contient que la preview ;
+- contrôle d’intégrité du MP4 par taille et SHA-256 ;
+- 1 `mod_data` Moodle par Mediacast ;
+- 1 record Moodle par entrée source ;
+- Moodle `CMID=60`, instance `2` ;
+- records `1` et `2` ;
+- MP4 stocké via Moodle Files API et affiché avec un lecteur HTML5 intégré ;
+- URL externe conservée dans un champ URL ;
+- previews conservées dans le package neutre mais non importées dans Moodle pour ce POC.
+
+Le dry-run ciblé peut rencontrer d’autres Mediacasts référencés par le Container mais absents du fixture ; ils sont alors `DEFER / SKIPPED_INCREMENTAL` sans bloquer l’objet sélectionné.
+
+Le premier apply a créé le `mod_data` et ses 2 records. Le second apply a mis à jour le même CMID 60 et les mêmes 2 records, sans doublon. Le lecteur MP4 et l’URL externe ont été validés visuellement dans Moodle.
+
+Le périmètre de cette validation est volontairement limité aux MP4 locaux et aux URL externes ; WebM, images et audio ne sont pas déclarés supportés par ce POC.
 
 ### Blog
 
