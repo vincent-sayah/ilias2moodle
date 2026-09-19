@@ -102,7 +102,11 @@ Première cible fonctionnelle : pages actuelles, navigation, liens et médias. L
 
 Cible : `mod_assign`.
 
-Un Exercise ILIAS contenant plusieurs unités peut nécessiter plusieurs activités Moodle regroupées dans une sous-section. Les remises, notes et feedbacks utilisateurs sont reportés à la Phase 7 lorsqu’ils dépendent des comptes utilisateurs.
+État : validé sur le POC réel ILIAS 10.8 / Moodle 5.0.2.
+
+La stratégie retenue crée un `mod_assign` par unité ILIAS dans la section Moodle correspondant au parent de l’Exercise. Les types validés sont le dépôt de fichier individuel, le texte en ligne et le dépôt de fichier en équipe. Les fichiers d’instruction absents de l’export natif ILIAS 10.8 peuvent être récupérés en lecture seule via IRSS, puis contrôlés par taille et SHA-256 avant intégration au package.
+
+Les remises, notes, feedbacks utilisateurs et appartenances aux équipes restent reportés à la Phase 7. Le second apply met à jour les mêmes activités sans créer de doublons.
 
 ### Forum
 
