@@ -238,25 +238,78 @@ try {
         );
     }
 
-    $written = stream_copy_to_stream($resource, $out);
+    $copyResult = stream_copy_to_stream($resource, $out);
     fclose($out);
 
-    if ($written === false) {
+    clearstatcache(true, $target);
+
+    if (!is_file($target)) {
         throw new RuntimeException(
-            "Impossible d'écrire $target"
+            "Aucun fichier n'a été produit : $target"
         );
     }
 
     $size = filesize($target);
+    if ($size === false) {
+        throw new RuntimeException(
+            "Impossible de déterminer la taille de $target"
+        );
+    }
+
+    $expectedSize = isset($info['size'])
+        ? (int) $info['size']
+        : 0;
+
+    /*
+     * ZIPStream peut retourner false à stream_copy_to_stream() après
+     * avoir néanmoins livré l'intégralité de l'entrée. On ne se fie
+     * donc pas à cette valeur seule : la validation décisive est la
+     * taille annoncée par le conteneur IRSS.
+     */
+    if ($expectedSize > 0 && $size !== $expectedSize) {
+        throw new RuntimeException(
+            "Taille extraite incorrecte pour $target : "
+            . "$size octets obtenus, $expectedSize attendus."
+        );
+    }
+
+    if ($size <= 0) {
+        throw new RuntimeException(
+            "Le fichier extrait est vide : $target"
+        );
+    }
+
     $sha256 = hash_file('sha256', $target);
+    if ($sha256 === false) {
+        throw new RuntimeException(
+            "Impossible de calculer le SHA256 de $target"
+        );
+    }
+
+    $copyWarning = $copyResult === false
+        ? 'STREAM_COPY_REPORTED_FALSE_BUT_SIZE_VALIDATED'
+        : null;
+
+    if ($copyWarning !== null) {
+        echo "[WARN] stream_copy_to_stream() a retourné false, "
+            . "mais la taille IRSS est conforme.\n";
+    }
 
     $manifest = [
         'mob_id' => $mobId,
         'location' => $location,
         'output_name' => $safeName,
         'output_path' => $target,
+        'expected_size' => $expectedSize,
         'size' => $size,
         'sha256' => $sha256,
+        'stream_copy_result' => $copyResult,
+        'warning' => $copyWarning,
+        'status' => (
+            $expectedSize > 0 && $size === $expectedSize
+                ? 'OK'
+                : 'OK_SIZE_UNAVAILABLE'
+        ),
         'entry_info' => $info,
         'source' => 'ilias_mediaobject_api',
         'read_only' => true,
