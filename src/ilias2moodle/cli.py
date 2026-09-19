@@ -13,6 +13,10 @@ from ilias2moodle.exercise_package import (
     extract_exercise_assets,
     recover_exercise_instruction_files,
 )
+from ilias2moodle.forum_package import (
+    enrich_document_forums,
+    extract_forum_assets,
+)
 from ilias2moodle.glossary_package import (
     enrich_document_glossaries,
     extract_glossary_assets,
@@ -142,6 +146,7 @@ def _parse_export_document(zip_path: Path, ilias_version: str) -> MigrationDocum
     enrich_document_glossaries(document, zip_path)
     enrich_document_wikis(document, zip_path)
     enrich_document_exercises(document, zip_path)
+    enrich_document_forums(document, zip_path)
     return document
 
 
@@ -197,6 +202,7 @@ def _prepare_export(
     glossary_result = extract_glossary_assets(document, zip_path, output)
     wiki_result = extract_wiki_assets(document, zip_path, output)
     exercise_result = extract_exercise_assets(document, zip_path, output)
+    forum_result = extract_forum_assets(document, zip_path, output)
     result = MigrationPackageBuilder(zip_path, output).build(document)
     package = result["package"]
     report = result["report"]
@@ -206,6 +212,7 @@ def _prepare_export(
         glossary_result,
         wiki_result,
         exercise_result,
+        forum_result,
     )
     for extension_result in extension_results:
         managed_directory = str(extension_result["managed_directory"])
