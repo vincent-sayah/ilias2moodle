@@ -124,7 +124,7 @@ Voir [`docs/migration-format.md`](docs/migration-format.md).
 | Content Page | `mod_page` | Planifié Phase 6.5 |
 | Glossaire | `mod_glossary` | Planifié Phase 6.5 |
 | Wiki | `mod_wiki` | Planifié Phase 6.5 |
-| Exercice | `mod_assign` | Planifié Phase 6.5 |
+| Exercice | `mod_assign` | Validé Phase 6.5 |
 | Forum | `mod_forum` | Planifié Phase 6.5 |
 | Mediacast | `mod_data` ou ressources | À figer sur POC Phase 6.5 |
 | Blog | `mod_data` privilégié | À figer sur POC Phase 6.5 |
@@ -270,14 +270,14 @@ Le plugin Moodle est situé dans :
 moodle/local_iliasmigration
 ```
 
-Version courante après clôture de la Phase 3 :
+Version courante :
 
 ```text
-0.15.2-alpha
-2026091402
+0.16.15-alpha
+2026091904
 ```
 
-La planification de la Phase 6.5 ne modifie pas la version du plugin tant qu’aucune nouvelle implémentation fonctionnelle n’est intégrée.
+La Phase 6.5 dispose désormais d’implémentations fonctionnelles validées sur le POC réel, dont l’Exercise ILIAS vers Moodle Assignment.
 
 ## Idempotence
 

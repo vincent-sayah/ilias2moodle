@@ -39,10 +39,12 @@ silencieusement en Assignment standard.
 ## Stratégie multi-unités
 
 Un objet Exercise ILIAS peut contenir plusieurs `exc_assignment`.
-Le modèle neutre prévoit donc un `mod_assign` Moodle par unité.
+La stratégie validée crée un `mod_assign` Moodle par unité, dans la section
+Moodle correspondant au parent de l’Exercise ILIAS.
 
-Le regroupement dans une sous-section Moodle dédiée est un candidat de
-conservation de structure et sera confirmé par le POC réel avant apply.
+Le POC réel n’a pas retenu la création d’une sous-section supplémentaire :
+la structure reste plus simple et l’idempotence repose sur un mapping persistant
+par unité sous la forme `<ref_id_exercise>:assignment:<id_unite>`.
 
 ## Données utilisateurs
 
@@ -58,18 +60,24 @@ Ces données restent explicitement reportées à la Phase 7.
 
 ## Garde-fous
 
-L'apply Moodle reste désactivé tant que le POC réel ILIAS 10.8 n'a pas confirmé :
+Le POC réel ILIAS 10.8 / Moodle 5.0.2 a confirmé les noms/valeurs XML utiles,
+les échéances, les types de remise retenus et la stratégie multi-unités.
+L’apply Moodle est activé uniquement lorsque le validateur confirme :
 
-- les noms/valeurs XML réels ;
-- la sérialisation des fichiers d'instruction ;
-- les échéances ;
-- les types de remise ;
-- la stratégie multi-unités.
+- un Exercise reconnu et un parent Moodle valide ;
+- aucune unité bloquée ;
+- la présence des plugins de remise requis ;
+- des fichiers d’instruction présents et validés ;
+- une action unitaire `CREATE` ou `UPDATE` sûre ;
+- le report explicite des appartenances aux équipes en Phase 7.
+
+L’exécuteur applique l’ensemble dans une transaction Moodle et conserve un
+mapping persistant pour empêcher la création de doublons lors des rejouages.
 
 
-## Anomalie confirmée sur ILIAS 10.8
+## Anomalie apparente du chemin d’export sur ILIAS 10.8
 
-Le POC réel sur ILIAS 10.8 a mis en évidence un défaut d’export des fichiers d’instruction des Exercise.
+Le POC réel sur ILIAS 10.8 a mis en évidence un comportement d’export qui laisse les fichiers d’instruction des Exercise hors du ZIP natif dans le cas observé.
 
 `ilExerciseExporter::getValidSchemaVersions()` borne le schéma Exercise `9.0` à `max = 9.99`, alors que `ilXmlExporter::determineSchemaVersion()` compare les contraintes avec `ILIAS_VERSION_NUMERIC` (10.8). L’export sélectionne donc le schéma `5.3.0`.
 
@@ -169,3 +177,63 @@ Après récupération :
 
 Le package final contient les quatre fichiers et ne signale aucune ressource
 manquante.
+
+
+## Apply Moodle validé
+
+Le POC final a été exécuté sur le cours Moodle `id=5` à partir de l’Exercise
+ILIAS `ref_id=274`, `obj_id=806`, intitulé `test migration exercice`.
+
+Le dry-run final a donné :
+
+- `ready = true` ;
+- `apply_implemented = true` ;
+- `apply_ready = true` ;
+- 3 unités ;
+- 3 créations prévues ;
+- 0 unité bloquée ;
+- 1 dépendance Phase 7 ;
+- 4 fichiers d’instruction.
+
+Le premier apply a créé :
+
+- `tache1` → `mod_assign`, CMID 56, remise fichier, 2 fichiers d’instruction ;
+- `tache2` → `mod_assign`, CMID 57, remise texte en ligne, 1 fichier d’instruction ;
+- `Dépôt équipe` → `mod_assign`, CMID 58, remise fichier en équipe, 1 fichier d’instruction.
+
+Les quatre fichiers récupérés via IRSS ont été retrouvés dans le File API
+Moodle avec les tailles attendues.
+
+Un second apply sur le même package a produit uniquement des `UPDATE` sur les
+mêmes CMID 56, 57 et 58. Aucun doublon n’a été créé.
+
+Les mappings persistants validés sont :
+
+```text
+274:assignment:1 -> assign CMID=56 STATUS=READY
+274:assignment:2 -> assign CMID=57 STATUS=READY
+274:assignment:3 -> assign CMID=58 STATUS=READY
+```
+
+La migration structurelle de l’objet Exercise est donc considérée comme
+validée pour la Phase 6.5.4. Les remises utilisateurs, notes, feedbacks et
+appartenances effectives aux équipes restent hors périmètre et sont reportés à
+la Phase 7.
+
+### Commandes Moodle
+
+Dry-run :
+
+```bash
+php local/iliasmigration/cli/exercise_dry_run.php \
+  --source=/path/to/migration.json \
+  --category=ID
+```
+
+Apply :
+
+```bash
+php local/iliasmigration/cli/exercise_apply.php \
+  --source=/path/to/migration.json \
+  --category=ID
+```

@@ -17,7 +17,7 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Content Page | `copa`* | `mod_page` | 6.5 | planifié — #14 |
 | Glossaire | `glo`* | `mod_glossary` | 6.5 | planifié — #15 |
 | Wiki | `wiki`* | `mod_wiki` | 6.5 | planifié — #16 |
-| Exercice | `exc`* | `mod_assign` | 6.5 | planifié — #17 |
+| Exercice | `exc` | `mod_assign` | 6.5 | validé — #17 |
 | Forum | `frm`* | `mod_forum` | 6.5 | planifié — #18 |
 | Mediacast | `mcst`* | `mod_data` ou collection de ressources | 6.5 | étude/POC — #19 |
 | Blog | `blog`* | `mod_data` privilégié | 6.5 | étude/POC — #20 |
