@@ -93,18 +93,36 @@ def test_exercise_parser_reads_units_types_files_and_constraints(tmp_path: Path)
     assert exercise["target_strategy"]["confirmed_by_real_poc"] is False
 
 
-def test_exercise_parser_detects_unembedded_resource_collection_uuid(tmp_path: Path) -> None:
+def test_exercise_parser_detects_unembedded_resource_collection_uuid(
+    tmp_path: Path,
+) -> None:
     archive_path = tmp_path / "course.zip"
     base = "set_31/1789807355__0__exc_806"
 
+    manifest = (
+        "<Manifest>\n"
+        "<ExportSet Path='set_31/1789807355__0__exc_806' Type='exc'/>\n"
+        "</Manifest>"
+    )
+    export_xml = (
+        "<Export><ExportItem Id='806'><DataSet>\n"
+        "<Rec Entity='exc'><Exc><Id>806</Id><Title>POC</Title></Exc></Rec>\n"
+        "<Rec Entity='exc_assignment'><ExcAssignment>\n"
+        "<Id>1</Id><ExerciseId>806</ExerciseId><Type>1</Type>\n"
+        "<Title>Tache</Title><Instruction>Consigne</Instruction>\n"
+        "<InstructionCollection>"
+        "91b53716-8ec4-45ad-ada7-0f714c76901f"
+        "</InstructionCollection>\n"
+        "<Peer>0</Peer><DeadlineMode>0</DeadlineMode>\n"
+        "</ExcAssignment></Rec>\n"
+        "</DataSet></ExportItem></Export>"
+    )
+
     with zipfile.ZipFile(archive_path, "w") as archive:
-        archive.writestr(
-            "manifest.xml",
-            """<Manifest>\n<ExportSet Path='set_31/1789807355__0__exc_806' Type='exc'/>\n</Manifest>""",
-        )
+        archive.writestr("manifest.xml", manifest)
         archive.writestr(
             f"{base}/components/ILIAS/Exercise/set_0/export.xml",
-            """<Export><ExportItem Id='806'><DataSet>\n<Rec Entity='exc'><Exc><Id>806</Id><Title>POC</Title></Exc></Rec>\n<Rec Entity='exc_assignment'><ExcAssignment>\n<Id>1</Id><ExerciseId>806</ExerciseId><Type>1</Type>\n<Title>Tache</Title><Instruction>Consigne</Instruction>\n<InstructionCollection>91b53716-8ec4-45ad-ada7-0f714c76901f</InstructionCollection>\n<Peer>0</Peer><DeadlineMode>0</DeadlineMode>\n</ExcAssignment></Rec>\n</DataSet></ExportItem></Export>""",
+            export_xml,
         )
 
     exercise = parse_exercises(archive_path)[0]
