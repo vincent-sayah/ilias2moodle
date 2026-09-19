@@ -326,3 +326,12 @@ Validation réalisée sur Moodle 5.0.2 avec le cours ILIAS 10.8 `ref_id=128` :
 - mappings persistants validés : 1 qbank, 1 quiz, 11 questions.
 
 La Phase 6 POC est considérée terminée.
+
+
+## Licence
+
+Le plugin `local_iliasmigration` fait partie d’ILIAS2Moodle et est distribué sous **GNU GPL v3.0 or later** (`GPL-3.0-or-later`).
+
+**Copyright (C) 2026 Vincent Sayah**
+
+Le texte complet de la licence est fourni dans `COPYING.txt`.

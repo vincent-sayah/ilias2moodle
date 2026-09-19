@@ -7,9 +7,13 @@ name = "ilias2moodle"
 version = "0.1.0"
 description = "Migration semi-automatisée de contenus ILIAS 10 vers Moodle 4.5"
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.11"
 authors = [
   { name = "Vincent Sayah" }
+]
+classifiers = [
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"
 ]
 dependencies = [
   "beautifulsoup4>=4.12,<5",

@@ -326,4 +326,10 @@ Dans la **Phase 6.5**, Content Page, Glossaire, Wiki, Exercice, Forum et Mediaca
 
 ## Licence
 
-La licence du projet n’est pas encore définie.
+ILIAS2Moodle est distribué sous la licence **GNU General Public License v3.0 or later** (`GPL-3.0-or-later`).
+
+**Copyright (C) 2026 Vincent Sayah**
+
+Toute redistribution du projet doit conserver les mentions de copyright et de licence applicables. Les versions modifiées redistribuées doivent respecter les obligations de la GPL, notamment l’indication des modifications et la mise à disposition du code source correspondant dans les conditions prévues par la licence.
+
+Le texte complet de la licence est disponible dans [`LICENSE`](LICENSE).
