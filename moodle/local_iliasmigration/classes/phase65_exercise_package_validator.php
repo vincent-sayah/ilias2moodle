@@ -142,16 +142,16 @@ final class phase65_exercise_package_validator {
             'assignsubmission_file_available' => $fileplugin,
             'assignsubmission_onlinetext_available' => $onlinetextplugin,
             'user_data_policy' => 'DEFER_TO_PHASE_7',
-            'multi_unit_strategy' => 'SUBSECTION_CANDIDATE_REQUIRES_REAL_POC',
+            'multi_unit_strategy' => 'ONE_MOD_ASSIGN_PER_UNIT_IN_PARENT_SECTION',
             'ready' => $ready,
-            'apply_implemented' => false,
-            'apply_ready' => false,
+            'apply_implemented' => true,
+            'apply_ready' => $ready && $unitblocked === 0,
         ];
 
-        if ($checked > 0) {
+        if ($phase7dependencies > 0) {
             $plan['warnings'][] = [
-                'code' => 'EXERCISE_APPLY_NOT_IMPLEMENTED',
-                'message' => 'Exercise dry-run is available, but CREATE/UPDATE remains disabled until the real ILIAS 10.8 POC confirms the export and multi-unit strategy.',
+                'code' => 'EXERCISE_PHASE7_GROUP_DEPENDENCY',
+                'message' => 'Team Assignment structure can be created in Phase 6.5.4, but actual team memberships remain deferred to Phase 7.',
             ];
         }
 
@@ -369,7 +369,7 @@ final class phase65_exercise_package_validator {
             'phase7_dependency_count' => $phase7,
             'instruction_file_count' => $instructionfiles,
             'multi_unit' => count($assignments) > 1,
-            'container_strategy' => 'SUBSECTION_CANDIDATE_REQUIRES_REAL_POC',
+            'container_strategy' => 'ONE_MOD_ASSIGN_PER_UNIT_IN_PARENT_SECTION',
             'units' => $units,
         ];
 
