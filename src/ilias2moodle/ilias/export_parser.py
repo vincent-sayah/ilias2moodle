@@ -24,6 +24,7 @@ TYPE_MAP = {
     "frm": "forum",
     "mcst": "mediacast",
     "blog": "blog",
+    "mep": "media_pool",
 }
 
 
