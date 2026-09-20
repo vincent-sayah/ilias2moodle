@@ -55,3 +55,52 @@ L'analyse doit déterminer :
 - si les objets Forum, Blog, Wiki, Exercice et Groupe utilisent les mêmes identifiants.
 
 Aucune écriture Moodle ne doit être effectuée pendant cette étape.
+
+
+## Résultat du POC ZIP complet
+
+Analyse du ZIP natif `1789892867__0__crs_504.zip` :
+
+- aucun composant utilisateur/profil/membership n'est exporté avec le cours ;
+- aucune liste d'inscrits du cours n'est présente ;
+- aucune liste de membres du Groupe 743 n'est présente ;
+- une seule référence au format `il_0_usr_<id>` est présente : `il_0_usr_6` ;
+- cette identité est utilisée comme auteur de Blog, créateur de versions de fichiers et propriétaire du Groupe 743 ;
+- les identités historiques observées dans d'autres objets ne disposent pas nécessairement d'un profil exporté dans le ZIP.
+
+Conclusion : le ZIP natif reste la source de contenu, mais il est insuffisant pour la résolution des identités et inscriptions.
+
+## Source complémentaire Phase 7
+
+La Phase 7 autorise une extraction complémentaire **lecture seule au niveau applicatif ILIAS** pour les données d'identité et de membership absentes du ZIP.
+
+Cette extraction doit :
+
+- utiliser les classes/services ILIAS, pas des requêtes SQL directes du projet ;
+- cibler explicitement le cours POC et les groupes concernés ;
+- exporter uniquement les champs nécessaires au rapprochement ;
+- produire un JSON auditable ;
+- ne modifier aucune donnée ILIAS.
+
+Champs candidats :
+
+- `source_user_id` ;
+- `login` ;
+- `email` ;
+- `firstname` ;
+- `lastname` ;
+- `matriculation` si disponible ;
+- `external_account` si disponible ;
+- statut actif ;
+- rôle dans le cours ;
+- appartenance/role dans les groupes.
+
+## État Moodle POC
+
+Cours cible `id=5 / ILIAS-128` :
+
+- 0 utilisateur inscrit ;
+- 3 comptes globaux non supprimés ;
+- aucun `idnumber` renseigné sur ces comptes.
+
+Aucun rapprochement automatique ne sera réalisé tant que les attributs ILIAS correspondants n'ont pas été récupérés.
