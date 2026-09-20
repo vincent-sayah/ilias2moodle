@@ -2,7 +2,7 @@
 
 ## État
 
-Analyse du POC réel à démarrer.
+Phase validée sur le POC réel ILIAS 10.8 → Moodle 5.0.2.
 
 Issue : #21.
 
@@ -121,7 +121,7 @@ Cette duplication dans deux contextes d'export est considérée valide : Moodle 
 
 ## Stratégie Moodle proposée après analyse réelle
 
-La cible privilégiée est désormais `mod_data` :
+La cible validée est `mod_data` :
 
 - 1 Media Pool ILIAS → 1 activité Database ;
 - 1 nœud de contenu `mob` ou `pg` → 1 record ;
@@ -145,3 +145,65 @@ Le pipeline doit :
 3. préparer `mep` ;
 4. conserver explicitement en `DEFER` les familles relevant d'une phase future, notamment `grp` jusqu'à la Phase 7 ;
 5. ne jamais exiger de suppression d'ExportSets pour faire passer le package.
+
+
+## Validation Moodle réelle
+
+Dry-run réel sur le package complet `course-128-v10` :
+
+- `MEDIA_POOL_READY` ;
+- `ready=true` ;
+- `blocked_media_pools=0` ;
+- `record_count=4` ;
+- `asset_count=4` ;
+- `image_count=3` ;
+- `video_count=1` ;
+- `page_record_count=1` ;
+- `folder_count=1` ;
+- parent résolu vers la section Moodle `1`.
+
+Premier apply :
+
+- `CREATE` → `CREATED` ;
+- `CMID=62` ;
+- instance `4` ;
+- section `1` ;
+- 4 records créés : tree ids `2→5`, `3→6`, `4→7`, `6→8` ;
+- 4 médias écrits ;
+- 3 images ;
+- 1 vidéo MP4.
+
+Validation visuelle conforme :
+
+- `duo` affiche `du2.png` et sa légende ;
+- `video5` affiche un lecteur vidéo HTML5 sur `vid5.mp4` ;
+- `texte media` affiche le texte et `trio.png` ;
+- `femme_noire_robot.png` est visible avec `folder_path=dossier1` ;
+- aucune preview ILIAS n’est affichée.
+
+Second apply :
+
+- `UPDATE` → `UPDATED` ;
+- même `CMID=62` ;
+- même instance `4` ;
+- `records_created=0` ;
+- `records_updated=4` ;
+- mêmes records `5`, `6`, `7`, `8` ;
+- exactement 4 fichiers finaux dans `mod_data/content`.
+
+## Critère de sortie atteint
+
+Les critères de sortie de #21 sont satisfaits :
+
+- type `mep` confirmé ;
+- parseur et package neutre fonctionnels sur le ZIP complet ;
+- références croisées avec le Wiki 279 comprises et conservées ;
+- dry-run sans écriture ;
+- stratégie `mod_data` validée ;
+- apply réel validé ;
+- mapping persistant ;
+- second apply idempotent ;
+- aucune preview importée ;
+- validation visuelle conforme.
+
+La Phase 6.5 est ainsi terminée. La suite du projet bascule sur la Phase 7.
