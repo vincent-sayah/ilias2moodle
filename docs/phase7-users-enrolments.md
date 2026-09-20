@@ -2,7 +2,7 @@
 
 ## État
 
-Analyse du POC réel à démarrer.
+POC réel validé pour les identités, inscriptions, rôles et dépendance Groupe.
 
 Parent : #7.
 
@@ -159,17 +159,20 @@ site administrator
 
 Le mapping est accepté uniquement si la cible Moodle est réellement administrateur de site.
 
-### Comptes de cours créés
+### Comptes de cours validés
 
-Les membres réels du cours ILIAS `obj_id=504` sont :
+L’extraction applicative ILIAS finale du cours `obj_id=504 / ref_id=128` confirme six participants :
 
-| ILIAS | Login | Moodle | Rôle cours |
-|---|---|---:|---|
-| 401 | `stagiaire.1` | 5 | student |
-| 402 | `stagiaire.2` | 6 | student |
-| 410 | `stagiaire.10` | 7 | student |
+| ILIAS | Login | Moodle | Rôle ILIAS | Rôle Moodle |
+|---|---|---:|---|---|
+| 401 | `stagiaire.1` | 5 | member | student |
+| 402 | `stagiaire.2` | 6 | member | student |
+| 410 | `stagiaire.10` | 7 | member | student |
+| 412 | `stagiaire.12` | 8 | admin | editingteacher |
+| 413 | `stagiaire.13` | 9 | admin | editingteacher |
+| 415 | `stagiaire.15` | 10 | tutor | teacher |
 
-Les trois comptes conservent l'adresse `vince.syh@free.fr`, autorisée par la configuration fonctionnelle Moodle.
+Les six comptes conservent l'adresse `vince.syh@free.fr`, autorisée par la configuration fonctionnelle Moodle.
 
 Politique de credentials :
 
@@ -186,36 +189,46 @@ ILIAS GLOBAL 6   -> Moodle user 2
 ILIAS GLOBAL 401 -> Moodle user 5
 ILIAS GLOBAL 402 -> Moodle user 6
 ILIAS GLOBAL 410 -> Moodle user 7
+ILIAS GLOBAL 412 -> Moodle user 8
+ILIAS GLOBAL 413 -> Moodle user 9
+ILIAS GLOBAL 415 -> Moodle user 10
 
-ILIAS course 504 user:401 -> Moodle enrolment 8
-ILIAS course 504 user:402 -> Moodle enrolment 9
-ILIAS course 504 user:410 -> Moodle enrolment 10
+ILIAS course 504 user:401 -> Moodle enrolment
+ILIAS course 504 user:402 -> Moodle enrolment
+ILIAS course 504 user:410 -> Moodle enrolment
+ILIAS course 504 user:412 -> Moodle enrolment
+ILIAS course 504 user:413 -> Moodle enrolment
+ILIAS course 504 user:415 -> Moodle enrolment
 ```
 
-Les sept mappings sont enregistrés avec le statut `READY`.
+Ces mappings sont enregistrés avec le statut `READY`.
 
-### Idempotence
+### Idempotence et notifications
 
-Premier apply :
-
-```text
-created_user_count        = 3
-reused_user_count         = 1
-enrolled_membership_count = 3
-updated_membership_count  = 0
-```
-
-Second apply :
+Après enrichissement du POC avec les rôles `admin` et `tutor`, l’apply final est idempotent :
 
 ```text
 created_user_count        = 0
-reused_user_count         = 4
+reused_user_count         = 6
 enrolled_membership_count = 0
-updated_membership_count  = 3
+updated_membership_count  = 6
 ```
 
-Le second passage ne crée donc aucun compte ni aucune inscription supplémentaire.
+Les rôles cibles sont conservés au second passage :
 
-### Suite de Phase 7
+```text
+401 -> student
+402 -> student
+410 -> student
+412 -> editingteacher
+413 -> editingteacher
+415 -> teacher
+```
 
-La dépendance d'identité de l'issue #22 Groupe est désormais levée : les membres peuvent être reliés à Moodle lorsqu'ils existent dans les données ILIAS. Le Groupe POC `obj_id=743` ne possède actuellement aucun membre, mais son propriétaire `usr_id=6` est résolu vers l'administrateur global Moodle.
+Les emails de bienvenue automatiques de l’inscription manuelle Moodle sont désactivés uniquement dans le flux de migration afin qu’un traitement batch ne dépende pas de la configuration d’un processeur de messagerie.
+
+### Dépendance Groupe levée
+
+La dépendance d’identité de l’issue #22 est levée. Le Groupe ILIAS `obj_id=743 / ref_id=254` contient sept participants source : six sont également participants du cours parent et sont résolus vers Moodle ; `usr_id=6 / root` est membre du groupe source mais pas du cours parent et reste donc volontairement différé.
+
+La Phase 7.2 valide ensuite la création d’un Groupe Moodle simple avec ces six participants, sans auto-inscription du compte global `root`.
