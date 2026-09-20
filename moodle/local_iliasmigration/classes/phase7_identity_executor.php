@@ -23,6 +23,7 @@ final class phase7_identity_executor {
         require_once($CFG->libdir . '/enrollib.php');
         require_once($CFG->libdir . '/moodlelib.php');
         require_once($CFG->libdir . '/authlib.php');
+        require_once($CFG->dirroot . '/user/lib.php');
 
         $plan = (new phase7_identity_resolver())->resolve(
             $identityjson,
