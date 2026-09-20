@@ -128,7 +128,7 @@ Voir [`docs/migration-format.md`](docs/migration-format.md).
 | Forum | `mod_forum` | Validé Phase 6.5 — structure ; contributions Phase 7 |
 | Mediacast | `mod_data` | Validé Phase 6.5 — MP4 local + URL externe |
 | Blog | `mod_data` | Validé Phase 6.5 — billets + images ; auteurs Moodle Phase 7 |
-| Media Pool / galerie média | ressources / `mod_data` / `mod_page` | À figer sur POC Phase 6.5 |
+| Media Pool / galerie média | `mod_data` | Validé Phase 6.5 — images + MP4 + COPage + dossiers |
 | Groupe | Groupe / Groupement + restrictions si nécessaire | Phase 7 |
 | Utilisateurs / inscriptions | Comptes / inscriptions / rôles | Phase 7 |
 | Progression / historique | Completion / historique | Phase 7 |
@@ -220,7 +220,7 @@ Ordre retenu :
 5. [#18 Forum](https://github.com/vincent-sayah/ilias2moodle/issues/18) → `mod_forum` ;
 6. [#19 Mediacast](https://github.com/vincent-sayah/ilias2moodle/issues/19) → `mod_data` ;
 7. [#20 Blog](https://github.com/vincent-sayah/ilias2moodle/issues/20) → `mod_data` ;
-8. [#21 Media Pool / galerie média](https://github.com/vincent-sayah/ilias2moodle/issues/21) → stratégie à figer sur POC.
+8. [#21 Media Pool / galerie média](https://github.com/vincent-sayah/ilias2moodle/issues/21) → `mod_data`.
 
 L’objet ILIAS Groupe reste volontairement dans la Phase 7 (#7), car sa migration complète dépend des utilisateurs, des membres, des inscriptions et des groupements.
 
@@ -273,11 +273,11 @@ moodle/local_iliasmigration
 Version courante :
 
 ```text
-0.16.18-alpha
-2026092001
+0.16.19-alpha
+2026092002
 ```
 
-La Phase 6.5 dispose désormais d’implémentations fonctionnelles validées sur le POC réel pour Content Page, Glossaire, Wiki, Exercice, Forum, Mediacast et Blog. Pour le Forum, le conteneur `mod_forum` est migré en Phase 6.5 tandis que discussions, messages et pièces jointes de contributions restent conservés dans le package neutre et reportés à la Phase 7 tant que les auteurs ne sont pas rapprochés de façon fiable. Pour le Mediacast, le périmètre validé couvre les MP4 locaux et les URL externes : un Mediacast devient un `mod_data`, chaque entrée devient un record, les MP4 sont stockés via la Files API et lus dans un lecteur HTML5 intégré. Pour le Blog, un Blog devient un `mod_data` et chaque billet devient un record ; le contenu COPage, les grilles et les images locales sont conservés, tandis que l’identifiant auteur ILIAS est stocké sans attribution artificielle à un utilisateur Moodle avant la Phase 7.
+La Phase 6.5 dispose désormais d’implémentations fonctionnelles validées sur le POC réel pour Content Page, Glossaire, Wiki, Exercice, Forum, Mediacast, Blog et Media Pool. Pour le Forum, le conteneur `mod_forum` est migré en Phase 6.5 tandis que discussions, messages et pièces jointes de contributions restent conservés dans le package neutre et reportés à la Phase 7 tant que les auteurs ne sont pas rapprochés de façon fiable. Pour le Mediacast, le périmètre validé couvre les MP4 locaux et les URL externes : un Mediacast devient un `mod_data`, chaque entrée devient un record, les MP4 sont stockés via la Files API et lus dans un lecteur HTML5 intégré. Pour le Blog, un Blog devient un `mod_data` et chaque billet devient un record ; le contenu COPage, les grilles et les images locales sont conservés, tandis que l’identifiant auteur ILIAS est stocké sans attribution artificielle à un utilisateur Moodle avant la Phase 7. Pour le Media Pool, un `mep` devient un `mod_data`, chaque nœud de contenu devient un record, les dossiers sont conservés via `folder_path`, les PNG et MP4 du POC sont stockés via Moodle Files API et les COPage internes sont rendues dans les records.
 
 ## Idempotence
 
@@ -293,6 +293,7 @@ ILIAS ref_id 269  → Moodle resource CMID 43
 ILIAS ref_id 275  → Moodle forum CMID 59
 ILIAS ref_id 276  → Moodle database CMID 60
 ILIAS ref_id 247  → Moodle database CMID 61
+ILIAS ref_id 278  → Moodle database CMID 62
 ```
 
 Les plans utilisent notamment les états :
@@ -315,7 +316,7 @@ Phase 3    [x] Ressources simples
 Phase 4    [x] SCORM
 Phase 5    [x] Modules d’apprentissage ILIAS
 Phase 6    [x] Tests et banques de questions
-Phase 6.5  [ ] Extension des objets pédagogiques
+Phase 6.5  [x] Extension des objets pédagogiques
 Phase 7    [ ] Utilisateurs, inscriptions, groupes et progression
 ```
 
@@ -323,7 +324,7 @@ Phase 7    [ ] Utilisateurs, inscriptions, groupes et progression
 
 **Phases 1 à 6 terminées et validées sur le POC de référence.**
 
-Dans la **Phase 6.5**, Content Page, Glossaire, Wiki, Exercice, Forum, Mediacast et Blog sont validés sur le POC réel. La prochaine étape active est **#21 Media Pool / galerie média**. La Phase 7 reste ouverte et reprendra notamment les utilisateurs, inscriptions, groupes, auteurs, remises et contributions nécessitant un rapprochement d’identité fiable.
+La **Phase 6.5 est terminée** : Content Page, Glossaire, Wiki, Exercice, Forum, Mediacast, Blog et Media Pool sont validés sur le POC réel. La prochaine étape active est la **Phase 7**, consacrée notamment aux utilisateurs, inscriptions, groupes, auteurs, remises, contributions et autres données nécessitant un rapprochement d’identité fiable.
 
 ## Licence
 
