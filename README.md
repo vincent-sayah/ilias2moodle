@@ -273,11 +273,30 @@ moodle/local_iliasmigration
 Version courante :
 
 ```text
-0.16.19-alpha
-2026092002
+0.17.0-alpha
+2026092003
 ```
 
 La Phase 6.5 dispose désormais d’implémentations fonctionnelles validées sur le POC réel pour Content Page, Glossaire, Wiki, Exercice, Forum, Mediacast, Blog et Media Pool. Pour le Forum, le conteneur `mod_forum` est migré en Phase 6.5 tandis que discussions, messages et pièces jointes de contributions restent conservés dans le package neutre et reportés à la Phase 7 tant que les auteurs ne sont pas rapprochés de façon fiable. Pour le Mediacast, le périmètre validé couvre les MP4 locaux et les URL externes : un Mediacast devient un `mod_data`, chaque entrée devient un record, les MP4 sont stockés via la Files API et lus dans un lecteur HTML5 intégré. Pour le Blog, un Blog devient un `mod_data` et chaque billet devient un record ; le contenu COPage, les grilles et les images locales sont conservés, tandis que l’identifiant auteur ILIAS est stocké sans attribution artificielle à un utilisateur Moodle avant la Phase 7. Pour le Media Pool, un `mep` devient un `mod_data`, chaque nœud de contenu devient un record, les dossiers sont conservés via `folder_path`, les PNG et MP4 du POC sont stockés via Moodle Files API et les COPage internes sont rendues dans les records.
+
+## Phase 7.1 — Utilisateurs et inscriptions
+
+La première sous-phase de la Phase 7 est validée sur le POC réel.
+
+Résultats validés :
+
+- extraction complémentaire en lecture seule des identités et memberships absents du ZIP natif ;
+- rapprochement déterministe par override explicite, login unique puis email unique ;
+- interdiction du rapprochement automatique par nom/prénom ;
+- support fonctionnel des emails partagés lorsque Moodle est configuré avec `allowaccountssameemail=1` ;
+- mapping administrateur global ILIAS `usr_id=6/root` vers Moodle `user id=2/admin` ;
+- création des comptes `stagiaire.1`, `stagiaire.2` et `stagiaire.10` ;
+- inscription des trois membres au cours Moodle `5` avec le rôle `student` ;
+- mappings persistants utilisateurs et inscriptions ;
+- mots de passe initiaux générés aléatoirement, non journalisés et changement forcé au premier accès ;
+- second apply idempotent : aucun compte ni enrolment supplémentaire créé.
+
+La suite active de la Phase 7 porte sur les groupes (#22), les auteurs/contributions, les remises, notes et progression.
 
 ## Idempotence
 
@@ -317,14 +336,15 @@ Phase 4    [x] SCORM
 Phase 5    [x] Modules d’apprentissage ILIAS
 Phase 6    [x] Tests et banques de questions
 Phase 6.5  [x] Extension des objets pédagogiques
-Phase 7    [ ] Utilisateurs, inscriptions, groupes et progression
+Phase 7    [~] Utilisateurs, inscriptions, groupes et progression
+  Phase 7.1 [x] Utilisateurs, inscriptions et rôles
 ```
 
 ## État actuel
 
 **Phases 1 à 6 terminées et validées sur le POC de référence.**
 
-La **Phase 6.5 est terminée** : Content Page, Glossaire, Wiki, Exercice, Forum, Mediacast, Blog et Media Pool sont validés sur le POC réel. La prochaine étape active est la **Phase 7**, consacrée notamment aux utilisateurs, inscriptions, groupes, auteurs, remises, contributions et autres données nécessitant un rapprochement d’identité fiable.
+La **Phase 6.5 est terminée** : Content Page, Glossaire, Wiki, Exercice, Forum, Mediacast, Blog et Media Pool sont validés sur le POC réel. La **Phase 7.1 utilisateurs / inscriptions / rôles est également validée**, avec création idempotente des comptes, mappings persistants et inscriptions au cours. La Phase 7 reste active pour les groupes, auteurs, remises, contributions, progression et historique.
 
 ## Licence
 

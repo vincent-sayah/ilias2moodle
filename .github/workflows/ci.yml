@@ -71,3 +71,6 @@ jobs:
 
       - name: Phase 6.5 Media Pool renderer regression
         run: php tests/php/test_phase65_media_pool_renderer.php
+
+      - name: Phase 7 identity policy regression
+        run: php tests/php/test_phase7_identity_policy.php
