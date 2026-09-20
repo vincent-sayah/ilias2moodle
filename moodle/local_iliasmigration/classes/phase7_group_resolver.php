@@ -238,6 +238,28 @@ final class phase7_group_resolver {
         $structurallyready = $groupaction !== 'BLOCKED'
             && $counts['blocked'] === 0;
 
+        $alloweddeferreasons = [
+            'SOURCE_NOT_PARENT_COURSE_PARTICIPANT',
+        ];
+        $unsafeDefer = false;
+
+        foreach ($plans as $entry) {
+            if (($entry['action'] ?? '') !== 'DEFER') {
+                continue;
+            }
+
+            if (!in_array(
+                (string) ($entry['reason'] ?? ''),
+                $alloweddeferreasons,
+                true
+            )) {
+                $unsafeDefer = true;
+                break;
+            }
+        }
+
+        $readyforapply = $structurallyready && !$unsafeDefer;
+
         return [
             'phase' => '7.2',
             'mode' => 'dry-run',
@@ -278,10 +300,11 @@ final class phase7_group_resolver {
                 'reuse_unmapped_group_by_name' => false,
                 'preserve_ilias_group_admin_role_as_moodle_role' => false,
                 'ilias_group_admins_become_group_members' => true,
+                'allowed_defer_reasons' => $alloweddeferreasons,
             ],
             'structurally_ready' => $structurallyready,
-            'ready_for_apply' => false,
-            'apply_implemented' => false,
+            'ready_for_apply' => $readyforapply,
+            'apply_implemented' => true,
         ];
     }
 
