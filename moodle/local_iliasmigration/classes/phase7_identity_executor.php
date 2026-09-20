@@ -87,6 +87,19 @@ final class phase7_identity_executor {
             );
         }
 
+        $coursecontext = \context_course::instance($courseid);
+        $managedroles = [];
+        foreach (['editingteacher', 'teacher', 'student'] as $shortname) {
+            $role = $DB->get_record(
+                'role',
+                ['shortname' => $shortname],
+                'id,shortname'
+            );
+            if ($role) {
+                $managedroles[(string) $role->shortname] = (int) $role->id;
+            }
+        }
+
         $originaluser = $USER;
         \core\session\manager::set_user(get_admin());
 
@@ -315,6 +328,43 @@ final class phase7_identity_executor {
                         );
                     }
 
+                    $mappingkey = 'user:' . $sourceid;
+                    $membershipowned = $DB->record_exists(
+                        'local_iliasmigration_map',
+                        [
+                            'sourcelms' => 'ILIAS',
+                            'sourceinstance' => $clientid,
+                            'sourcecourse' => $sourcecourse,
+                            'sourceref' => $mappingkey,
+                            'targettype' => 'enrolment',
+                        ]
+                    );
+
+                    if ($membershipowned) {
+                        foreach ($managedroles as $managedroleid) {
+                            if ((int) $managedroleid === $targetroleid) {
+                                continue;
+                            }
+
+                            if ($DB->record_exists(
+                                'role_assignments',
+                                [
+                                    'roleid' => (int) $managedroleid,
+                                    'userid' => $targetid,
+                                    'contextid' => (int) $coursecontext->id,
+                                    'component' => '',
+                                    'itemid' => 0,
+                                ]
+                            )) {
+                                role_unassign(
+                                    (int) $managedroleid,
+                                    $targetid,
+                                    (int) $coursecontext->id
+                                );
+                            }
+                        }
+                    }
+
                     $manualplugin->enrol_user(
                         $manualinstance,
                         $targetid,
@@ -334,7 +384,6 @@ final class phase7_identity_executor {
                         MUST_EXIST
                     );
 
-                    $mappingkey = 'user:' . $sourceid;
                     $this->save_mapping(
                         $clientid,
                         $sourcecourse,
