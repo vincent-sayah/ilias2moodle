@@ -28,7 +28,7 @@ Cette phase conserve les principes déjà appliqués au projet :
 | 4 | Exercice | `mod_assign` | #17 | semi-automatique |
 | 5 | Forum | `mod_forum` | #18 | semi-automatique |
 | 6 | Mediacast | `mod_data` | #19 | transformation contrôlée |
-| 7 | Blog | `mod_data` privilégié | #20 | transformation contrôlée |
+| 7 | Blog | `mod_data` | #20 | transformation contrôlée |
 | 8 | Media Pool / galerie média | ressources / `mod_data` / `mod_page` | #21 | transformation contrôlée |
 
 ## Dépendance avec la Phase 7
@@ -163,7 +163,29 @@ Le périmètre de cette validation est volontairement limité aux MP4 locaux et 
 
 ### Blog
 
-Le blog Moodle natif n’est pas retenu par défaut car il est centré sur l’utilisateur plutôt que sur une activité de cours. `mod_data` est la cible privilégiée pour représenter une collection de billets.
+Cible : `mod_data`.
+
+État : validé sur le POC réel ILIAS 10.8 / Moodle 5.0.2.
+
+POC validé :
+
+- ILIAS Blog `ref_id=247`, `obj_id=732`, type `blog` ;
+- 2 billets : `12 / titre 1` et `13 / titre 2` ;
+- contenu riche des billets reconstruit depuis les COPage `blp:<posting_id>` ;
+- 2 MediaObjects PNG locaux : `tous.png` et `trio.png` ;
+- conservation des paragraphes et d’une Grid 3 colonnes ;
+- 1 `mod_data` Moodle par Blog ;
+- 1 record Moodle par billet ;
+- Moodle `CMID=61`, instance `3` ;
+- records `3` et `4` ;
+- champs : `source_posting_id`, `position`, `title`, `created`, `source_author`, `keywords`, `content` ;
+- images stockées via Moodle Files API dans `mod_data/content` ;
+- identifiant auteur ILIAS `il_0_usr_6` conservé dans `source_author` ;
+- propriétaire technique Moodle des records conservé jusqu’au rapprochement utilisateurs de la Phase 7.
+
+Le dry-run réel a validé `BLOG_READY`, `blocked_blogs=0` et `ready=true`. Le premier apply a créé le `mod_data` et les 2 records ; le second apply a mis à jour le même CMID 61 et les mêmes records 3 et 4, sans doublon. Les deux images finales sont présentes une seule fois dans Moodle et l’affichage du billet `titre 2`, comprenant l’image initiale et la Grid 3 colonnes avec `trio.png` au centre, a été validé visuellement.
+
+Le POC réel ne contient aucun `KeywordN` malgré l’option Keywords activée : le parsing est implémenté, mais les mots-clés restent à confirmer sur un export réel qui en contient. Les liens internes ILIAS et les fichiers embarqués hors médias image restent bloqués tant qu’ils n’ont pas été validés par un POC dédié.
 
 ### Media Pool / galerie média
 
