@@ -317,6 +317,41 @@ final class phase7_identity_resolver {
             }
         }
 
+        require_once($CFG->libdir . '/authlib.php');
+        $authplugins = get_enabled_auth_plugins();
+        $manualauthready = in_array('manual', $authplugins, true);
+
+        $manualenrol = $DB->get_record(
+            'enrol',
+            [
+                'courseid' => $courseid,
+                'enrol' => 'manual',
+            ]
+        );
+        $manualenrolready = $manualenrol
+            && (int) $manualenrol->status === ENROL_INSTANCE_ENABLED;
+
+        $studentroleready = !empty($rolesbyshortname['student']);
+
+        $readyforapply = $manualauthready
+            && $manualenrolready
+            && $studentroleready;
+
+        foreach ($membershipplan as $entry) {
+            $action = (string) ($entry['action'] ?? 'DEFER');
+            if (in_array($action, ['ENROL', 'UPDATE'], true)) {
+                continue;
+            }
+
+            if ($action === 'DEFER'
+                    && ($entry['creation_candidate_status'] ?? '')
+                        === 'CREATE_CANDIDATE') {
+                continue;
+            }
+
+            $readyforapply = false;
+        }
+
         return [
             'phase' => '7.1',
             'mode' => 'dry-run',
@@ -340,6 +375,18 @@ final class phase7_identity_resolver {
                 'automatic_user_creation' => false,
                 'subscriber_enrolment' => false,
                 'allow_same_email' => !empty($CFG->allowaccountssameemail),
+                'account_creation_auth' => 'manual',
+                'initial_password' => 'GENERATED_RANDOM_NOT_LOGGED',
+                'force_password_change' => true,
+            ],
+            'target_capabilities' => [
+                'manual_auth_enabled' => $manualauthready,
+                'manual_enrol_enabled' => (bool) $manualenrolready,
+                'manual_enrol_id' => $manualenrol ? (int) $manualenrol->id : null,
+                'student_role_available' => $studentroleready,
+                'student_role_id' => $studentroleready
+                    ? (int) $rolesbyshortname['student']
+                    : null,
             ],
             'overrides_applied' => $overrides,
             'identity_counts' => $counts,
@@ -348,8 +395,8 @@ final class phase7_identity_resolver {
             'identities' => $resolutions,
             'account_creation_candidates' => $creationcandidates,
             'course_memberships' => $membershipplan,
-            'ready_for_apply' => $membershipcounts['defer'] === 0,
-            'apply_implemented' => false,
+            'ready_for_apply' => $readyforapply,
+            'apply_implemented' => true,
         ];
     }
 
