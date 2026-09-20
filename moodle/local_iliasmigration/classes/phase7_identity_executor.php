@@ -414,7 +414,26 @@ final class phase7_identity_executor {
 
                 $transaction->allow_commit();
             } catch (\Throwable $exception) {
-                $transaction->rollback($exception);
+                if (!$transaction->is_disposed()) {
+                    try {
+                        $transaction->rollback($exception);
+                    } catch (\Throwable $rollbackexception) {
+                        throw new \RuntimeException(
+                            'Phase 7.1 transaction failed. Original: '
+                            . get_class($exception)
+                            . ': '
+                            . $exception->getMessage()
+                            . ' | Rollback: '
+                            . get_class($rollbackexception)
+                            . ': '
+                            . $rollbackexception->getMessage(),
+                            0,
+                            $exception
+                        );
+                    }
+                }
+
+                throw $exception;
             }
         } finally {
             if ($originaluser instanceof \stdClass) {
