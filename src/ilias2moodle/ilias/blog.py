@@ -47,7 +47,7 @@ class BlogParser:
         object_id = _text_descendant(blog, "Id")
         media = self.page_parser._parse_media()
         files = self.page_parser._parse_files()
-        copages = self._parse_copages()
+        copages = self._parse_copages(media, files)
 
         postings: list[dict[str, Any]] = []
         unsupported: list[dict[str, str]] = []
@@ -160,14 +160,16 @@ class BlogParser:
         )
         return {name: _text_descendant(blog, name) for name in names}
 
-    def _parse_copages(self) -> dict[str, dict[str, Any]]:
+    def _parse_copages(
+        self,
+        media: dict[str, dict[str, Any]],
+        files: dict[str, dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
         component = self._component_export("COPage")
         if component is None:
             return {}
 
         root = self._parse_xml(component)
-        media = self.page_parser._parse_media()
-        files = self.page_parser._parse_files()
         result: dict[str, dict[str, Any]] = {}
 
         for export_item in root.iter():
