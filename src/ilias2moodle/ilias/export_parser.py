@@ -23,6 +23,7 @@ TYPE_MAP = {
     "exc": "exercise",
     "frm": "forum",
     "mcst": "mediacast",
+    "blog": "blog",
 }
 
 
