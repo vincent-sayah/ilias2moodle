@@ -62,3 +62,86 @@ Sur l’export natif ILIAS 10.8 :
 ## Critère de sortie
 
 #21 sera validée lorsque la stratégie Moodle sera documentée à partir du POC réel, que les médias utiles seront présents et contrôlés dans le package neutre, que le dry-run et l’apply seront sûrs et que le second apply ne créera aucun doublon.
+
+
+## Résultats du POC réel
+
+Export complet analysé :
+
+- `/vagrant/1789892867__0__crs_504.zip` ;
+- taille observée : environ 840 Mo ;
+- SHA-256 : `6a0aa2e93620b854555693db385d77b08f1b94381828c568f047297e86523527`.
+
+Media Pool :
+
+- type ILIAS confirmé : `mep` ;
+- `ref_id=278` ;
+- `obj_id=818` ;
+- titre : `galerie de media` ;
+- description : `test galerie pour migration moodle`.
+
+Arbre `mep_tree` observé :
+
+- child 1 : `dummy` racine technique ;
+- child 2 : média `duo` → mob 819 ;
+- child 3 : média `video5` → mob 820 ;
+- child 4 : Page Editor `texte media` → COPage `mep:4` ;
+- child 5 : dossier `dossier1` ;
+- child 6 : média `femme_noire_robot.png` → mob 822, sous `dossier1`.
+
+La COPage `mep:4` contient :
+
+- le paragraphe `texte de contenu` ;
+- le MediaObject `mob 821` → `trio.png`.
+
+Les MediaObjects sont répartis sur plusieurs sets :
+
+- `set_0` : mob 819, 820, 822 ;
+- `set_1` : mob 821.
+
+Les originaux observés sont :
+
+- `du2.png` — image/png ;
+- `vid5.mp4` — video/mp4 ;
+- `trio.png` — image/png ;
+- `femme_noire_robot.png` — image/png.
+
+Les fichiers `mob_vpreview.png` sont des dérivés techniques et ne doivent pas être migrés comme contenu.
+
+## Réutilisation depuis le Wiki
+
+Le Wiki `ref_id=279`, `obj_id=823` réexporte directement les MediaObjects de la galerie qu'il utilise :
+
+- mob 820 → `vid5.mp4` ;
+- mob 822 → `femme_noire_robot.png`.
+
+Les mêmes identifiants de MediaObjects sont donc présents dans le Media Pool et dans le Wiki. Le Wiki dispose également de ses propres binaires dans son ExportSet ; son import ne dépend pas d'un chemin physique vers l'ExportSet `mep`.
+
+Cette duplication dans deux contextes d'export est considérée valide : Moodle pourra stocker les mêmes octets dans les zones de fichiers propres aux activités qui les consomment, sans créer de dépendance inter-composants fragile.
+
+## Stratégie Moodle proposée après analyse réelle
+
+La cible privilégiée est désormais `mod_data` :
+
+- 1 Media Pool ILIAS → 1 activité Database ;
+- 1 nœud de contenu `mob` ou `pg` → 1 record ;
+- les nœuds `dummy` sont ignorés ;
+- les dossiers sont conservés sous forme de `folder_path` sur les records descendants ;
+- les médias sont rendus selon leur MIME (image/vidéo ; audio à valider sur un POC réel avant déclaration de support) ;
+- les nœuds `pg` conservent leur contenu COPage ;
+- les originaux sont stockés via Moodle Files API ;
+- les previews ILIAS ne sont pas injectées dans Moodle.
+
+Le POC actuel valide des images PNG et une vidéo MP4. Il ne contient aucun fichier audio : le support audio ne doit donc pas être déclaré validé à ce stade.
+
+## Politique ZIP complet
+
+La Phase 6.5.8 est testée sur le ZIP complet et non sur un fixture réduit.
+
+Le pipeline doit :
+
+1. parser l'ensemble du Container ;
+2. préparer toutes les familles déjà supportées ;
+3. préparer `mep` ;
+4. conserver explicitement en `DEFER` les familles relevant d'une phase future, notamment `grp` jusqu'à la Phase 7 ;
+5. ne jamais exiger de suppression d'ExportSets pour faire passer le package.
