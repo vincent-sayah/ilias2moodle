@@ -41,15 +41,38 @@ if ($courseid <= 0) {
     cli_error('A valid --course=ID is required.');
 }
 
-$result = (
-    new \local_iliasmigration\phase7_group_resolver()
-)->resolve(
-    $groupjson,
-    $courseid
-);
+try {
+    $result = (
+        new \local_iliasmigration\phase7_group_resolver()
+    )->resolve(
+        $groupjson,
+        $courseid
+    );
 
-echo json_encode(
-    $result,
-    JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-);
-echo PHP_EOL;
+    echo json_encode(
+        $result,
+        JSON_PRETTY_PRINT
+            | JSON_UNESCAPED_SLASHES
+            | JSON_UNESCAPED_UNICODE
+            | JSON_THROW_ON_ERROR
+    );
+    echo PHP_EOL;
+    exit(0);
+} catch (Throwable $exception) {
+    fwrite(
+        STDERR,
+        "[PHASE7.2 ERROR] "
+        . get_class($exception)
+        . ": "
+        . $exception->getMessage()
+        . PHP_EOL
+    );
+
+    fwrite(
+        STDERR,
+        $exception->getTraceAsString()
+        . PHP_EOL
+    );
+
+    exit(1);
+}
