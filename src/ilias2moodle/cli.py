@@ -4,6 +4,10 @@ import argparse
 import json
 from pathlib import Path
 
+from ilias2moodle.blog_package import (
+    enrich_document_blogs,
+    extract_blog_assets,
+)
 from ilias2moodle.content_page_package import (
     enrich_document_content_pages,
     extract_content_page_assets,
@@ -162,6 +166,7 @@ def _parse_export_document(zip_path: Path, ilias_version: str) -> MigrationDocum
     enrich_document_exercises(document, zip_path)
     enrich_document_forums(document, zip_path)
     enrich_document_mediacasts(document, zip_path)
+    enrich_document_blogs(document, zip_path)
     return document
 
 
@@ -241,6 +246,7 @@ def _prepare_export(
     mediacast_result = extract_mediacast_assets(
         document, zip_path, output
     )
+    blog_result = extract_blog_assets(document, zip_path, output)
     result = MigrationPackageBuilder(zip_path, output).build(document)
     package = result["package"]
     report = result["report"]
@@ -252,6 +258,7 @@ def _prepare_export(
         exercise_result,
         forum_result,
         mediacast_result,
+        blog_result,
     )
     for extension_result in extension_results:
         managed_directory = str(extension_result["managed_directory"])
