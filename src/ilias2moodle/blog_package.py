@@ -168,6 +168,9 @@ def extract_blog_assets(
 
             blog_root = PurePosixPath("blogs", item.source_id)
 
+            blog_media_files = 0
+            blog_files = 0
+
             media = structure.get("media", {})
             if isinstance(media, dict):
                 for media_id, media_object in media.items():
@@ -206,6 +209,7 @@ def extract_blog_assets(
                             media_item["migration_size"] = size
                             media_item["migration_sha256"] = sha256
                             stats["blog_media_files"] += 1
+                            blog_media_files += 1
                         else:
                             missing.append(
                                 {
@@ -243,6 +247,7 @@ def extract_blog_assets(
                         file_object["migration_size"] = size
                         file_object["migration_sha256"] = sha256
                         stats["blog_files"] += 1
+                        blog_files += 1
                     else:
                         missing.append(
                             {
@@ -269,10 +274,8 @@ def extract_blog_assets(
             )
 
             item.metadata["migration_structure_path"] = structure_path.as_posix()
-            item.metadata["migration_media_file_count"] = stats[
-                "blog_media_files"
-            ]
-            item.metadata["migration_embedded_file_count"] = stats["blog_files"]
+            item.metadata["migration_media_file_count"] = blog_media_files
+            item.metadata["migration_embedded_file_count"] = blog_files
             item.metadata.pop("blog_structure", None)
             stats["blog_structures"] += 1
 
