@@ -78,8 +78,6 @@ final class phase7_group_executor {
                     'name' => $groupname,
                     'description' => $groupdescription,
                     'descriptionformat' => FORMAT_PLAIN,
-                    'enablemessaging' => 0,
-                    'visibility' => GROUPS_VISIBILITY_ALL,
                 ];
 
                 $groupid = (int) groups_create_group(
