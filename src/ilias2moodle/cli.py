@@ -26,14 +26,14 @@ from ilias2moodle.glossary_package import (
     extract_glossary_assets,
 )
 from ilias2moodle.ilias.export_parser import IliasExportParser
+from ilias2moodle.media_pool_package import (
+    enrich_document_media_pools,
+    extract_media_pool_assets,
+)
 from ilias2moodle.mediacast_package import (
     enrich_document_mediacasts,
     extract_mediacast_assets,
     recover_mediacast_local_files,
-)
-from ilias2moodle.media_pool_package import (
-    enrich_document_media_pools,
-    extract_media_pool_assets,
 )
 from ilias2moodle.model import MigrationDocument
 from ilias2moodle.package_builder import MigrationPackageBuilder
