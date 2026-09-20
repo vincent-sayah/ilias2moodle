@@ -258,7 +258,11 @@ final class phase7_group_resolver {
             }
         }
 
-        $readyforapply = $structurallyready && !$unsafeDefer;
+        // A native ILIAS Group is a repository/container object, not merely
+        // a participant set. Creating a Moodle Group alone is therefore not
+        // a semantically complete migration. Keep the analysis available but
+        // disable automatic apply until a complete container mapping exists.
+        $readyforapply = false;
 
         return [
             'phase' => '7.2',
@@ -303,8 +307,10 @@ final class phase7_group_resolver {
                 'allowed_defer_reasons' => $alloweddeferreasons,
             ],
             'structurally_ready' => $structurallyready,
+            'semantic_mapping_status' => 'DEFERRED',
+            'semantic_mapping_reason' => 'ILIAS_GROUP_IS_CONTENT_CONTAINER_NOT_MOODLE_GROUP',
             'ready_for_apply' => $readyforapply,
-            'apply_implemented' => true,
+            'apply_implemented' => false,
         ];
     }
 
