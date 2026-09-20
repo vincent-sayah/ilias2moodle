@@ -2,102 +2,204 @@
 
 ## État
 
-Analyse du POC réel en cours.
+Phase validée sur le POC réel ILIAS 10.8 → Moodle 5.0.2.
 
 Issue : #20.
 
-Branche : `phase6-5-blog`.
+PR : #32.
 
-POC déjà référencé dans le cours ILIAS de référence :
+POC :
 
-- cours : `ref_id=128`, `obj_id=504` ;
-- Blog : `ref_id=247`, `obj_id=732` ;
+- cours ILIAS : `ref_id=128`, `obj_id=504` ;
+- Blog : `ref_id=247`, `obj_id=732`, type `blog` ;
 - titre : `blog` ;
-- parent : `ref_id=246`.
+- parent : `ref_id=246` ;
+- cible Moodle : `mod_data`, `CMID=61`, instance `3`.
 
-## Principe
+## Mapping retenu
 
-La cible Moodle `mod_data` est privilégiée, mais elle ne sera figée qu'après analyse de l'export réel.
+Le Blog utilisateur natif Moodle n’est pas utilisé, car le Blog ILIAS est un objet pédagogique du repository/cours.
 
-La migration ne doit pas utiliser le blog utilisateur natif de Moodle comme équivalent automatique, car le Blog ILIAS est un objet pédagogique de dépôt et de publication dans le repository/cours.
+Le mapping validé est :
 
-## Structure d'export ILIAS observée dans le code ILIAS
+```text
+1 Blog ILIAS
+    ↓
+1 activité Moodle mod_data
 
-Le composant Blog exporte deux entités de dataset :
+1 billet ILIAS
+    ↓
+1 record mod_data
+```
 
-- `blog` : paramètres du Blog ;
-- `blog_posting` : métadonnées des billets.
+Le POC contient deux billets :
 
-Le schéma Blog courant est `8.0`.
+| Posting ILIAS | Titre | Record Moodle |
+|---:|---|---:|
+| 12 | titre 1 | 3 |
+| 13 | titre 2 | 4 |
 
-Les paramètres Blog exportés comprennent notamment :
+## Export ILIAS
 
-- Id ;
-- Title ;
-- Description ;
-- Notes ;
-- BgColor / FontColor ;
-- image et options de présentation ;
-- RSS ;
-- Approval ;
-- options d'aperçu ;
-- navigation ;
-- Keywords ;
-- Authors ;
-- Style ;
-- ReadingTime.
+Le composant Blog exporte :
 
-Les billets exportent notamment :
+- l’entité `blog` pour les paramètres du Blog ;
+- l’entité `blog_posting` pour les métadonnées de chaque billet.
 
-- Id ;
-- BlogId ;
-- Title ;
-- Created ;
-- Author ;
-- Approved ;
-- LastWithdrawn ;
-- mots-clés dynamiques `Keyword0...`.
+Les billets conservent notamment :
 
-## Contenu des billets
+- `Id` ;
+- `BlogId` ;
+- `Title` ;
+- `Created` ;
+- `Author` ;
+- `Approved` ;
+- `LastWithdrawn` ;
+- les éventuels `KeywordN`.
 
-Le contenu riche d'un billet n'est pas stocké dans `blog_posting`.
-
-Pour chaque billet, l'exporteur Blog ajoute une dépendance COPage avec un identifiant :
+Le contenu riche n’est pas stocké directement dans `blog_posting`. Chaque billet est associé à une COPage :
 
 ```text
 blp:<posting_id>
 ```
 
-La migration doit donc reconstruire le contenu de chaque billet à partir des exports `components/ILIAS/COPage`, puis réconcilier les médias et fichiers référencés selon les mécanismes déjà utilisés par les autres objets Page Editor.
+Le parseur réutilise les mécanismes Page Editor déjà validés afin de reconstruire les paragraphes, médias, grilles et autres blocs supportés.
+
+## POC réel
+
+L’export natif du Blog contient :
+
+- 2 billets ;
+- 2 MediaObjects PNG locaux ;
+- 0 fichier documentaire embarqué ;
+- 0 composant Page Editor non supporté.
+
+Médias :
+
+- `mob 735` → `tous.png` — 2 207 605 octets ;
+- `mob 736` → `trio.png` — 2 115 739 octets.
+
+Le billet `13 / titre 2` contient :
+
+- une image `tous.png` ;
+- une Grid 3 colonnes ;
+- du texte dans les colonnes gauche et droite ;
+- `trio.png` dans la colonne centrale.
+
+## Package neutre
+
+Le package produit notamment :
+
+```text
+blogs/247/structure.json
+blogs/247/media/735/tous.png
+blogs/247/media/736/trio.png
+```
+
+Chaque fichier extrait reçoit une taille et un SHA-256. Le dry-run Moodle recalcule ces valeurs et bloque l’apply en cas d’écart.
+
+## Champs Moodle
+
+Le `mod_data` créé contient les champs :
+
+- `source_posting_id` ;
+- `position` ;
+- `title` ;
+- `created` ;
+- `source_author` ;
+- `keywords` ;
+- `content`.
+
+Le champ `content` contient le HTML déterministe reconstruit depuis le COPage. Les images sont stockées via Moodle Files API dans la zone `mod_data/content`.
 
 ## Auteurs
 
-L'auteur est exporté sous forme d'identifiant utilisateur d'export ILIAS.
+Le POC exporte l’auteur :
 
-En Phase 6.5.7, cet identifiant source peut être conservé comme métadonnée, mais aucun compte Moodle ne doit être attribué artificiellement. Le rapprochement utilisateur reste du ressort de la Phase 7.
+```text
+il_0_usr_6
+```
 
-## Cible Moodle envisagée
+Cet identifiant est conservé dans `source_author`.
 
-Si le POC réel confirme cette structure :
+Aucun compte Moodle n’est attribué artificiellement au billet en Phase 6.5.7. Les records sont créés par le compte technique de migration et le rapprochement de l’auteur réel reste reporté à la Phase 7.
 
-- 1 Blog ILIAS → 1 `mod_data` ;
-- 1 billet → 1 record ;
-- champs pressentis : identifiant source, titre, date, contenu, mots-clés, auteur source ;
-- médias/fichiers intégrés via Moodle Files API ;
-- auteur Moodle différé en Phase 7 ;
-- mapping persistant Blog et billets ;
-- CREATE puis UPDATE idempotents.
+## Mots-clés
 
-Cette structure reste provisoire jusqu'à analyse du ZIP réel du Blog `ref_id=247`.
+L’option Keywords est active dans le Blog source, mais le POC réel ne contient aucun élément `KeywordN` dans les billets.
 
-## Prochaine validation
+Le parsing `Keyword0`, `Keyword1`, etc. est implémenté et testé sur fixture synthétique. La restitution de mots-clés réels reste à confirmer lorsqu’un export POC contenant effectivement des `KeywordN` sera disponible.
 
-Analyser dans l'export natif ILIAS 10.8 :
+## Dry-run
 
-1. le manifeste Container pour `ref_id=247` / `obj_id=732` ;
-2. l'export `components/ILIAS/Blog` ;
-3. les billets `blog_posting` ;
-4. les pages COPage `blp:<posting_id>` ;
-5. les médias/fichiers dépendants ;
-6. les mots-clés et les identifiants auteurs réellement présents ;
-7. l'ordre et les dates des billets.
+Le dry-run réel a validé :
+
+- `BLOG_READY` ;
+- `blocked_blogs=0` ;
+- `ready=true` ;
+- `posting_count=2` ;
+- `asset_count=2` ;
+- parent `ref_id=246` résolu vers la sous-section Moodle 6 ;
+- aucune écriture en mode dry-run.
+
+Les Blog référencés par un Container mais absents d’un package incrémental ciblé sont différés explicitement au lieu de bloquer l’objet sélectionné.
+
+## Apply et idempotence
+
+Premier apply :
+
+- action demandée : `CREATE` ;
+- action réalisée : `CREATED` ;
+- `CMID=61` ;
+- instance `3` ;
+- 2 records créés ;
+- 2 images écrites via Files API.
+
+Second apply :
+
+- action demandée : `UPDATE` ;
+- action réalisée : `UPDATED` ;
+- même `CMID=61` ;
+- même instance `3` ;
+- `records_created=0` ;
+- `records_updated=2` ;
+- mêmes records `3` et `4` ;
+- exactement 2 fichiers média finaux, sans doublon.
+
+## Validation visuelle
+
+La validation visuelle est conforme dans Moodle :
+
+- `titre 1` affiche ses deux paragraphes ;
+- `titre 2` affiche `tous.png`, puis la Grid 3 colonnes ;
+- `trio.png` est rendu dans la colonne centrale ;
+- les textes des colonnes sont conservés.
+
+## Garde-fous
+
+Le périmètre validé de Phase 6.5.7 couvre les médias image locaux observés dans le POC.
+
+Les cas suivants restent bloqués tant qu’ils ne sont pas validés sur un POC dédié :
+
+- liens internes ILIAS dans un billet ;
+- fichiers documentaires embarqués dans le contenu du Blog ;
+- types de média autres que ceux explicitement validés.
+
+Aucune perte silencieuse n’est autorisée.
+
+## Critère de sortie
+
+Les critères de sortie de #20 sont satisfaits :
+
+- parseur Blog fonctionnel ;
+- package neutre complet ;
+- dry-run sans écriture ;
+- cible `mod_data` validée ;
+- apply réel validé ;
+- mapping persistant ;
+- second apply idempotent ;
+- aucun doublon ;
+- auteur source conservé sans attribution Moodle inventée ;
+- validation visuelle conforme.
+
+La prochaine famille d’objets de la Phase 6.5 est #21 — Media Pool / galerie média.
