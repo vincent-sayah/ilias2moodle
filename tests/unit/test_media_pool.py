@@ -1,3 +1,4 @@
+# ruff: noqa: I001, E501
 from __future__ import annotations
 
 import json
