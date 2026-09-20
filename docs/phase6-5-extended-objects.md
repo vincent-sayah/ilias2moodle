@@ -29,7 +29,7 @@ Cette phase conserve les principes déjà appliqués au projet :
 | 5 | Forum | `mod_forum` | #18 | semi-automatique |
 | 6 | Mediacast | `mod_data` | #19 | transformation contrôlée |
 | 7 | Blog | `mod_data` | #20 | transformation contrôlée |
-| 8 | Media Pool / galerie média | ressources / `mod_data` / `mod_page` | #21 | transformation contrôlée |
+| 8 | Media Pool / galerie média | `mod_data` | #21 | transformation contrôlée |
 
 ## Dépendance avec la Phase 7
 
@@ -189,7 +189,37 @@ Le POC réel ne contient aucun `KeywordN` malgré l’option Keywords activée :
 
 ### Media Pool / galerie média
 
-Le Media Pool peut être une bibliothèque d’auteur plus qu’une activité destinée aux apprenants. La migration doit donc privilégier les médias réellement utiles plutôt que recréer artificiellement toute la structure technique ILIAS.
+Cible : `mod_data`.
+
+État : validé sur le POC réel ILIAS 10.8 / Moodle 5.0.2.
+
+POC validé :
+
+- ILIAS Media Pool `ref_id=278`, `obj_id=818`, type `mep` ;
+- 6 nœuds `mep_tree` : 1 dummy, 3 médias directs, 1 Page Editor, 1 dossier ;
+- 4 records de contenu ;
+- 4 MediaObjects originaux : 3 PNG + 1 MP4 ;
+- COPage `mep:4` avec texte + image ;
+- dossier `dossier1` conservé via `folder_path` ;
+- Wiki `ref_id=279` réutilisant les MediaObjects 820 et 822 validé comme autonome dans son propre ExportSet ;
+- previews `mob_vpreview.png` exclues de l’import ;
+- intégrité des 4 assets contrôlée par taille et SHA-256 ;
+- Moodle `CMID=62`, instance `4`, section `1` ;
+- records `5`, `6`, `7`, `8` correspondant aux tree ids `2`, `3`, `4`, `6`.
+
+Le `mod_data` contient les champs :
+
+- `source_tree_id` ;
+- `position` ;
+- `item_type` ;
+- `title` ;
+- `folder_path` ;
+- `media_source_id` ;
+- `content`.
+
+Le premier apply a créé l’activité et les 4 records, écrit 4 médias via Moodle Files API, puis la validation visuelle a confirmé les images, le lecteur vidéo, la légende de `duo`, la COPage `texte media` et le dossier `dossier1`. Le second apply a mis à jour le même CMID 62 et les mêmes records 5 à 8 avec `records_created=0`, `records_updated=4` et toujours exactement 4 fichiers média.
+
+Le POC réel valide les images PNG et la vidéo MP4. Aucun média audio n’étant présent dans ce POC, le support audio n’est pas déclaré validé à ce stade.
 
 ## Critères généraux de sortie
 

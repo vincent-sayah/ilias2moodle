@@ -21,7 +21,7 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Forum | `frm` | `mod_forum` | 6.5 | validé structure — #18 ; contributions Phase 7 |
 | Mediacast | `mcst` | `mod_data` | 6.5 | validé — #19 ; MP4 local + URL externe |
 | Blog | `blog` | `mod_data` | 6.5 | validé — #20 ; billets + images, auteurs Moodle Phase 7 |
-| Media Pool / galerie média | `mep`* / selon export | ressources, `mod_data` ou `mod_page` | 6.5 | étude/POC — #21 |
+| Media Pool / galerie média | `mep` | `mod_data` | 6.5 | validé — #21 ; images + MP4 + COPage + dossiers |
 | Groupe | `grp`* | Groupe / Groupement + structure/restrictions si nécessaire | 7 | planifié — #7 |
 | Learning Progress | — | Completion / historique | 7 | complexe |
 
@@ -62,13 +62,15 @@ Ordre de développement retenu :
 5. Forum → `mod_forum` ;
 6. Mediacast → `mod_data` ;
 7. Blog → `mod_data` ;
-8. Media Pool / galerie média → cible à figer après POC.
+8. Media Pool / galerie média → `mod_data`.
 
 Pour les objets dépendants des identités utilisateurs, la structure pédagogique peut être traitée en Phase 6.5, tandis que les auteurs, membres, remises, notes ou contributions sont reportés à la Phase 7 lorsqu’un rapprochement utilisateur fiable est nécessaire. C’est la politique validée pour le Forum : le `mod_forum` est créé/mis à jour en Phase 6.5.5, tandis que les threads, posts et assets de contributions restent conservés dans le package jusqu’au rapprochement des auteurs.
 
 Pour le Mediacast, le mapping validé est `mcst` → `mod_data` : un `mod_data` par Mediacast et un record par entrée. Le périmètre POC validé couvre `video/mp4` local et les références externes HTTP/HTTPS. Les MP4 absents du ZIP natif peuvent être récupérés en lecture seule via MediaObjects/IRSS, puis contrôlés par taille et SHA-256 avant packaging. Le fichier est stocké via Moodle Files API et rendu dans un lecteur HTML5 ; les previews restent conservées dans le package sans être injectées dans Moodle.
 
 Pour le Blog, le mapping validé est `blog` → `mod_data` : un `mod_data` par Blog et un record par billet. Le contenu riche est reconstruit depuis les COPage `blp:<posting_id>`, avec conservation des paragraphes, grilles et images locales validées sur le POC. Les images sont stockées via Moodle Files API dans la zone `mod_data/content`. L’identifiant auteur ILIAS est conservé dans le champ `source_author` ; l’attribution à un utilisateur Moodle est reportée à la Phase 7. Le second apply met à jour le même CMID et les mêmes records sans doublon.
+
+Pour le Media Pool, le mapping validé est `mep` → `mod_data` : un `mod_data` par Media Pool et un record par nœud de contenu `mob` ou `pg`. Les nœuds `dummy` sont ignorés, les dossiers sont conservés sous forme de `folder_path`, les contenus COPage sont rendus dans le record, et les originaux image/MP4 sont stockés via Moodle Files API dans `mod_data/content`. Les previews `mob_vpreview.png` ne sont pas importées. Le POC réel valide PNG + MP4 ; l’audio reste non déclaré supporté faute de POC réel audio.
 
 ## Objet Groupe
 

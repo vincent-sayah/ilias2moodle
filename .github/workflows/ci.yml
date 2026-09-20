@@ -68,3 +68,6 @@ jobs:
 
       - name: Phase 6.5 Blog renderer regression
         run: php tests/php/test_phase65_blog_renderer.php
+
+      - name: Phase 6.5 Media Pool renderer regression
+        run: php tests/php/test_phase65_media_pool_renderer.php
