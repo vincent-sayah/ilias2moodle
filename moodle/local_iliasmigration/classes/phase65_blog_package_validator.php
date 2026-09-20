@@ -189,8 +189,8 @@ final class phase65_blog_package_validator {
             'incremental_object_policy' => 'VALIDATE_ONLY_NORMALIZED_BLOGS_IN_PACKAGE',
             'prerequisite_policy' => 'PERSISTED_TARGET_STATE',
             'ready' => $ready,
-            'apply_implemented' => false,
-            'apply_ready' => false,
+            'apply_implemented' => true,
+            'apply_ready' => $ready,
         ];
 
         return $plan;
@@ -293,6 +293,15 @@ final class phase65_blog_package_validator {
                 $operation,
                 'BLOG_UNSUPPORTED_COMPONENTS',
                 'The selected Blog contains unsupported Page Editor components.'
+            );
+            return $this->empty_summary();
+        }
+
+        if ((int) ($structure['file_count'] ?? 0) > 0) {
+            $this->block(
+                $operation,
+                'BLOG_EMBEDDED_FILES_NOT_VALIDATED',
+                'Embedded Blog file-list assets are not part of the validated Phase 6.5.7 POC.'
             );
             return $this->empty_summary();
         }
@@ -414,6 +423,15 @@ final class phase65_blog_package_validator {
                 return $this->empty_summary();
             }
 
+            if ($this->contains_internal_link($blocks)) {
+                $this->block(
+                    $operation,
+                    'BLOG_INTERNAL_LINK_NOT_VALIDATED',
+                    'At least one Blog posting contains an internal ILIAS link; Blog internal-link rewriting is not yet validated.'
+                );
+                return $this->empty_summary();
+            }
+
             $keywords = is_array($posting['keywords'] ?? null)
                 ? $posting['keywords']
                 : [];
@@ -469,6 +487,18 @@ final class phase65_blog_package_validator {
             'keywords' => $keywordcount,
             'source_authors' => array_keys($sourceauthors),
         ];
+    }
+
+    private function contains_internal_link(array $value): bool {
+        foreach ($value as $key => $item) {
+            if ($key === 'type' && $item === 'internal_link') {
+                return true;
+            }
+            if (is_array($item) && $this->contains_internal_link($item)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function validate_assets(
