@@ -22,7 +22,7 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Mediacast | `mcst` | `mod_data` | 6.5 | validé — #19 ; MP4 local + URL externe |
 | Blog | `blog` | `mod_data` | 6.5 | validé — #20 ; billets + images, auteurs Moodle Phase 7 |
 | Media Pool / galerie média | `mep` | `mod_data` | 6.5 | validé — #21 ; images + MP4 + COPage + dossiers |
-| Groupe | `grp` | Groupe Moodle simple si aucun contenu enfant ; structure/restrictions complémentaires seulement si le POC l’exige | 7 | validé sur POC — #22 |
+| Groupe | `grp` | Non migré automatiquement pour l’instant ; nécessite conteneur + membres + restrictions + contenus | 7 | différé — #22 |
 | Learning Progress | — | Completion / historique | 7 | complexe |
 
 \* Les codes encore marqués d’un astérisque restent indicatifs tant qu’ils n’ont pas été confirmés sur leur POC réel.
@@ -76,24 +76,16 @@ Pour le Media Pool, le mapping validé est `mep` → `mod_data` : un `mod_data` 
 
 Le type ILIAS Groupe est confirmé : `grp`.
 
-Le POC réel validé le 20 septembre 2026 concerne le Groupe ILIAS `obj_id=743 / ref_id=254`, enfant direct du cours `obj_id=504 / ref_id=128`. L’analyse du Container export confirme qu’il ne contient aucun objet enfant.
+La migration automatique de cet objet est **différée**. Un objet ILIAS Groupe est un conteneur de dépôt à part entière : il possède des membres et peut contenir des ressources/activités visibles dans son propre contexte. Un Moodle Group ne représente qu'un ensemble de participants et ne constitue donc pas un équivalent fonctionnel complet.
 
-Dans ce cas, le mapping retenu est donc volontairement simple :
+Le POC `obj_id=743 / ref_id=254` ne contient aucun objet enfant. Il a permis de valider techniquement la lecture des memberships, mais la création d'un simple Moodle Group n'est plus considérée comme une migration valide de l'objet ILIAS `grp`.
+
+Politique retenue :
 
 ```text
-ILIAS course 504 / ref 128
-└── grp 743 / ref 254
-    └── membres
-          ↓
-Moodle course 5 / ILIAS-128
-└── Moodle Group
-    └── membres Moodle rapprochés
+ILIAS grp
+   ↓
+DEFERRED / HISTORY_ONLY
 ```
 
-Le Groupe Moodle est créé ou mis à jour via les API natives `groups_create_group()`, `groups_update_group()` et `groups_add_member()`. Le mapping persistant utilise `sourcecourse=504`, `sourceref=254`, `sourceobj=743`, `targettype=group`.
-
-La politique est additive : les membres ILIAS éligibles sont ajoutés, mais la migration ne supprime pas automatiquement d’éventuels membres Moodle ajoutés indépendamment. Un utilisateur présent uniquement dans le groupe source mais absent du cours parent n’est pas inscrit automatiquement au cours.
-
-Sur le POC, six participants du cours sont ajoutés au Groupe Moodle et l’utilisateur ILIAS `usr_id=6 / root` reste différé car il n’est pas participant du cours parent.
-
-Si un futur Groupe ILIAS contient des objets enfants, un simple Moodle Group ne suffira pas : il faudra alors compléter le mapping par une structure de cours et, si nécessaire, des restrictions d’accès.
+Aucun Moodle Group ne doit être créé automatiquement comme substitut de l'objet ILIAS Groupe. Une future prise en charge devra définir et valider une combinaison complète, par exemple section/sous-section + Groupe/Grouping + restrictions d'accès + migration des contenus enfants.
