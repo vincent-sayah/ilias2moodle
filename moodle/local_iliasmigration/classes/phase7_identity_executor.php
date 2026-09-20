@@ -23,6 +23,7 @@ final class phase7_identity_executor {
         require_once($CFG->libdir . '/enrollib.php');
         require_once($CFG->libdir . '/moodlelib.php');
         require_once($CFG->libdir . '/authlib.php');
+        require_once($CFG->libdir . '/accesslib.php');
         require_once($CFG->dirroot . '/user/lib.php');
 
         $plan = (new phase7_identity_resolver())->resolve(
@@ -87,12 +88,18 @@ final class phase7_identity_executor {
             );
         }
 
-        $studentrole = $DB->get_record(
-            'role',
-            ['shortname' => 'student'],
-            'id,shortname',
-            MUST_EXIST
-        );
+        $coursecontext = \context_course::instance($courseid);
+        $managedroles = [];
+        foreach (['editingteacher', 'teacher', 'student'] as $shortname) {
+            $role = $DB->get_record(
+                'role',
+                ['shortname' => $shortname],
+                'id,shortname'
+            );
+            if ($role) {
+                $managedroles[(string) $role->shortname] = (int) $role->id;
+            }
+        }
 
         $originaluser = $USER;
         \core\session\manager::set_user(get_admin());
@@ -293,17 +300,114 @@ final class phase7_identity_executor {
                             'enrolid' => (int) $manualinstance->id,
                             'userid' => $targetid,
                         ],
-                        'id,status'
+                        'id,status,timestart,timeend'
                     );
 
-                    $manualplugin->enrol_user(
-                        $manualinstance,
-                        $targetid,
-                        (int) $studentrole->id,
-                        0,
-                        0,
-                        ENROL_USER_ACTIVE
+                    $targetrole = trim((string) ($membership['target_role'] ?? ''));
+                    $targetroleid = (int) ($membership['target_role_id'] ?? 0);
+
+                    if ($targetrole === '' || $targetroleid <= 0) {
+                        throw new \coding_exception(
+                            'Phase 7 membership has no valid target Moodle role.'
+                        );
+                    }
+
+                    $roleexists = $DB->record_exists(
+                        'role',
+                        [
+                            'id' => $targetroleid,
+                            'shortname' => $targetrole,
+                        ]
                     );
+
+                    if (!$roleexists) {
+                        throw new \coding_exception(
+                            'Phase 7 target Moodle role does not exist or does not match: '
+                            . $targetrole
+                            . ' / '
+                            . $targetroleid
+                        );
+                    }
+
+                    $mappingkey = 'user:' . $sourceid;
+                    $membershipowned = $DB->record_exists(
+                        'local_iliasmigration_map',
+                        [
+                            'sourcelms' => 'ILIAS',
+                            'sourceinstance' => $clientid,
+                            'sourcecourse' => $sourcecourse,
+                            'sourceref' => $mappingkey,
+                            'targettype' => 'enrolment',
+                        ]
+                    );
+
+                    if ($membershipowned) {
+                        foreach ($managedroles as $managedroleid) {
+                            if ((int) $managedroleid === $targetroleid) {
+                                continue;
+                            }
+
+                            if ($DB->record_exists(
+                                'role_assignments',
+                                [
+                                    'roleid' => (int) $managedroleid,
+                                    'userid' => $targetid,
+                                    'contextid' => (int) $coursecontext->id,
+                                    'component' => '',
+                                    'itemid' => 0,
+                                ]
+                            )) {
+                                role_unassign(
+                                    (int) $managedroleid,
+                                    $targetid,
+                                    (int) $coursecontext->id
+                                );
+                            }
+                        }
+                    }
+
+                    if ($before) {
+                        if ((int) $before->status !== ENROL_USER_ACTIVE) {
+                            $manualplugin->update_user_enrol(
+                                $manualinstance,
+                                $targetid,
+                                ENROL_USER_ACTIVE,
+                                null,
+                                null
+                            );
+                        }
+
+                        $hasrole = $DB->record_exists(
+                            'role_assignments',
+                            [
+                                'roleid' => $targetroleid,
+                                'userid' => $targetid,
+                                'contextid' => (int) $coursecontext->id,
+                                'component' => '',
+                                'itemid' => 0,
+                            ]
+                        );
+
+                        if (!$hasrole) {
+                            role_assign(
+                                $targetroleid,
+                                $targetid,
+                                (int) $coursecontext->id
+                            );
+                        }
+                    } else {
+                        $migrationinstance = clone $manualinstance;
+                        $migrationinstance->customint1 = ENROL_DO_NOT_SEND_EMAIL;
+
+                        $manualplugin->enrol_user(
+                            $migrationinstance,
+                            $targetid,
+                            $targetroleid,
+                            0,
+                            0,
+                            ENROL_USER_ACTIVE
+                        );
+                    }
 
                     $after = $DB->get_record(
                         'user_enrolments',
@@ -315,7 +419,6 @@ final class phase7_identity_executor {
                         MUST_EXIST
                     );
 
-                    $mappingkey = 'user:' . $sourceid;
                     $this->save_mapping(
                         $clientid,
                         $sourcecourse,
@@ -327,9 +430,10 @@ final class phase7_identity_executor {
 
                     $entry = [
                         'source_user_id' => $sourceid,
+                        'source_role' => (string) ($membership['source_role'] ?? ''),
                         'target_user_id' => $targetid,
-                        'target_role' => 'student',
-                        'target_role_id' => (int) $studentrole->id,
+                        'target_role' => $targetrole,
+                        'target_role_id' => $targetroleid,
                         'enrolment_id' => (int) $after->id,
                     ];
 
@@ -344,7 +448,26 @@ final class phase7_identity_executor {
 
                 $transaction->allow_commit();
             } catch (\Throwable $exception) {
-                $transaction->rollback($exception);
+                if (!$transaction->is_disposed()) {
+                    try {
+                        $transaction->rollback($exception);
+                    } catch (\Throwable $rollbackexception) {
+                        throw new \RuntimeException(
+                            'Phase 7.1 transaction failed. Original: '
+                            . get_class($exception)
+                            . ': '
+                            . $exception->getMessage()
+                            . ' | Rollback: '
+                            . get_class($rollbackexception)
+                            . ': '
+                            . $rollbackexception->getMessage(),
+                            0,
+                            $exception
+                        );
+                    }
+                }
+
+                throw $exception;
             }
         } finally {
             if ($originaluser instanceof \stdClass) {
@@ -371,6 +494,10 @@ final class phase7_identity_executor {
             'password' => 'GENERATED_RANDOM_NOT_LOGGED',
             'force_password_change' => true,
             'delivery' => 'ADMIN_RESET_REQUIRED',
+        ];
+        $result['enrolment_notification_policy'] = [
+            'course_welcome_message' => false,
+            'reason' => 'MIGRATION_BATCH_NO_AUTOMATIC_WELCOME_EMAIL',
         ];
 
         return $result;

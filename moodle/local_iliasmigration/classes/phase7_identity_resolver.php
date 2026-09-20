@@ -331,11 +331,39 @@ final class phase7_identity_resolver {
         $manualenrolready = $manualenrol
             && (int) $manualenrol->status === ENROL_INSTANCE_ENABLED;
 
+        $requiredtargetroles = [];
+        foreach ($courseroles as $sourcerole => $sourceids) {
+            if ($sourcerole === 'subscriber' || empty((array) $sourceids)) {
+                continue;
+            }
+
+            $targetrole = self::ROLE_MAP[$sourcerole] ?? null;
+            if ($targetrole !== null) {
+                $requiredtargetroles[$targetrole] = true;
+            }
+        }
+
+        $requiredtargetroles = array_keys($requiredtargetroles);
+        sort($requiredtargetroles);
+
+        $targetrolesavailable = [];
+        foreach ($requiredtargetroles as $targetrole) {
+            $targetrolesavailable[$targetrole] = !empty(
+                $rolesbyshortname[$targetrole]
+            );
+        }
+
+        $allrequiredrolesready = !in_array(
+            false,
+            $targetrolesavailable,
+            true
+        );
+
         $studentroleready = !empty($rolesbyshortname['student']);
 
         $readyforapply = $manualauthready
             && $manualenrolready
-            && $studentroleready;
+            && $allrequiredrolesready;
 
         foreach ($membershipplan as $entry) {
             $action = (string) ($entry['action'] ?? 'DEFER');
@@ -387,6 +415,8 @@ final class phase7_identity_resolver {
                 'student_role_id' => $studentroleready
                     ? (int) $rolesbyshortname['student']
                     : null,
+                'required_target_roles' => $requiredtargetroles,
+                'target_roles_available' => $targetrolesavailable,
             ],
             'overrides_applied' => $overrides,
             'identity_counts' => $counts,

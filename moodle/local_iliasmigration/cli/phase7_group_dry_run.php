@@ -4,13 +4,11 @@ define('CLI_SCRIPT', true);
 
 require(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
-require_once(__DIR__ . '/../classes/phase7_identity_resolver.php');
-require_once(__DIR__ . '/../classes/phase7_identity_executor.php');
+require_once(__DIR__ . '/../classes/phase7_group_resolver.php');
 
 [$options, $unrecognized] = cli_get_params(
     [
-        'identities' => '',
-        'overrides' => '',
+        'group' => '',
         'course' => 0,
         'help' => false,
     ],
@@ -21,26 +19,24 @@ if ($unrecognized) {
     cli_error('Unknown options: ' . implode(', ', $unrecognized));
 }
 
-$help = "ILIAS2Moodle Phase 7.1 identity apply\n\n"
-    . "php local/iliasmigration/cli/phase7_identity_apply.php "
-    . "--identities=/path/to/phase7_ilias_identities.json "
-    . "[--overrides=/path/to/phase7_identity_overrides.json] "
+$help = "ILIAS2Moodle Phase 7.2 group dry-run\n\n"
+    . "php local/iliasmigration/cli/phase7_group_dry_run.php "
+    . "--group=/path/to/phase7_ilias_group.json "
     . "--course=ID\n\n"
-    . "Creates missing Moodle users approved by the Phase 7.1 dry-run, "
-    . "persists identity mappings, and enrols source course members using "
-    . "the Moodle manual enrolment API. Generated passwords are never printed.\n";
+    . "Read-only. Resolves a source ILIAS group against Phase 7.1 persistent "
+    . "user mappings and current Moodle course enrolments. No group or group "
+    . "membership is created.\n";
 
 if ($options['help']) {
     echo $help;
     exit(0);
 }
 
-$identities = trim((string) $options['identities']);
-$overrides = trim((string) $options['overrides']);
+$groupjson = trim((string) $options['group']);
 $courseid = (int) $options['course'];
 
-if ($identities === '') {
-    cli_error('Missing --identities.');
+if ($groupjson === '') {
+    cli_error('Missing --group.');
 }
 if ($courseid <= 0) {
     cli_error('A valid --course=ID is required.');
@@ -48,11 +44,10 @@ if ($courseid <= 0) {
 
 try {
     $result = (
-        new \local_iliasmigration\phase7_identity_executor()
-    )->execute(
-        $identities,
-        $courseid,
-        $overrides !== '' ? $overrides : null
+        new \local_iliasmigration\phase7_group_resolver()
+    )->resolve(
+        $groupjson,
+        $courseid
     );
 
     echo json_encode(
@@ -67,7 +62,7 @@ try {
 } catch (Throwable $exception) {
     fwrite(
         STDERR,
-        "[PHASE7.1 APPLY ERROR] "
+        "[PHASE7.2 ERROR] "
         . get_class($exception)
         . ": "
         . $exception->getMessage()
