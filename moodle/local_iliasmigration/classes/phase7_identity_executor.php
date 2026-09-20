@@ -87,13 +87,6 @@ final class phase7_identity_executor {
             );
         }
 
-        $studentrole = $DB->get_record(
-            'role',
-            ['shortname' => 'student'],
-            'id,shortname',
-            MUST_EXIST
-        );
-
         $originaluser = $USER;
         \core\session\manager::set_user(get_admin());
 
@@ -296,10 +289,36 @@ final class phase7_identity_executor {
                         'id,status'
                     );
 
+                    $targetrole = trim((string) ($membership['target_role'] ?? ''));
+                    $targetroleid = (int) ($membership['target_role_id'] ?? 0);
+
+                    if ($targetrole === '' || $targetroleid <= 0) {
+                        throw new \coding_exception(
+                            'Phase 7 membership has no valid target Moodle role.'
+                        );
+                    }
+
+                    $roleexists = $DB->record_exists(
+                        'role',
+                        [
+                            'id' => $targetroleid,
+                            'shortname' => $targetrole,
+                        ]
+                    );
+
+                    if (!$roleexists) {
+                        throw new \coding_exception(
+                            'Phase 7 target Moodle role does not exist or does not match: '
+                            . $targetrole
+                            . ' / '
+                            . $targetroleid
+                        );
+                    }
+
                     $manualplugin->enrol_user(
                         $manualinstance,
                         $targetid,
-                        (int) $studentrole->id,
+                        $targetroleid,
                         0,
                         0,
                         ENROL_USER_ACTIVE
@@ -327,9 +346,10 @@ final class phase7_identity_executor {
 
                     $entry = [
                         'source_user_id' => $sourceid,
+                        'source_role' => (string) ($membership['source_role'] ?? ''),
                         'target_user_id' => $targetid,
-                        'target_role' => 'student',
-                        'target_role_id' => (int) $studentrole->id,
+                        'target_role' => $targetrole,
+                        'target_role_id' => $targetroleid,
                         'enrolment_id' => (int) $after->id,
                     ];
 
