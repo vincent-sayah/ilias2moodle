@@ -300,7 +300,7 @@ final class phase7_identity_executor {
                             'enrolid' => (int) $manualinstance->id,
                             'userid' => $targetid,
                         ],
-                        'id,status'
+                        'id,status,timestart,timeend'
                     );
 
                     $targetrole = trim((string) ($membership['target_role'] ?? ''));
@@ -366,14 +366,48 @@ final class phase7_identity_executor {
                         }
                     }
 
-                    $manualplugin->enrol_user(
-                        $manualinstance,
-                        $targetid,
-                        $targetroleid,
-                        0,
-                        0,
-                        ENROL_USER_ACTIVE
-                    );
+                    if ($before) {
+                        if ((int) $before->status !== ENROL_USER_ACTIVE) {
+                            $manualplugin->update_user_enrol(
+                                $manualinstance,
+                                $targetid,
+                                ENROL_USER_ACTIVE,
+                                null,
+                                null
+                            );
+                        }
+
+                        $hasrole = $DB->record_exists(
+                            'role_assignments',
+                            [
+                                'roleid' => $targetroleid,
+                                'userid' => $targetid,
+                                'contextid' => (int) $coursecontext->id,
+                                'component' => '',
+                                'itemid' => 0,
+                            ]
+                        );
+
+                        if (!$hasrole) {
+                            role_assign(
+                                $targetroleid,
+                                $targetid,
+                                (int) $coursecontext->id
+                            );
+                        }
+                    } else {
+                        $migrationinstance = clone $manualinstance;
+                        $migrationinstance->customint1 = ENROL_DO_NOT_SEND_EMAIL;
+
+                        $manualplugin->enrol_user(
+                            $migrationinstance,
+                            $targetid,
+                            $targetroleid,
+                            0,
+                            0,
+                            ENROL_USER_ACTIVE
+                        );
+                    }
 
                     $after = $DB->get_record(
                         'user_enrolments',
@@ -460,6 +494,10 @@ final class phase7_identity_executor {
             'password' => 'GENERATED_RANDOM_NOT_LOGGED',
             'force_password_change' => true,
             'delivery' => 'ADMIN_RESET_REQUIRED',
+        ];
+        $result['enrolment_notification_policy'] = [
+            'course_welcome_message' => false,
+            'reason' => 'MIGRATION_BATCH_NO_AUTOMATIC_WELCOME_EMAIL',
         ];
 
         return $result;
