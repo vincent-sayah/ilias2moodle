@@ -104,3 +104,30 @@ Cours cible `id=5 / ILIAS-128` :
 - aucun `idnumber` renseigné sur ces comptes.
 
 Aucun rapprochement automatique ne sera réalisé tant que les attributs ILIAS correspondants n'ont pas été récupérés.
+
+
+## Dry-run Moodle réel
+
+Le dry-run Phase 7.1 sur le cours Moodle `5 / ILIAS-128` est validé :
+
+- `PHASE7_DRY_RUN_RC=0` ;
+- `writes_performed=false` ;
+- `ready_for_apply=false` ;
+- `apply_implemented=false` ;
+- `MATCHED=0` ;
+- `AMBIGUOUS=3` ;
+- `NOT_IN_TARGET=1` ;
+- `ENROL=0` ;
+- `UPDATE=0` ;
+- `DEFER=3`.
+
+Résolution réelle :
+
+- ILIAS 6 / `root` / `ilias@yourserver.com` → `NOT_IN_TARGET` ;
+- ILIAS 401 / `stagiaire.1` / `vince.syh@free.fr` → `AMBIGUOUS` ;
+- ILIAS 402 / `stagiaire.2` / `vince.syh@free.fr` → `AMBIGUOUS` ;
+- ILIAS 410 / `stagiaire.10` / `vince.syh@free.fr` → `AMBIGUOUS`.
+
+L'ambiguïté est correcte : l'email source est partagé par trois comptes ILIAS et correspond au compte Moodle `admin` (id 2). Aucun rapprochement par email n'est donc autorisé.
+
+La prochaine étape consiste à évaluer une création contrôlée de comptes Moodle dédiés en conservant les logins ILIAS uniques, puis à inscrire uniquement les comptes créés/résolus au rôle Moodle `student`. L'identité ILIAS 6 ne doit pas être créée ni inscrite automatiquement car elle n'est pas membre du cours.
