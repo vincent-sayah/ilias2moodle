@@ -4,6 +4,8 @@ define('CLI_SCRIPT', true);
 
 require(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
+require_once(__DIR__ . '/../classes/phase7_identity_resolver.php');
+require_once(__DIR__ . '/../classes/phase7_identity_executor.php');
 
 [$options, $unrecognized] = cli_get_params(
     [
@@ -44,16 +46,39 @@ if ($courseid <= 0) {
     cli_error('A valid --course=ID is required.');
 }
 
-$result = (
-    new \local_iliasmigration\phase7_identity_executor()
-)->execute(
-    $identities,
-    $courseid,
-    $overrides !== '' ? $overrides : null
-);
+try {
+    $result = (
+        new \local_iliasmigration\phase7_identity_executor()
+    )->execute(
+        $identities,
+        $courseid,
+        $overrides !== '' ? $overrides : null
+    );
 
-echo json_encode(
-    $result,
-    JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
-);
-echo PHP_EOL;
+    echo json_encode(
+        $result,
+        JSON_PRETTY_PRINT
+            | JSON_UNESCAPED_SLASHES
+            | JSON_UNESCAPED_UNICODE
+            | JSON_THROW_ON_ERROR
+    );
+    echo PHP_EOL;
+    exit(0);
+} catch (Throwable $exception) {
+    fwrite(
+        STDERR,
+        "[PHASE7.1 APPLY ERROR] "
+        . get_class($exception)
+        . ": "
+        . $exception->getMessage()
+        . PHP_EOL
+    );
+
+    fwrite(
+        STDERR,
+        $exception->getTraceAsString()
+        . PHP_EOL
+    );
+
+    exit(1);
+}
