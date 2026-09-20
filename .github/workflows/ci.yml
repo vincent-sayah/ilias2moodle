@@ -65,3 +65,6 @@ jobs:
 
       - name: Phase 6.5 Wiki renderer regression
         run: php tests/php/test_phase65_wiki_renderer.php
+
+      - name: Phase 6.5 Blog renderer regression
+        run: php tests/php/test_phase65_blog_renderer.php
