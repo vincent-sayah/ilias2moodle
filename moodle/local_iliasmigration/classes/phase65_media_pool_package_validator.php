@@ -174,8 +174,8 @@ final class phase65_media_pool_package_validator {
             'preview_policy' => 'DO_NOT_IMPORT',
             'audio_policy' => 'NOT_VALIDATED_BY_REAL_POC',
             'ready' => $ready,
-            'apply_implemented' => false,
-            'apply_ready' => false,
+            'apply_implemented' => true,
+            'apply_ready' => $ready,
         ];
 
         return $plan;
