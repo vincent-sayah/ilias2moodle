@@ -61,9 +61,9 @@
 
 ## Phase 7 — Utilisateurs et progression
 
-- [ ] utilisateurs ;
-- [ ] inscriptions ;
-- [ ] rôles ;
-- [ ] groupes ;
+- [x] utilisateurs — Phase 7.1 validée sur POC ;
+- [x] inscriptions — Phase 7.1 validée sur POC ;
+- [x] rôles — member/admin/tutor validés vers student/editingteacher/teacher ;
+- [x] groupes — Phase 7.2 validée sur POC, apply idempotent ;
 - [ ] achèvements ;
 - [ ] étude des historiques et tentatives.
