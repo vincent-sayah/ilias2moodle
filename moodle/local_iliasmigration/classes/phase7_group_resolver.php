@@ -12,7 +12,9 @@ defined('MOODLE_INTERNAL') || die();
  */
 final class phase7_group_resolver {
     public function resolve(string $groupjson, int $courseid): array {
-        global $DB;
+        global $CFG, $DB;
+
+        require_once($CFG->libdir . '/enrollib.php');
 
         $source = $this->read_source($groupjson);
 
