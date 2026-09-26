@@ -239,6 +239,9 @@ final class phase7_forum_contribution_resolver {
             && (int) $forum->forcesubscribe === FORUM_FORCESUBSCRIBE;
         $notificationrisk = $forumsubscriptions > 0 || $forcedsubscription;
 
+        $modulecontext = \context_module::instance($cmid);
+        $filestorage = get_file_storage();
+
         $threads = [];
         $posts = [];
         $threadcreate = 0;
@@ -248,6 +251,8 @@ final class phase7_forum_contribution_resolver {
         $blocked = 0;
         $assetcount = 0;
         $assetmissing = 0;
+        $targetassetsverified = 0;
+        $targetassetsmissing = 0;
 
         foreach ((array) ($structure['threads'] ?? []) as $thread) {
             if (!is_array($thread)) {
@@ -419,16 +424,60 @@ final class phase7_forum_contribution_resolver {
                             $blocked++;
                         }
 
+                        $kind = $assetkind === 'attachments'
+                            ? 'attachment'
+                            : 'media_object';
+                        $filename = (string) ($asset['filename'] ?? '');
+                        $sourcesize = $resolved !== null
+                            ? (int) filesize($resolved)
+                            : null;
+
+                        $targetexists = null;
+                        $targetmatches = null;
+                        $targetsize = null;
+
+                        if ($kind === 'attachment'
+                                && $targetpost
+                                && $filename !== '') {
+                            $stored = $filestorage->get_file(
+                                $modulecontext->id,
+                                'mod_forum',
+                                'attachment',
+                                (int) $targetpost->id,
+                                '/',
+                                $filename
+                            );
+
+                            $targetexists = (bool) $stored;
+                            if ($stored) {
+                                $targetsize = (int) $stored->get_filesize();
+                                $targetmatches = $resolved !== null
+                                    && $targetsize === $sourcesize
+                                    && $stored->get_contenthash()
+                                        === sha1_file($resolved);
+                            } else {
+                                $targetmatches = false;
+                            }
+
+                            if ($targetmatches) {
+                                $targetassetsverified++;
+                            } else {
+                                $targetassetsmissing++;
+                            }
+                        }
+
                         $assets[] = [
-                            'kind' => $assetkind === 'attachments'
-                                ? 'attachment'
-                                : 'media_object',
-                            'filename' => (string) ($asset['filename'] ?? ''),
+                            'kind' => $kind,
+                            'filename' => $filename,
                             'migration_path' => $relative,
                             'exists' => $resolved !== null,
-                            'size' => $resolved !== null
-                                ? (int) filesize($resolved)
-                                : null,
+                            'size' => $sourcesize,
+                            'target_exists' => $targetexists,
+                            'target_matches_source' => $targetmatches,
+                            'target_size' => $targetsize,
+                            'repair_required' => $targetpost
+                                && $kind === 'attachment'
+                                && $targetmatches === false,
                         ];
                     }
                 }
@@ -457,6 +506,11 @@ final class phase7_forum_contribution_resolver {
                     'action' => $postaction,
                     'reason' => $postreason,
                     'assets' => $assets,
+                    'target_asset_repairs_required' => count(array_filter(
+                        $assets,
+                        static fn(array $asset): bool =>
+                            !empty($asset['repair_required'])
+                    )),
                 ];
             }
         }
@@ -539,6 +593,8 @@ final class phase7_forum_contribution_resolver {
                 'post_keep' => $postkeep,
                 'assets' => $assetcount,
                 'assets_missing' => $assetmissing,
+                'target_assets_verified' => $targetassetsverified,
+                'target_assets_missing' => $targetassetsmissing,
                 'blocked_items' => $blocked,
                 'explicit_subscriptions' => $forumsubscriptions,
                 'notification_risk' => $notificationrisk ? 1 : 0,
