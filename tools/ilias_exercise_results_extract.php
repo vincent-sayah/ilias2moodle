@@ -154,6 +154,9 @@ try {
     ilContext::init(ilContext::CONTEXT_CRON);
     ilInitialisation::initILIAS();
 
+    global $DIC;
+    $db = $DIC->database();
+
     $exercise = ilObjectFactory::getInstanceByRefId(
         $exerciseRef,
         false
@@ -223,26 +226,29 @@ try {
     $commentCount = 0;
 
     foreach ($assignments as $assignment) {
-        $memberList = $assignment->getMemberListData();
-
         $assignmentUsers = [];
 
         foreach ($courseUserIds as $userId) {
-            $memberRow = $memberList[$userId] ?? null;
-
-            // ilExSubmission construction is read-only here. We only call
-            // read accessors and never mutation methods.
-            $submission = new ilExSubmission(
-                $assignment,
-                $userId
+            // Read exercise membership directly. This mirrors the source used
+            // by ilExAssignment::getMemberListData() without constructing
+            // ilExSubmission (which pulls web/UI dependencies in CLI).
+            $memberSet = $db->queryF(
+                'SELECT usr_id FROM exc_members WHERE obj_id = %s AND usr_id = %s',
+                ['integer', 'integer'],
+                [(int) $exercise->getId(), $userId]
             );
+            $exerciseMember = (bool) $db->fetchAssoc($memberSet);
 
-            $lastSubmission = $submission->getLastSubmission();
-            $hasSubmitted = $lastSubmission !== null
-                && $lastSubmission !== '';
+            // Read tutor/member status directly from the documented
+            // exc_mem_ass_status table. No setters/update hooks are called.
+            $statusSet = $db->queryF(
+                'SELECT * FROM exc_mem_ass_status WHERE ass_id = %s AND usr_id = %s',
+                ['integer', 'integer'],
+                [(int) $assignment->getId(), $userId]
+            );
+            $memberRow = $db->fetchAssoc($statusSet) ?: null;
 
-            $statusRowExists = is_array($memberRow)
-                && array_key_exists('status', $memberRow);
+            $statusRowExists = is_array($memberRow);
 
             $status = $statusRowExists
                 ? (string) ($memberRow['status'] ?? 'notgraded')
@@ -253,8 +259,37 @@ try {
                 : '';
 
             $comment = $statusRowExists
-                ? trim((string) ($memberRow['comment'] ?? ''))
+                ? trim((string) ($memberRow['u_comment'] ?? ''))
                 : '';
+
+            // Mirror ilExSubmission::getLastSubmission() with a read-only
+            // query on exc_returned. The current POC assignment is individual;
+            // for team assignments we report that detailed submission lookup
+            // is not evaluated rather than guessing team ownership.
+            $lastSubmission = null;
+            $hasSubmitted = false;
+
+            if (!$assignment->hasTeam()) {
+                $db->setLimit(1, 0);
+
+                $submissionSet = $db->queryF(
+                    'SELECT ts FROM exc_returned
+                     WHERE ass_id = %s
+                       AND user_id = %s
+                       AND (filename IS NOT NULL OR atext IS NOT NULL)
+                       AND ts IS NOT NULL
+                     ORDER BY ts DESC',
+                    ['integer', 'integer'],
+                    [(int) $assignment->getId(), $userId]
+                );
+
+                $submissionRow = $db->fetchAssoc($submissionSet);
+
+                if ($submissionRow && !empty($submissionRow['ts'])) {
+                    $lastSubmission = (string) $submissionRow['ts'];
+                    $hasSubmitted = true;
+                }
+            }
 
             if ($statusRowExists) {
                 $statusRowCount++;
@@ -283,7 +318,7 @@ try {
             $assignmentUsers[(string) $userId] = [
                 'source_user_id' => (string) $userId,
                 'source_login' => $users[(string) $userId]['source_login'],
-                'exercise_member' => is_array($memberRow),
+                'exercise_member' => $exerciseMember,
                 'status_row_exists' => $statusRowExists,
                 'status' => $status,
                 'status_time' => $statusRowExists
@@ -302,6 +337,9 @@ try {
                     : '',
                 'has_submission' => $hasSubmitted,
                 'last_submission' => $lastSubmission,
+                'submission_lookup' => $assignment->hasTeam()
+                    ? 'TEAM_NOT_EVALUATED'
+                    : 'INDIVIDUAL_READ_ONLY',
             ];
         }
 
@@ -358,6 +396,11 @@ try {
             'member_status_update_called' => false,
             'lp_refresh_called' => false,
             'lp_update_called' => false,
+            'direct_tables_read' => [
+                'exc_members',
+                'exc_mem_ass_status',
+                'exc_returned',
+            ],
             'writes_performed' => false,
         ],
     ];
