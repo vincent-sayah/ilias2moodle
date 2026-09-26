@@ -6,9 +6,9 @@ from pathlib import PurePosixPath
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from ilias2moodle.ilias.export_sets import find_export_sets
 
 from ilias2moodle.ilias.content_page import _local_name, _text_descendant
+from ilias2moodle.ilias.export_sets import find_export_sets
 
 RESOURCE_COLLECTION_UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
