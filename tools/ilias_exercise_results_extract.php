@@ -157,24 +157,32 @@ try {
     global $DIC;
     $db = $DIC->database();
 
-    $exercise = ilObjectFactory::getInstanceByRefId(
-        $exerciseRef,
-        false
-    );
-    $course = ilObjectFactory::getInstanceByRefId(
-        $courseRef,
-        false
-    );
+    // Avoid instantiating specialised repository objects in CLI. In ILIAS 10
+    // ilObjExercise construction pulls Repository/Form services that require
+    // the web constant ILIAS_HTTP_PATH.
+    $exerciseObjId = (int) ilObject::_lookupObjId($exerciseRef);
+    $exerciseType = $exerciseObjId > 0
+        ? (string) ilObject::_lookupType($exerciseObjId)
+        : '';
+    $exerciseTitle = $exerciseObjId > 0
+        ? (string) ilObject::_lookupTitle($exerciseObjId)
+        : '';
 
-    if (!$exercise instanceof ilObjExercise
-            || $exercise->getType() !== 'exc') {
+    $courseObjId = (int) ilObject::_lookupObjId($courseRef);
+    $courseType = $courseObjId > 0
+        ? (string) ilObject::_lookupType($courseObjId)
+        : '';
+    $courseTitle = $courseObjId > 0
+        ? (string) ilObject::_lookupTitle($courseObjId)
+        : '';
+
+    if ($exerciseObjId <= 0 || $exerciseType !== 'exc') {
         throw new RuntimeException(
             "ref_id {$exerciseRef} is not an ILIAS Exercise."
         );
     }
 
-    if (!$course instanceof ilObject
-            || $course->getType() !== 'crs') {
+    if ($courseObjId <= 0 || $courseType !== 'crs') {
         throw new RuntimeException(
             "ref_id {$courseRef} is not an ILIAS course."
         );
@@ -219,7 +227,7 @@ try {
     $assignmentSet = $db->queryF(
         'SELECT * FROM exc_assignment WHERE exc_id = %s ORDER BY order_nr',
         ['integer'],
-        [(int) $exercise->getId()]
+        [$exerciseObjId]
     );
 
     while ($row = $db->fetchAssoc($assignmentSet)) {
@@ -271,7 +279,7 @@ try {
             $memberSet = $db->queryF(
                 'SELECT usr_id FROM exc_members WHERE obj_id = %s AND usr_id = %s',
                 ['integer', 'integer'],
-                [(int) $exercise->getId(), $userId]
+                [$exerciseObjId, $userId]
             );
             $exerciseMember = (bool) $db->fetchAssoc($memberSet);
 
@@ -409,14 +417,14 @@ try {
             'client_id' => CLIENT_ID,
         ],
         'course' => [
-            'object_id' => (string) $course->getId(),
+            'object_id' => (string) $courseObjId,
             'ref_id' => (string) $courseRef,
-            'title' => (string) $course->getTitle(),
+            'title' => (string) $courseTitle,
         ],
         'exercise' => [
-            'object_id' => (string) $exercise->getId(),
+            'object_id' => (string) $exerciseObjId,
             'ref_id' => (string) $exerciseRef,
-            'title' => (string) $exercise->getTitle(),
+            'title' => (string) $exerciseTitle,
         ],
         'users' => $users,
         'assignments' => $assignmentData,
@@ -476,18 +484,18 @@ try {
     echo "============================================\n";
     echo "Client              : " . CLIENT_ID . "\n";
     echo "Course              : "
-        . $course->getId()
+        . $courseObjId
         . " / ref "
         . $courseRef
         . " / "
-        . $course->getTitle()
+        . $courseTitle
         . "\n";
     echo "Exercise            : "
-        . $exercise->getId()
+        . $exerciseObjId
         . " / ref "
         . $exerciseRef
         . " / "
-        . $exercise->getTitle()
+        . $exerciseTitle
         . "\n";
     echo "Course participants : "
         . count($courseUserIds)
@@ -531,6 +539,7 @@ try {
         . $exception->getMessage()
         . PHP_EOL
     );
+    fwrite(STDERR, $exception->getTraceAsString() . PHP_EOL);
 
     exit(1);
 }
