@@ -65,5 +65,5 @@
 - [x] inscriptions — Phase 7.1 validée sur POC ;
 - [x] rôles — member/admin/tutor validés vers student/editingteacher/teacher ;
 - [ ] groupes — objet ILIAS `grp` différé : un Moodle Group simple n'est pas un équivalent fonctionnel complet ;
-- [ ] achèvements ;
-- [ ] étude des historiques et tentatives.
+- [x] achèvements — Phase 7.3 analysée sur POC : aucune donnée `completed/failed` migrable ;
+- [x] historiques et tentatives — Test/SCORM/Exercice inventoriés ; 2 états cours `in_progress` conservés `HISTORY_ONLY`, 21 cas `NO_DATA`.
