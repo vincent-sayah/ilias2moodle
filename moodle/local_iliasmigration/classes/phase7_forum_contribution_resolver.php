@@ -146,17 +146,11 @@ final class phase7_forum_contribution_resolver {
         $authorissues = 0;
 
         foreach ($authorids as $sourceuserid) {
-            $mapping = $DB->get_record(
-                'local_iliasmigration_map',
-                [
-                    'sourcelms' => 'ILIAS',
-                    'sourceinstance' => $sourceinstance,
-                    'sourcecourse' => 'GLOBAL',
-                    'sourceref' => $sourceuserid,
-                    'targettype' => 'user',
-                ],
-                'id,targetid,status'
+            $mappingresolution = $this->resolve_user_mapping(
+                $sourceinstance,
+                $sourceuserid
             );
+            $mapping = $mappingresolution['mapping'];
 
             $targetuser = null;
             if ($mapping && (int) $mapping->targetid > 0) {
@@ -185,6 +179,15 @@ final class phase7_forum_contribution_resolver {
                 'mapping_status' => $mapping
                     ? (string) $mapping->status
                     : 'MISSING',
+                'mapping_resolution' => (string) (
+                    $mappingresolution['resolution'] ?? 'MISSING'
+                ),
+                'mapping_sourceinstance' => $mapping
+                    ? (string) $mapping->sourceinstance
+                    : null,
+                'mapping_candidates' => (int) (
+                    $mappingresolution['candidate_count'] ?? 0
+                ),
                 'target_user_id' => $mapping
                     ? (int) $mapping->targetid
                     : null,
@@ -545,6 +548,65 @@ final class phase7_forum_contribution_resolver {
         }
 
         return $decoded;
+    }
+
+    private function resolve_user_mapping(
+        string $sourceinstance,
+        string $sourceuserid
+    ): array {
+        global $DB;
+
+        if ($sourceinstance !== '') {
+            $exact = $DB->get_record(
+                'local_iliasmigration_map',
+                [
+                    'sourcelms' => 'ILIAS',
+                    'sourceinstance' => $sourceinstance,
+                    'sourcecourse' => 'GLOBAL',
+                    'sourceref' => $sourceuserid,
+                    'targettype' => 'user',
+                ],
+                'id,sourceinstance,targetid,status'
+            );
+
+            if ($exact) {
+                return [
+                    'mapping' => $exact,
+                    'resolution' => 'EXACT_SOURCEINSTANCE',
+                    'candidate_count' => 1,
+                ];
+            }
+        }
+
+        $candidates = $DB->get_records(
+            'local_iliasmigration_map',
+            [
+                'sourcelms' => 'ILIAS',
+                'sourcecourse' => 'GLOBAL',
+                'sourceref' => $sourceuserid,
+                'targettype' => 'user',
+            ],
+            'id ASC',
+            'id,sourceinstance,targetid,status'
+        );
+
+        if (count($candidates) === 1) {
+            return [
+                'mapping' => reset($candidates),
+                'resolution' => $sourceinstance === ''
+                    ? 'UNIQUE_GLOBAL_MAPPING_WITHOUT_PACKAGE_INSTANCE'
+                    : 'UNIQUE_GLOBAL_MAPPING_AFTER_EXACT_MISS',
+                'candidate_count' => 1,
+            ];
+        }
+
+        return [
+            'mapping' => false,
+            'resolution' => count($candidates) > 1
+                ? 'AMBIGUOUS_GLOBAL_MAPPING'
+                : 'MISSING_GLOBAL_MAPPING',
+            'candidate_count' => count($candidates),
+        ];
     }
 
     private function find_mapping(
