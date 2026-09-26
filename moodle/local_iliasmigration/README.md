@@ -356,6 +356,32 @@ php local/iliasmigration/cli/phase7_forum_apply.php \
 
 Les discussions et posts passent par les API Forum. Les pièces jointes historiques sont synchronisées via la File API dans `mod_forum/attachment`, avec vérification taille + hash et réparation ciblée d'un fichier manquant. Un second passage inchangé ne crée ni discussion, ni post, ni fichier, ni mapping.
 
+
+## Phase 7.5 — Blog : auteurs
+
+La Phase 7.5 audite les propriétaires des records Blog `mod_data` déjà créés en Phase 6.5.7.
+
+POC validé :
+- Blog ILIAS `obj_id=732/ref_id=247` -> Moodle `CMID=61 / instance=3` ;
+- posting 12 -> record 3 ;
+- posting 13 -> record 4 ;
+- `source_author=il_0_usr_6` pour les deux billets ;
+- mapping GLOBAL unique `ILIAS 6 -> Moodle 2/admin` ;
+- les deux records ont déjà `userid=2` ;
+- aucune réattribution nécessaire ;
+- 2 images `mod_data/content` conservées ;
+- `writes_performed=false`.
+
+Dry-run :
+
+```bash
+php local/iliasmigration/cli/phase7_blog_author_dry_run.php \
+  --course=5 \
+  --blog-ref=247
+```
+
+Si le propriétaire d'un record correspond déjà à l'auteur source résolu, le résultat est `KEEP` et aucun apply n'est nécessaire.
+
 ## Principes d'écriture
 
 Les écritures de contenu passent par les API Moodle du module cible, les outils core du module et la File API. Le plugin n'écrit pas directement les contenus pédagogiques dans les tables cœur Moodle en contournant les API/outils du module.
