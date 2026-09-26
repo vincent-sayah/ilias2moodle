@@ -23,7 +23,7 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Blog | `blog` | `mod_data` | 6.5 | validé — #20 ; billets + images, auteurs Moodle Phase 7 |
 | Media Pool / galerie média | `mep` | `mod_data` | 6.5 | validé — #21 ; images + MP4 + COPage + dossiers |
 | Groupe | `grp` | Non migré automatiquement pour l’instant ; nécessite conteneur + membres + restrictions + contenus | 7 | différé — #22 |
-| Learning Progress | — | Completion / historique | 7 | complexe |
+| Learning Progress | — | Completion / historique | 7 | POC validé : 0 donnée migrable, 2 `HISTORY_ONLY`, 21 `NO_DATA` — #37 |
 
 \* Les codes encore marqués d’un astérisque restent indicatifs tant qu’ils n’ont pas été confirmés sur leur POC réel.
 
@@ -89,3 +89,44 @@ DEFERRED / HISTORY_ONLY
 ```
 
 Aucun Moodle Group ne doit être créé automatiquement comme substitut de l'objet ILIAS Groupe. Une future prise en charge devra définir et valider une combinaison complète, par exemple section/sous-section + Groupe/Grouping + restrictions d'accès + migration des contenus enfants.
+
+
+## Phase 7.3 — Learning Progress, résultats et tentatives
+
+Le POC réel `cours 504 / ref 128` a été inventorié en lecture seule côté ILIAS puis classifié dans Moodle à partir des mappings persistants.
+
+Résultat du dry-run consolidé :
+
+```text
+Identités source       = 6
+Mappings utilisateurs  = 6
+Cibles Moodle valides  = 6
+Utilisateurs inscrits  = 6
+Problèmes identité     = 0
+
+MIGRATE                = 0
+PARTIAL                = 0
+HISTORY_ONLY           = 2
+UNSUPPORTED            = 0
+NO_DATA                = 21
+```
+
+Les deux entrées `HISTORY_ONLY` correspondent aux utilisateurs ILIAS `401/stagiaire.1` et `402/stagiaire.2`, dont le cours est en état `in_progress` avec le mode `LP_MODE_MANUAL_BY_TUTOR`. Cet état n'est pas converti en achèvement Moodle, car aucune équivalence sûre n'est validée.
+
+Les données détaillées ont également été contrôlées :
+
+- Test `713/ref 236` : aucune tentative ni score ;
+- SCORM `719/ref 241` : aucun tracking, tentative, SCO ou score ;
+- SCORM `720/ref 242` : aucun tracking, tentative, SCO ou score ;
+- Exercice `806/ref 274` : 4 assignments mais aucune remise, note, marque, commentaire ou feedback utilisateur.
+
+Politique validée :
+
+```text
+not_attempted                 -> NO_DATA
+in_progress manuel du cours   -> HISTORY_ONLY
+aucune tentative/résultat     -> NO_DATA
+completed/failed futur        -> conversion seulement après validation sémantique
+```
+
+Aucun apply Phase 7.3 n'est exécuté sur ce POC, car il n'existe aucune donnée classée `MIGRATE`. Le dry-run reste volontairement sans écriture Moodle.

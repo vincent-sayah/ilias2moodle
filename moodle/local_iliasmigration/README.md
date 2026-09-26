@@ -290,6 +290,36 @@ Deux points restent à arbitrer avant l'écriture réelle :
 
 Voir `docs/phase6-questions.md`.
 
+
+## Phase 7.3 — progression et résultats
+
+La Phase 7.3 fournit des extracteurs ILIAS en lecture seule et un dry-run Moodle consolidé pour classifier les données de progression et de résultats sans écrire dans les tables d'achèvement, de notes ou de tentatives.
+
+Le POC réel `ILIAS obj_id=504/ref_id=128 -> Moodle course id=5` valide :
+
+- 6 utilisateurs source, 6 mappings persistants valides et 6 inscriptions Moodle ;
+- 19 enregistrements Learning Progress : 17 `not_attempted`, 2 `in_progress`, 0 `completed`, 0 `failed` ;
+- Test `713/ref 236` : aucune tentative ni score ;
+- SCORM `719/ref 241` et `720/ref 242` : aucun tracking ni résultat ;
+- Exercice `806/ref 274` : 4 assignments, aucune remise ni évaluation utilisateur ;
+- classification finale : `MIGRATE=0`, `PARTIAL=0`, `HISTORY_ONLY=2`, `UNSUPPORTED=0`, `NO_DATA=21`.
+
+Les deux états `in_progress` du cours sont conservés comme `HISTORY_ONLY` car le mode source `LP_MODE_MANUAL_BY_TUTOR` ne possède pas d'équivalent Moodle suffisamment sûr pour une conversion automatique.
+
+Le dry-run Moodle s'exécute avec :
+
+```bash
+php local/iliasmigration/cli/phase7_progress_dry_run.php \
+  --progress=/tmp/phase73_ilias_progress_course_504.json \
+  --test=/tmp/phase73_ilias_test_713_results.json \
+  --scorm719=/tmp/phase73_scorm_719.json \
+  --scorm720=/tmp/phase73_scorm_720.json \
+  --exercise=/tmp/phase73_exercise_806.json \
+  --course=5
+```
+
+Le résultat POC retourne `ready_for_apply=false`, `apply_implemented=false` et `writes_performed=false`. Cette absence d'apply est volontaire : aucune donnée n'est classée `MIGRATE`.
+
 ## Principes d'écriture
 
 Les écritures de contenu passent par les API Moodle du module cible, les outils core du module et la File API. Le plugin n'écrit pas directement les contenus pédagogiques dans les tables cœur Moodle en contournant les API/outils du module.
