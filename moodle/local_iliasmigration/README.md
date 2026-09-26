@@ -382,6 +382,42 @@ php local/iliasmigration/cli/phase7_blog_author_dry_run.php \
 
 Si le propriétaire d'un record correspond déjà à l'auteur source résolu, le résultat est `KEEP` et aucun apply n'est nécessaire.
 
+
+## Phase 7.6 — Wiki : auteurs et dates des pages courantes
+
+La Phase 7.6 complète les pages Wiki créées en Phase 6.5.3 avec les métadonnées courantes relues en lecture seule depuis ILIAS 10.
+
+POC validé :
+- Wiki ILIAS `obj_id=801/ref_id=273` -> Moodle `CMID=55 / instance=1 / subwiki=1` ;
+- 3 pages source 11/12/13 -> Moodle 1/2/3 ;
+- auteur courant source : ILIAS user 6/root -> Moodle 2/admin ;
+- dates de création et dernière modification source restaurées ;
+- version courante Moodle version 1 réconciliée ;
+- version 0 technique Moodle préservée ;
+- aucun contenu, lien ou asset modifié ;
+- historique complet ILIAS conservé `HISTORY_ONLY` ;
+- second apply strictement idempotent (`writes_performed=false`).
+
+Dry-run :
+
+```bash
+php local/iliasmigration/cli/phase7_wiki_author_dry_run.php \
+  --source=/tmp/phase76_wiki_801_authors.json \
+  --course=5 \
+  --wiki-ref=273
+```
+
+Apply ciblé :
+
+```bash
+php local/iliasmigration/cli/phase7_wiki_author_apply.php \
+  --source=/tmp/phase76_wiki_801_authors.json \
+  --course=5 \
+  --wiki-ref=273
+```
+
+L'apply ne crée jamais de nouvelle version Wiki et refuse d'agir si une version 2+ existe déjà.
+
 ## Principes d'écriture
 
 Les écritures de contenu passent par les API Moodle du module cible, les outils core du module et la File API. Le plugin n'écrit pas directement les contenus pédagogiques dans les tables cœur Moodle en contournant les API/outils du module.
