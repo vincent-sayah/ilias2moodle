@@ -104,3 +104,110 @@ def test_package_builder_extracts_native_file(tmp_path: Path) -> None:
     assert course.items[0].items[0].metadata["migration_path"] == "files/12/document.pdf"
     assert (output / "migration.json").is_file()
     assert (output / "package.json").is_file()
+
+
+def _write_multiset_zip(path: Path) -> None:
+    course_manifest = """<?xml version="1.0"?>
+<Manifest MainEntity="crs" Title="Cours multi-set"
+          InstallationId="0" InstallationUrl="http://ilias.test"/>
+"""
+    folder_manifest = """<?xml version="1.0"?>
+<Manifest MainEntity="fold" Title="Dossier"
+          InstallationId="0" InstallationUrl="http://ilias.test"/>
+"""
+    file_manifest = """<?xml version="1.0"?>
+<Manifest MainEntity="file" Title="document.pdf"
+          InstallationId="0" InstallationUrl="http://ilias.test"/>
+"""
+    container = """<?xml version="1.0"?>
+<exp:Export xmlns:exp="http://www.ilias.de/Services/Export/exp/4_1">
+  <exp:ExportItem Id="100">
+    <Items>
+      <Item RefId="10" Id="100" Title="Cours multi-set" Type="crs">
+        <Item RefId="11" Id="101" Title="Dossier" Type="fold">
+          <Item RefId="12" Id="102" Title="document.pdf" Type="file"/>
+        </Item>
+      </Item>
+    </Items>
+  </exp:ExportItem>
+</exp:Export>
+"""
+    file_export = """<?xml version="1.0"?>
+<exp:Export xmlns:exp="http://www.ilias.de/Services/Export/exp/4_1">
+  <exp:ExportItem Id="102">
+    <File type="application/pdf" size="1234">
+      <Filename>document.pdf</Filename>
+      <Title>document.pdf</Title>
+      <Description>PDF multi-set</Description>
+      <Versions>
+        <Version>components/ILIAS/File/set_0/expDir_1/1_document.pdf</Version>
+      </Versions>
+    </File>
+  </exp:ExportItem>
+</exp:Export>
+"""
+    course_base = "set_1/1700000000__0__crs_100"
+    folder_base = "set_2/1700000000__0__fold_101"
+    file_base = "set_3/1700000000__0__file_102"
+
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr(f"{course_base}/manifest.xml", course_manifest)
+        archive.writestr(f"{folder_base}/manifest.xml", folder_manifest)
+        archive.writestr(f"{file_base}/manifest.xml", file_manifest)
+        archive.writestr(
+            f"{course_base}/components/ILIAS/Container/set_0/export.xml",
+            container,
+        )
+        archive.writestr(
+            f"{file_base}/components/ILIAS/File/set_0/export.xml",
+            file_export,
+        )
+        archive.writestr(
+            f"{file_base}/components/ILIAS/File/set_0/expDir_1/1_document.pdf",
+            b"%PDF-multiset",
+        )
+
+
+def test_multiset_export_parser_rebuilds_tree_without_root_manifest(
+    tmp_path: Path,
+) -> None:
+    archive_path = tmp_path / "course-multiset.zip"
+    _write_multiset_zip(archive_path)
+
+    with IliasExportParser(archive_path) as parser:
+        course = parser.parse_course()
+
+    assert course.source_id == "10"
+    assert course.title == "Cours multi-set"
+    assert course.metadata["obj_id"] == "100"
+    assert course.metadata["installation_url"] == "http://ilias.test"
+
+    folder = course.items[0]
+    assert folder.source_id == "11"
+    assert folder.type == "folder"
+
+    file_item = folder.items[0]
+    assert file_item.source_id == "12"
+    assert file_item.type == "file"
+    assert file_item.description == "PDF multi-set"
+    assert file_item.metadata["filename"] == "document.pdf"
+
+
+def test_multiset_package_builder_extracts_file(tmp_path: Path) -> None:
+    archive_path = tmp_path / "course-multiset.zip"
+    _write_multiset_zip(archive_path)
+
+    with IliasExportParser(archive_path) as parser:
+        course = parser.parse_course()
+
+    document = MigrationDocument(
+        course=course,
+        source={"lms": "ILIAS", "version": "10.8"},
+    )
+    output = tmp_path / "package"
+    result = MigrationPackageBuilder(archive_path, output).build(document)
+
+    extracted = output / "files" / "12" / "document.pdf"
+    assert extracted.read_bytes() == b"%PDF-multiset"
+    assert result["package"]["extracted"]["files"] == 1
+    assert result["package"]["missing_count"] == 0
