@@ -6,15 +6,14 @@ from pathlib import PurePosixPath
 from typing import Any
 from xml.etree import ElementTree as ET
 
-
 from ilias2moodle.ilias.content_page import (
     ContentPageParser,
     _first_descendant,
     _local_name,
     _text_descendant,
 )
-
 from ilias2moodle.ilias.export_sets import find_export_sets
+
 
 class BlogParser:
     """Parse one native ILIAS Blog export set."""
