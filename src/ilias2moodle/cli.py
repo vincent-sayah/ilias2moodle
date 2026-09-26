@@ -100,6 +100,24 @@ def _build_parser() -> argparse.ArgumentParser:
             "depuis ILIAS, indexés par mob_<id>."
         ),
     )
+    prepare_export.add_argument(
+        "--mediaobject-recovery",
+        type=Path,
+        default=None,
+        help=(
+            "Répertoire contenant des MediaObjects récupérés depuis ILIAS "
+            "pour Blog et Media Pool, indexés par mob_<id>."
+        ),
+    )
+    prepare_export.add_argument(
+        "--forum-attachment-recovery",
+        type=Path,
+        default=None,
+        help=(
+            "Répertoire contenant les pièces jointes Forum récupérées "
+            "depuis ILIAS, indexées par forum_<obj>/post_<id>."
+        ),
+    )
     return parser
 
 
@@ -202,6 +220,8 @@ def _prepare_export(
     ilias_version: str,
     exercise_irss_recovery: Path | None = None,
     mediacast_media_recovery: Path | None = None,
+    mediaobject_recovery: Path | None = None,
+    forum_attachment_recovery: Path | None = None,
 ) -> int:
     document = _parse_export_document(zip_path, ilias_version)
 
@@ -243,17 +263,44 @@ def _prepare_export(
             document,
             mediacast_media_recovery,
         )
+    if mediaobject_recovery is not None and not mediaobject_recovery.is_dir():
+        raise FileNotFoundError(
+            "Répertoire MediaObject recovery introuvable : "
+            f"{mediaobject_recovery}"
+        )
+    if (
+        forum_attachment_recovery is not None
+        and not forum_attachment_recovery.is_dir()
+    ):
+        raise FileNotFoundError(
+            "Répertoire Forum recovery introuvable : "
+            f"{forum_attachment_recovery}"
+        )
+
     content_page_result = extract_content_page_assets(document, zip_path, output)
     glossary_result = extract_glossary_assets(document, zip_path, output)
     wiki_result = extract_wiki_assets(document, zip_path, output)
     exercise_result = extract_exercise_assets(document, zip_path, output)
-    forum_result = extract_forum_assets(document, zip_path, output)
+    forum_result = extract_forum_assets(
+        document,
+        zip_path,
+        output,
+        attachment_recovery=forum_attachment_recovery,
+    )
     mediacast_result = extract_mediacast_assets(
         document, zip_path, output
     )
-    blog_result = extract_blog_assets(document, zip_path, output)
+    blog_result = extract_blog_assets(
+        document,
+        zip_path,
+        output,
+        mediaobject_recovery=mediaobject_recovery,
+    )
     media_pool_result = extract_media_pool_assets(
-        document, zip_path, output
+        document,
+        zip_path,
+        output,
+        mediaobject_recovery=mediaobject_recovery,
     )
     result = MigrationPackageBuilder(zip_path, output).build(document)
     package = result["package"]
@@ -359,6 +406,8 @@ def main(argv: list[str] | None = None) -> int:
             args.ilias_version,
             args.exercise_irss_recovery,
             args.mediacast_media_recovery,
+            args.mediaobject_recovery,
+            args.forum_attachment_recovery,
         )
 
     parser.error("Commande inconnue")

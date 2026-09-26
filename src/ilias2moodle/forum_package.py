@@ -9,6 +9,7 @@ from typing import Any
 
 from ilias2moodle.ilias.forum import parse_forums
 from ilias2moodle.model import MigrationDocument, MigrationItem
+from ilias2moodle.recovery_assets import load_forum_attachment_recovery
 
 
 def _walk(
@@ -112,6 +113,7 @@ def extract_forum_assets(
     document: MigrationDocument,
     archive_path: str | Path,
     output_dir: Path,
+    attachment_recovery: str | Path | None = None,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -122,6 +124,7 @@ def extract_forum_assets(
     stats = {
         "forum_structures": 0,
         "forum_attachment_files": 0,
+        "forum_attachment_files_recovered": 0,
         "forum_media_files": 0,
     }
     missing: list[dict[str, str]] = []
@@ -235,13 +238,52 @@ def extract_forum_assets(
                             filename,
                         )
 
-                        if copy_member(
+                        copied = copy_member(
                             source_path,
                             destination,
-                        ):
+                        )
+                        recovered = False
+                        recovery_error = None
+
+                        if not copied and attachment_recovery is not None:
+                            forum_obj_id = str(
+                                structure.get("source", {}).get(
+                                    "object_id",
+                                    "",
+                                )
+                            )
+                            recovery, recovery_error = (
+                                load_forum_attachment_recovery(
+                                    attachment_recovery,
+                                    forum_obj_id,
+                                    post_id,
+                                    filename,
+                                )
+                            )
+                            if recovery is not None:
+                                destination_path = output_dir.joinpath(
+                                    *destination.parts
+                                )
+                                destination_path.parent.mkdir(
+                                    parents=True,
+                                    exist_ok=True,
+                                )
+                                shutil.copy2(
+                                    recovery["path"],
+                                    destination_path,
+                                )
+                                copied = True
+                                recovered = True
+
+                        if copied:
                             attachment[
                                 "migration_path"
                             ] = destination.as_posix()
+                            if recovered:
+                                attachment["recovery_status"] = "RECOVERED"
+                                stats[
+                                    "forum_attachment_files_recovered"
+                                ] += 1
                             stats[
                                 "forum_attachment_files"
                             ] += 1
@@ -251,8 +293,8 @@ def extract_forum_assets(
                                     "source_id":
                                         item.source_id,
                                     "post_id": post_id,
-                                    "kind":
-                                        "forum_attachment",
+                                    "kind": recovery_error
+                                        or "forum_attachment",
                                     "source_path":
                                         source_path,
                                 }
