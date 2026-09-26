@@ -745,12 +745,14 @@ final class phase7_forum_contribution_executor {
             $createdcount++;
         }
 
-        $DB->set_field(
-            'forum_posts',
-            'attachment',
-            '1',
-            ['id' => $postid]
-        );
+        if ($createdcount > 0) {
+            $DB->set_field(
+                'forum_posts',
+                'attachment',
+                '1',
+                ['id' => $postid]
+            );
+        }
 
         return $createdcount;
     }
