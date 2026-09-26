@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import zipfile
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath\n\nfrom ilias2moodle.ilias.export_sets import find_export_sets
 from typing import Any
 from xml.etree import ElementTree as ET
 
@@ -320,45 +320,10 @@ class ForumParser:
         }
 
 
-def find_forum_export_sets(
-    archive: zipfile.ZipFile,
-) -> list[dict[str, str]]:
-    manifest_name = next(
-        (
-            name
-            for name in archive.namelist()
-            if name.lstrip("/") == "manifest.xml"
-        ),
-        None,
-    )
-    if manifest_name is None:
-        raise ValueError("manifest.xml racine introuvable")
+def find_forum_export_sets(archive: zipfile.ZipFile) -> list[dict[str, str]]:
+    """Return frm export sets from a native ILIAS course ZIP."""
 
-    root = ET.fromstring(archive.read(manifest_name))
-    result: list[dict[str, str]] = []
-
-    for element in root:
-        if _local_name(element.tag) != "ExportSet":
-            continue
-        if element.attrib.get("Type") != "frm":
-            continue
-
-        path = element.attrib.get("Path", "").lstrip("/")
-        object_id = (
-            path.rsplit("__frm_", 1)[-1]
-            if "__frm_" in path
-            else ""
-        )
-        result.append(
-            {
-                "object_id": object_id,
-                "path": path,
-                "type": "frm",
-            }
-        )
-
-    return result
-
+    return find_export_sets(archive, "frm")
 
 def parse_forums(
     archive_path: str | PurePosixPath,
