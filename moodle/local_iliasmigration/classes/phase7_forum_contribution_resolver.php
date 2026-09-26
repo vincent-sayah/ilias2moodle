@@ -102,7 +102,7 @@ final class phase7_forum_contribution_resolver {
         $forum = $DB->get_record(
             'forum',
             ['id' => (int) $cm->instance],
-            'id,course,name,type',
+            'id,course,name,type,forcesubscribe',
             MUST_EXIST
         );
 
@@ -207,6 +207,29 @@ final class phase7_forum_contribution_resolver {
                 'ready_as_historical_author' => (bool) $ready,
             ];
         }
+
+        $resolvedinstances = array_values(array_unique(array_filter(
+            array_map(
+                static fn(array $entry): string => trim((string) (
+                    $entry['mapping_sourceinstance'] ?? ''
+                )),
+                $authors
+            ),
+            static fn(string $value): bool => $value !== ''
+        )));
+
+        $mappingsourceinstance = $sourceinstance;
+        if ($mappingsourceinstance === '' && count($resolvedinstances) === 1) {
+            $mappingsourceinstance = $resolvedinstances[0];
+        }
+
+        $forumsubscriptions = $DB->count_records(
+            'forum_subscriptions',
+            ['forum' => (int) $forum->id]
+        );
+        $forcedsubscription = defined('FORUM_FORCESUBSCRIBE')
+            && (int) $forum->forcesubscribe === FORUM_FORCESUBSCRIBE;
+        $notificationrisk = $forumsubscriptions > 0 || $forcedsubscription;
 
         $threads = [];
         $posts = [];
@@ -331,7 +354,7 @@ final class phase7_forum_contribution_resolver {
 
                 $postmappingref = $forumref . ':post:' . $postid;
                 $postmapping = $this->find_mapping(
-                    $sourceinstance,
+                    $mappingsourceinstance,
                     $sourcecourse,
                     $postmappingref,
                     'forumpost'
@@ -441,9 +464,18 @@ final class phase7_forum_contribution_resolver {
             $blocked++;
         }
 
+        if ($mappingsourceinstance === '') {
+            $blocked++;
+        }
+        if ($notificationrisk) {
+            $blocked++;
+        }
+
         $ready = $authorissues === 0
             && $blocked === 0
             && $assetmissing === 0
+            && !$notificationrisk
+            && $mappingsourceinstance !== ''
             && count($threads) > 0
             && count($posts) > 0;
 
@@ -453,7 +485,8 @@ final class phase7_forum_contribution_resolver {
             'writes_performed' => false,
             'source' => [
                 'lms' => 'ILIAS',
-                'instance' => $sourceinstance,
+                'package_instance' => $sourceinstance,
+                'mapping_instance' => $mappingsourceinstance,
                 'course_object_id' => $sourcecourse,
                 'forum_ref_id' => $forumref,
                 'forum_object_id' => (string) (
@@ -470,6 +503,9 @@ final class phase7_forum_contribution_resolver {
                 'instance_id' => (int) $forum->id,
                 'name' => (string) $forum->name,
                 'type' => (string) $forum->type,
+                'forcesubscribe' => (int) $forum->forcesubscribe,
+                'explicit_subscription_count' => $forumsubscriptions,
+                'notification_risk' => $notificationrisk,
             ],
             'policy' => [
                 'persistent_user_mapping_required' => true,
@@ -481,6 +517,7 @@ final class phase7_forum_contribution_resolver {
                 'preserve_source_dates' => true,
                 'assets_via_file_api' => true,
                 'idempotence_via_persistent_contribution_mappings' => true,
+                'notification_policy' => 'BLOCK_APPLY_IF_FORUM_HAS_SUBSCRIBERS_OR_FORCED_SUBSCRIPTION',
             ],
             'counts' => [
                 'source_authors' => count($authors),
@@ -494,6 +531,8 @@ final class phase7_forum_contribution_resolver {
                 'assets' => $assetcount,
                 'assets_missing' => $assetmissing,
                 'blocked_items' => $blocked,
+                'explicit_subscriptions' => $forumsubscriptions,
+                'notification_risk' => $notificationrisk ? 1 : 0,
             ],
             'authors' => $authors,
             'threads' => $threads,
