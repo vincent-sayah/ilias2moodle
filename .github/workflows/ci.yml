@@ -45,6 +45,9 @@ jobs:
       - name: PHP syntax
         run: find moodle/local_iliasmigration -name '*.php' -print0 | xargs -0 -n1 php -l
 
+      - name: XMLDB index-length regression
+        run: php tests/php/test_xmldb_index_lengths.php
+
       - name: Phase 2 deep-folder policy regression
         run: php tests/php/test_folder_flattener.php
 
