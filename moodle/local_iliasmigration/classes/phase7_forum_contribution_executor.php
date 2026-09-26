@@ -42,8 +42,33 @@ final class phase7_forum_contribution_executor {
         global $CFG, $DB, $USER;
 
         require_once($CFG->dirroot . '/mod/forum/lib.php');
-        require_once($CFG->dirroot . '/mod/forum/post_form.php');
         require_once($CFG->libdir . '/filelib.php');
+
+        if (!class_exists('mod_forum_post_form')) {
+            $postformcandidates = [
+                $CFG->dirroot . '/mod/forum/post_form.php',
+                $CFG->dirroot . '/public/mod/forum/post_form.php',
+                dirname($CFG->dirroot) . '/public/mod/forum/post_form.php',
+            ];
+
+            $postformloaded = false;
+            foreach ($postformcandidates as $candidate) {
+                if (is_file($candidate)) {
+                    require_once($candidate);
+                    $postformloaded = class_exists('mod_forum_post_form');
+                    if ($postformloaded) {
+                        break;
+                    }
+                }
+            }
+
+            if (!$postformloaded) {
+                throw new \coding_exception(
+                    'Unable to locate/load Moodle mod_forum_post_form. Checked: '
+                    . implode(', ', $postformcandidates)
+                );
+            }
+        }
 
         $resolver = new phase7_forum_contribution_resolver(
             $this->migrationjson
