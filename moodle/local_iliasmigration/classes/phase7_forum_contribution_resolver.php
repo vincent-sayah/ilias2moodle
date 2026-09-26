@@ -263,7 +263,7 @@ final class phase7_forum_contribution_resolver {
 
             $threadmappingref = $forumref . ':thread:' . $threadid;
             $threadmapping = $this->find_mapping(
-                $sourceinstance,
+                $mappingsourceinstance,
                 $sourcecourse,
                 $threadmappingref,
                 'forumdiscussion'
