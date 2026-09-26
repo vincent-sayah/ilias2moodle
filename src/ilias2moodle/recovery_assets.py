@@ -85,6 +85,41 @@ def load_mediaobject_recovery(
     )
 
 
+def load_mediaobject_recovery_by_id(
+    recovery_dir: str | Path,
+    mob_id: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    root = Path(recovery_dir).resolve()
+    manifest_path = root / f"mob_{mob_id}" / "manifest.json"
+    if not manifest_path.is_file():
+        return None, "mediaobject_recovery_manifest_missing"
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, "mediaobject_recovery_manifest_invalid"
+
+    if str(manifest.get("mob_id", "")) != str(mob_id):
+        return None, "mediaobject_recovery_mob_mismatch"
+
+    location = str(manifest.get("location", ""))
+    if not location:
+        return None, "mediaobject_recovery_location_missing"
+
+    recovery, error = load_mediaobject_recovery(
+        recovery_dir,
+        mob_id,
+        location,
+    )
+    if recovery is None:
+        return None, error
+
+    recovery["location"] = location
+    recovery["output_name"] = str(manifest.get("output_name", ""))
+    recovery["manifest_data"] = manifest
+    return recovery, None
+
+
 def load_forum_attachment_recovery(
     recovery_dir: str | Path,
     forum_obj_id: str,
