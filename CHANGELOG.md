@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.0-rc2 — 2026-09-26
+
+- Correction bloquante de l'installation neuve Moodle 5.0.2 MySQL/MariaDB détectée pendant la validation sur VM vierge (#50).
+- Réduction de `sourceinstance` de 191 à 128 caractères ; la clé unique `source_target_unique` passe de 371 à 308 caractères et respecte la limite XMLDB Moodle de 333 caractères.
+- Ajout d'un chemin d'upgrade sûr pour les installations existantes, avec refus explicite si une valeur `sourceinstance` dépasse 128 caractères.
+- Ajout d'un test CI de régression sur la longueur des clés/index XMLDB.
+- RC2 : `0.20.0-rc2`, build Moodle `2026092605`.
+
 ## 0.20.0-rc1 — 2026-09-26
 
 - Validation des phases 1 à 7 sur le POC ILIAS 10 -> Moodle.
