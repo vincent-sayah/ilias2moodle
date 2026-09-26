@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Ilias2Moodle - Read-only extraction of current ILIAS Wiki page content.
  *
  * This extractor reads current Wiki page metadata through the Wiki repository
- * and current COPage XML through ilWikiPage::getXMLContent(). It does not call
+ * and current COPage XML through a narrow read-only page_object SELECT. It does not call
  * update/create/delete and does not access fsv2 directly.
  *
  * Example:
@@ -354,8 +354,28 @@ try {
             $language = '-';
         }
 
-        $page = new ilWikiPage((int) $pageId, 0, $language);
-        $xml = (string) $page->getXMLContent(true);
+        $set = $DIC->database()->queryF(
+            "SELECT content, parent_id, active, last_change, last_change_user, " .
+            "create_user, created, lang FROM page_object " .
+            "WHERE page_id = %s AND parent_type = %s AND lang = %s",
+            ["integer", "text", "text"],
+            [(int) $pageId, "wpg", $language]
+        );
+        $pageRecord = $DIC->database()->fetchAssoc($set);
+
+        if (!$pageRecord) {
+            throw new RuntimeException(
+                "Current page_object row not found for Wiki page {$pageId}."
+            );
+        }
+
+        if ((int) ($pageRecord['parent_id'] ?? 0) !== $wikiObjId) {
+            throw new RuntimeException(
+                "Wiki page {$pageId} parent_id does not match Wiki {$wikiObjId}."
+            );
+        }
+
+        $xml = (string) ($pageRecord['content'] ?? '');
 
         if (trim($xml) === '') {
             throw new RuntimeException(
@@ -472,11 +492,12 @@ try {
         ],
         'safety' => [
             'read_only' => true,
-            'wiki_page_method' => 'ilWikiPage::getXMLContent',
+            'wiki_page_method' => 'read-only page_object.content query',
             'update_called' => false,
             'create_called' => false,
             'delete_called' => false,
             'direct_fsv2_access' => false,
+            'direct_sql_scope' => 'SELECT page_object current wpg content only',
             'writes_performed' => false,
         ],
     ];
