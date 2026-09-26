@@ -167,3 +167,32 @@ Le propriétaire Moodle correspond donc exactement à l'auteur source résolu po
 Les deux images historiques restent présentes dans `mod_data/content` : `tous.png` et `trio.png`.
 
 Aucun rapprochement par login, email ou nom n'est autorisé. Une future réattribution n'est permise que si le record source expose un identifiant auteur au format strict `il_0_usr_<id>` et si cet id possède un mapping GLOBAL Moodle unique.
+
+
+## Phase 7.6 — Wiki : auteurs et métadonnées des pages courantes
+
+Le POC réel `Wiki ILIAS obj_id=801/ref_id=273 -> Moodle CMID=55 / instance=1 / subwiki=1` est validé.
+
+Source ILIAS 10 relue en lecture seule :
+- page 11 / page1 : création 2026-09-18 15:24:28 ; dernière modification 2026-09-19 07:07:53 ;
+- page 12 / page2 : création 2026-09-19 07:07:59 ; dernière modification 2026-09-19 07:11:38 ;
+- page 13 / page3 : création 2026-09-19 07:11:42 ; dernière modification 2026-09-19 07:13:33 ;
+- créateur et dernier éditeur : ILIAS user 6/root pour les 3 pages ;
+- mapping GLOBAL : `ILIAS 6 -> Moodle 2/admin`.
+
+Politique appliquée :
+- `wiki_pages.userid` <- dernier éditeur source mappé ;
+- `wiki_pages.timecreated` <- date de création source ;
+- `wiki_pages.timemodified` <- dernière modification source ;
+- version Moodle courante (version 1) : `userid` + `timecreated` <- dernier éditeur/date source ;
+- version 0 technique Moodle : inchangée ;
+- contenu, liens, assets : inchangés ;
+- identité du créateur distincte : `HISTORY_ONLY` car Moodle Wiki ne possède pas de champ créateur séparé ;
+- historique complet des révisions ILIAS : `HISTORY_ONLY`.
+
+Le resolver refuse l'apply si le Wiki n'a plus exactement les versions `[0,1]` avec version courante `1`, afin de ne pas écraser une modification Moodle postérieure à la migration.
+
+Validation finale :
+- premier apply : 3 pages mises à jour, 3 versions courantes mises à jour, aucune nouvelle page/version ;
+- dry-run suivant : 3 `KEEP`, 0 réconciliation ;
+- second apply : `writes_performed=false`.
