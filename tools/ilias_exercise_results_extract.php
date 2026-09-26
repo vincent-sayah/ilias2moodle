@@ -212,9 +212,37 @@ try {
         ];
     }
 
-    $assignments = ilExAssignment::getInstancesByExercise(
-        (int) $exercise->getId()
+    // Read assignments directly. ilExAssignment's constructor initialises
+    // Exercise GUI services which require ILIAS_HTTP_PATH and are not CLI-safe.
+    $assignments = [];
+
+    $assignmentSet = $db->queryF(
+        'SELECT * FROM exc_assignment WHERE exc_id = %s ORDER BY order_nr',
+        ['integer'],
+        [(int) $exercise->getId()]
     );
+
+    while ($row = $db->fetchAssoc($assignmentSet)) {
+        $assignments[] = $row;
+    }
+
+    $assignmentTypeNames = [
+        1 => 'upload',
+        2 => 'blog',
+        3 => 'portfolio',
+        4 => 'upload_team',
+        5 => 'text',
+        6 => 'wiki_team',
+    ];
+
+    $submissionTypeNames = [
+        1 => 'File',
+        2 => 'Object',
+        3 => 'Object',
+        4 => 'File',
+        5 => 'Text',
+        6 => 'RepoObject',
+    ];
 
     $assignmentData = [];
     $statusRowCount = 0;
@@ -226,6 +254,14 @@ try {
     $commentCount = 0;
 
     foreach ($assignments as $assignment) {
+        $assignmentId = (int) ($assignment['id'] ?? 0);
+        $assignmentType = (int) ($assignment['type'] ?? 0);
+        $usesTeams = in_array($assignmentType, [4, 6], true);
+
+        if ($assignmentId <= 0) {
+            continue;
+        }
+
         $assignmentUsers = [];
 
         foreach ($courseUserIds as $userId) {
@@ -244,7 +280,7 @@ try {
             $statusSet = $db->queryF(
                 'SELECT * FROM exc_mem_ass_status WHERE ass_id = %s AND usr_id = %s',
                 ['integer', 'integer'],
-                [(int) $assignment->getId(), $userId]
+                [$assignmentId, $userId]
             );
             $memberRow = $db->fetchAssoc($statusSet) ?: null;
 
@@ -269,7 +305,7 @@ try {
             $lastSubmission = null;
             $hasSubmitted = false;
 
-            if (!$assignment->hasTeam()) {
+            if (!$usesTeams) {
                 $db->setLimit(1, 0);
 
                 $submissionSet = $db->queryF(
@@ -280,7 +316,7 @@ try {
                        AND ts IS NOT NULL
                      ORDER BY ts DESC',
                     ['integer', 'integer'],
-                    [(int) $assignment->getId(), $userId]
+                    [$assignmentId, $userId]
                 );
 
                 $submissionRow = $db->fetchAssoc($submissionSet);
@@ -337,24 +373,29 @@ try {
                     : '',
                 'has_submission' => $hasSubmitted,
                 'last_submission' => $lastSubmission,
-                'submission_lookup' => $assignment->hasTeam()
+                'submission_lookup' => $usesTeams
                     ? 'TEAM_NOT_EVALUATED'
                     : 'INDIVIDUAL_READ_ONLY',
             ];
         }
 
         $assignmentData[] = [
-            'assignment_id' => (string) $assignment->getId(),
-            'title' => (string) $assignment->getTitle(),
-            'type' => (int) $assignment->getType(),
-            'submission_type' => (string) (
-                $assignment->getAssignmentType()->getSubmissionType()
-            ),
-            'uses_teams' => (bool) $assignment->hasTeam(),
-            'mandatory' => (bool) $assignment->getMandatory(),
-            'start_time' => $assignment->getStartTime(),
-            'deadline' => $assignment->getDeadline(),
-            'extended_deadline' => $assignment->getExtendedDeadline(),
+            'assignment_id' => (string) $assignmentId,
+            'title' => (string) ($assignment['title'] ?? ''),
+            'type' => $assignmentType,
+            'type_name' => $assignmentTypeNames[$assignmentType] ?? 'unknown',
+            'submission_type' => $submissionTypeNames[$assignmentType] ?? 'Unknown',
+            'uses_teams' => $usesTeams,
+            'mandatory' => !empty($assignment['mandatory']),
+            'start_time' => isset($assignment['start_time'])
+                ? (int) $assignment['start_time']
+                : null,
+            'deadline' => isset($assignment['time_stamp'])
+                ? (int) $assignment['time_stamp']
+                : null,
+            'extended_deadline' => isset($assignment['deadline2'])
+                ? (int) $assignment['deadline2']
+                : null,
             'users' => $assignmentUsers,
         ];
     }
@@ -397,6 +438,7 @@ try {
             'lp_refresh_called' => false,
             'lp_update_called' => false,
             'direct_tables_read' => [
+                'exc_assignment',
                 'exc_members',
                 'exc_mem_ass_status',
                 'exc_returned',
