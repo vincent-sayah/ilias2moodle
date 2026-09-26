@@ -78,16 +78,42 @@ class IliasExportParser:
         self.close()
 
     def _find_root_manifest(self) -> str:
+        # Historical ILIAS exports expose one aggregate manifest at the ZIP root.
         for name in self.names:
             if name.lstrip("/") == "manifest.xml":
                 return name
-        raise ValueError("manifest.xml racine introuvable dans l'export ILIAS")
+
+        # Newer/native exports may contain one autonomous manifest per export set
+        # and no aggregate root manifest. In that layout, the course manifest is
+        # the unique manifest whose MainEntity is "crs".
+        course_manifests: list[str] = []
+        for name in self.names:
+            normalized = name.rstrip("/")
+            if PurePosixPath(normalized).name.lower() != "manifest.xml":
+                continue
+            try:
+                root = self._parse_xml(name)
+            except (ET.ParseError, KeyError):
+                continue
+            if root.attrib.get("MainEntity") == "crs":
+                course_manifests.append(name)
+
+        if len(course_manifests) == 1:
+            return course_manifests[0]
+        if len(course_manifests) > 1:
+            raise ValueError(
+                "Plusieurs manifestes de cours (MainEntity=crs) trouvés "
+                "dans l'export ILIAS"
+            )
+        raise ValueError("manifest.xml du cours introuvable dans l'export ILIAS")
 
     def _parse_xml(self, name: str) -> ET.Element:
         return ET.fromstring(self.archive.read(name))
 
     def _index_export_sets(self) -> dict[str, dict[str, str]]:
         result: dict[str, dict[str, str]] = {}
+
+        # Historical aggregate-manifest layout.
         for element in self.root_manifest:
             if _local_name(element.tag) != "ExportSet":
                 continue
@@ -96,6 +122,37 @@ class IliasExportParser:
             match = re.search(r"__([a-z0-9]+)_(\d+)$", path)
             if match:
                 result[match.group(2)] = {"path": path, "type": object_type}
+
+        if result:
+            return result
+
+        # Multi-set layout: every set has its own manifest.xml and the directory
+        # name carries the ILIAS type/object id, e.g.
+        # set_1/1790441011__0__crs_504/manifest.xml.
+        for name in self.names:
+            normalized = name.lstrip("/").rstrip("/")
+            if PurePosixPath(normalized).name.lower() != "manifest.xml":
+                continue
+
+            base = str(PurePosixPath(normalized).parent)
+            match = re.search(r"__([a-z0-9]+)_(\d+)$", base)
+            if not match:
+                continue
+
+            object_type = match.group(1)
+            object_id = match.group(2)
+            previous = result.get(object_id)
+            current = {"path": base, "type": object_type}
+            if previous is not None and previous != current:
+                raise ValueError(
+                    "ObjId ILIAS ambigu dans l'export multi-set : "
+                    f"{object_id}"
+                )
+            result[object_id] = current
+
+        if not result:
+            raise ValueError("Aucun export set exploitable trouvé dans l'archive ILIAS")
+
         return result
 
     def _archive_member(self, base: str, suffix: str) -> str | None:
