@@ -12,6 +12,7 @@ from ilias2moodle.ilias.content_page import (
     _local_name,
     _text_descendant,
 )
+from ilias2moodle.ilias.export_sets import find_export_sets
 
 
 def _records(root: ET.Element, entity: str) -> list[ET.Element]:
@@ -358,41 +359,10 @@ class MediaPoolParser:
         }
 
 
-def find_media_pool_export_sets(
-    archive: zipfile.ZipFile,
-) -> list[dict[str, str]]:
-    manifest_name = next(
-        (
-            name
-            for name in archive.namelist()
-            if name.lstrip("/") == "manifest.xml"
-        ),
-        None,
-    )
-    if manifest_name is None:
-        raise ValueError("manifest.xml racine introuvable")
+def find_media_pool_export_sets(archive: zipfile.ZipFile) -> list[dict[str, str]]:
+    """Return mep export sets from a native ILIAS course ZIP."""
 
-    root = ET.fromstring(archive.read(manifest_name))
-    results: list[dict[str, str]] = []
-
-    for element in root:
-        if _local_name(element.tag) != "ExportSet":
-            continue
-        if element.attrib.get("Type") != "mep":
-            continue
-
-        path = element.attrib.get("Path", "").lstrip("/")
-        match = re.search(r"__mep_(\d+)$", path)
-        results.append(
-            {
-                "object_id": match.group(1) if match else "",
-                "path": path,
-                "type": "mep",
-            }
-        )
-
-    return results
-
+    return find_export_sets(archive, "mep")
 
 def parse_media_pools(
     archive_path: str | PurePosixPath,

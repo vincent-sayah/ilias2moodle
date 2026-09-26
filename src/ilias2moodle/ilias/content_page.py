@@ -6,6 +6,8 @@ from pathlib import PurePosixPath
 from typing import Any
 from xml.etree import ElementTree as ET
 
+from ilias2moodle.ilias.export_sets import find_export_sets
+
 
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
@@ -463,33 +465,9 @@ class ContentPageParser:
 
 
 def find_content_page_export_sets(archive: zipfile.ZipFile) -> list[dict[str, str]]:
-    """Return Content Page export sets from a native ILIAS course ZIP."""
+    """Return copa export sets from a native ILIAS course ZIP."""
 
-    manifest_name = next(
-        (name for name in archive.namelist() if name.lstrip("/") == "manifest.xml"),
-        None,
-    )
-    if manifest_name is None:
-        raise ValueError("manifest.xml racine introuvable")
-
-    root = ET.fromstring(archive.read(manifest_name))
-    results: list[dict[str, str]] = []
-    for element in root:
-        if _local_name(element.tag) != "ExportSet":
-            continue
-        if element.attrib.get("Type") != "copa":
-            continue
-        path = element.attrib.get("Path", "").lstrip("/")
-        match = re.search(r"__copa_(\d+)$", path)
-        results.append(
-            {
-                "object_id": match.group(1) if match else "",
-                "path": path,
-                "type": "copa",
-            }
-        )
-    return results
-
+    return find_export_sets(archive, "copa")
 
 def parse_content_pages(archive_path: str | PurePosixPath) -> list[dict[str, Any]]:
     """Parse every Content Page contained in a native ILIAS course ZIP."""

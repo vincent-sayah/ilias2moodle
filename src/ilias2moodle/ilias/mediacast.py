@@ -6,6 +6,7 @@ from typing import Any
 from xml.etree import ElementTree as ET
 
 from ilias2moodle.ilias.content_page import _local_name, _text_descendant
+from ilias2moodle.ilias.export_sets import find_export_sets
 
 
 def _int(element: ET.Element, field: str, default: int = 0) -> int:
@@ -442,45 +443,10 @@ class MediaCastParser:
         }
 
 
-def find_mediacast_export_sets(
-    archive: zipfile.ZipFile,
-) -> list[dict[str, str]]:
-    manifest_name = next(
-        (
-            name
-            for name in archive.namelist()
-            if name.lstrip("/") == "manifest.xml"
-        ),
-        None,
-    )
-    if manifest_name is None:
-        raise ValueError("manifest.xml racine introuvable")
+def find_mediacast_export_sets(archive: zipfile.ZipFile) -> list[dict[str, str]]:
+    """Return mcst export sets from a native ILIAS course ZIP."""
 
-    root = ET.fromstring(archive.read(manifest_name))
-    result: list[dict[str, str]] = []
-
-    for element in root:
-        if _local_name(element.tag) != "ExportSet":
-            continue
-        if element.attrib.get("Type") != "mcst":
-            continue
-
-        path = element.attrib.get("Path", "").lstrip("/")
-        object_id = (
-            path.rsplit("__mcst_", 1)[-1]
-            if "__mcst_" in path
-            else ""
-        )
-        result.append(
-            {
-                "object_id": object_id,
-                "path": path,
-                "type": "mcst",
-            }
-        )
-
-    return result
-
+    return find_export_sets(archive, "mcst")
 
 def parse_mediacasts(
     archive_path: str | PurePosixPath,

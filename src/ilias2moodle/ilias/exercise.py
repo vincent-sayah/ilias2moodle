@@ -7,6 +7,7 @@ from typing import Any
 from xml.etree import ElementTree as ET
 
 from ilias2moodle.ilias.content_page import _local_name, _text_descendant
+from ilias2moodle.ilias.export_sets import find_export_sets
 
 RESOURCE_COLLECTION_UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -381,25 +382,9 @@ class ExerciseParser:
 
 
 def find_exercise_export_sets(archive: zipfile.ZipFile) -> list[dict[str, str]]:
-    manifest_name = next(
-        (name for name in archive.namelist() if name.lstrip("/") == "manifest.xml"),
-        None,
-    )
-    if manifest_name is None:
-        raise ValueError("manifest.xml racine introuvable")
+    """Return exc export sets from a native ILIAS course ZIP."""
 
-    root = ET.fromstring(archive.read(manifest_name))
-    result: list[dict[str, str]] = []
-    for element in root:
-        if _local_name(element.tag) != "ExportSet":
-            continue
-        if element.attrib.get("Type") != "exc":
-            continue
-        path = element.attrib.get("Path", "").lstrip("/")
-        object_id = path.rsplit("__exc_", 1)[-1] if "__exc_" in path else ""
-        result.append({"object_id": object_id, "path": path, "type": "exc"})
-    return result
-
+    return find_export_sets(archive, "exc")
 
 def parse_exercises(archive_path: str | PurePosixPath) -> list[dict[str, Any]]:
     with zipfile.ZipFile(str(archive_path)) as archive:
