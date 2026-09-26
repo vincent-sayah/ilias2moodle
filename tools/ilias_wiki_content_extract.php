@@ -67,7 +67,7 @@ function wikiRecoveryReferencedObjectIds(string $xml): array
     $mobIds = [];
     $fileIds = [];
 
-    if (preg_match_all('/il_[0-9]+_mob_([0-9]+)/i', $xml, $matches)) {
+    if (preg_match_all('/il_(?:[0-9]+)?_mob_([0-9]+)/i', $xml, $matches)) {
         foreach ($matches[1] as $value) {
             $id = (int) $value;
             if ($id > 0) {
@@ -76,7 +76,7 @@ function wikiRecoveryReferencedObjectIds(string $xml): array
         }
     }
 
-    if (preg_match_all('/il_[0-9]+_file_([0-9]+)/i', $xml, $matches)) {
+    if (preg_match_all('/il_(?:[0-9]+)?_file_([0-9]+)/i', $xml, $matches)) {
         foreach ($matches[1] as $value) {
             $id = (int) $value;
             if ($id > 0) {
