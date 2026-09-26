@@ -157,6 +157,7 @@ final class phase7_forum_contribution_executor {
                     $discussionid = 0;
                     $rootpostid = 0;
                     $threadcreated = false;
+                    $threadchanged = false;
 
                     if (($threadplan['action'] ?? '') === 'KEEP') {
                         $discussionid = (int) (
@@ -192,6 +193,7 @@ final class phase7_forum_contribution_executor {
                         }
 
                         $keptdiscussions++;
+                        $keptposts++;
                     } else if (($threadplan['action'] ?? '') === 'CREATE') {
                         $authorid = (int) (
                             $root['target_author_user_id'] ?? 0
@@ -271,6 +273,7 @@ final class phase7_forum_contribution_executor {
                         $createddiscussions++;
                         $createdposts++;
                         $threadcreated = true;
+                        $threadchanged = true;
                         $writes = true;
 
                         $this->save_mapping(
@@ -475,6 +478,7 @@ final class phase7_forum_contribution_executor {
                         $createdposts++;
                         $createdattachments += $attachmentcount;
                         $createdmappings++;
+                        $threadchanged = true;
                         $writes = true;
 
                         if ($modified >= $latesttime) {
@@ -483,7 +487,7 @@ final class phase7_forum_contribution_executor {
                         }
                     }
 
-                    if ($threadcreated || $createdposts > 0) {
+                    if ($threadchanged) {
                         $DB->update_record(
                             'forum_discussions',
                             (object) [
