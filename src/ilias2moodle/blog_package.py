@@ -10,6 +10,7 @@ from typing import Any
 
 from ilias2moodle.ilias.blog import parse_blogs
 from ilias2moodle.model import MigrationDocument, MigrationItem
+from ilias2moodle.recovery_assets import load_mediaobject_recovery
 
 
 def _walk(items: Iterable[MigrationItem]) -> Iterable[MigrationItem]:
@@ -107,6 +108,7 @@ def extract_blog_assets(
     document: MigrationDocument,
     archive_path: str | Path,
     output_dir: Path,
+    mediaobject_recovery: str | Path | None = None,
 ) -> dict[str, Any]:
     """Extract Blog media/files and persist one normalized structure per Blog."""
 
@@ -119,6 +121,7 @@ def extract_blog_assets(
         "blog_structures": 0,
         "blog_postings": 0,
         "blog_media_files": 0,
+        "blog_media_files_recovered": 0,
         "blog_files": 0,
     }
     missing: list[dict[str, str]] = []
@@ -204,17 +207,42 @@ def extract_blog_assets(
                             source_path,
                             destination,
                         )
+                        recovered = False
+                        recovery_error = None
+                        if not copied and mediaobject_recovery is not None:
+                            recovery, recovery_error = load_mediaobject_recovery(
+                                mediaobject_recovery,
+                                str(media_id),
+                                str(media_item.get("location", "")),
+                            )
+                            if recovery is not None:
+                                destination_path = output_dir.joinpath(
+                                    *destination.parts
+                                )
+                                destination_path.parent.mkdir(
+                                    parents=True,
+                                    exist_ok=True,
+                                )
+                                shutil.copy2(recovery["path"], destination_path)
+                                copied = True
+                                recovered = True
+                                size = int(recovery["size"])
+                                sha256 = str(recovery["sha256"])
+
                         if copied:
                             media_item["migration_path"] = destination.as_posix()
                             media_item["migration_size"] = size
                             media_item["migration_sha256"] = sha256
+                            if recovered:
+                                media_item["recovery_status"] = "RECOVERED"
+                                stats["blog_media_files_recovered"] += 1
                             stats["blog_media_files"] += 1
                             blog_media_files += 1
                         else:
                             missing.append(
                                 {
                                     "source_id": item.source_id,
-                                    "kind": "blog_media",
+                                    "kind": recovery_error or "blog_media",
                                     "source_path": source_path,
                                 }
                             )
