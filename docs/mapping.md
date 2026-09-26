@@ -18,7 +18,7 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Glossaire | `glo` | `mod_glossary` | 6.5 | validé — #15 |
 | Wiki | `wiki` | `mod_wiki` | 6.5 | validé — #16 |
 | Exercice | `exc` | `mod_assign` | 6.5 | validé — #17 |
-| Forum | `frm` | `mod_forum` | 6.5 | validé structure — #18 ; contributions Phase 7 |
+| Forum | `frm` | `mod_forum` | 6.5 + 7 | validé structure + contributions/auteurs/assets — #18, #42 |
 | Mediacast | `mcst` | `mod_data` | 6.5 | validé — #19 ; MP4 local + URL externe |
 | Blog | `blog` | `mod_data` | 6.5 | validé — #20 ; billets + images, auteurs Moodle Phase 7 |
 | Media Pool / galerie média | `mep` | `mod_data` | 6.5 | validé — #21 ; images + MP4 + COPage + dossiers |
@@ -130,3 +130,23 @@ completed/failed futur        -> conversion seulement après validation sémanti
 ```
 
 Aucun apply Phase 7.3 n'est exécuté sur ce POC, car il n'existe aucune donnée classée `MIGRATE`. Le dry-run reste volontairement sans écriture Moodle.
+
+
+## Phase 7.4 — Forum : auteurs et contributions
+
+Le POC réel `Forum ILIAS obj_id=807/ref_id=275 -> Moodle CMID=59 / instance=6` est validé de bout en bout.
+
+Résultat :
+- 3 auteurs source résolus uniquement par mappings persistants : `6 -> Moodle 2`, `401 -> Moodle 5`, `402 -> Moodle 6` ;
+- 2 discussions créées ;
+- 7 posts créés ;
+- arbre parent/enfant conservé ;
+- dates source conservées ;
+- 3 pièces jointes présentes dans `mod_forum/attachment` ;
+- 9 mappings persistants de contribution : 2 `forumdiscussion` + 7 `forumpost` ;
+- notifications neutralisées pour les contributions historiques ;
+- dernier apply strictement idempotent : 0 création, 0 fichier, 0 mapping, `writes_performed=false`.
+
+Une anomalie réelle a été détectée et corrigée pendant le POC : un fichier volumineux (`handout.pdf`, 896549 octets) n'avait pas été transféré par le chemin de brouillon Forum alors que le post portait `attachment=1`. La politique finale importe donc les pièces jointes historiques via la File API Moodle directement dans `mod_forum/attachment`, puis vérifie taille et SHA-1. Les discussions et posts restent créés via les API Forum.
+
+Le package natif peut contenir `source.instance=unknown-ilias-instance`. Cette valeur est traitée comme un placeholder ; l'instance canonique des mappings Phase 7 est alors résolue uniquement à partir d'un mapping utilisateur GLOBAL unique, sans fallback par login, email ou nom.

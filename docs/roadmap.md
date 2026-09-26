@@ -66,4 +66,7 @@
 - [x] rôles — member/admin/tutor validés vers student/editingteacher/teacher ;
 - [ ] groupes — objet ILIAS `grp` différé : un Moodle Group simple n'est pas un équivalent fonctionnel complet ;
 - [x] achèvements — Phase 7.3 analysée sur POC : aucune donnée `completed/failed` migrable ;
-- [x] historiques et tentatives — Test/SCORM/Exercice inventoriés ; 2 états cours `in_progress` conservés `HISTORY_ONLY`, 21 cas `NO_DATA`.
+- [x] historiques et tentatives — Test/SCORM/Exercice inventoriés ; 2 états cours `in_progress` conservés `HISTORY_ONLY`, 21 cas `NO_DATA` ;
+- [x] contributions Forum — auteurs, 2 discussions, 7 posts et 3 pièces jointes migrés avec arbre préservé et apply idempotent ;
+- [ ] contributions Blog — prochain chantier ;
+- [ ] contributions Wiki — après Blog.
