@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import zipfile
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath\n\nfrom ilias2moodle.ilias.export_sets import find_export_sets
 from typing import Any
 from xml.etree import ElementTree as ET
 
@@ -214,36 +214,9 @@ class BlogParser:
 
 
 def find_blog_export_sets(archive: zipfile.ZipFile) -> list[dict[str, str]]:
-    """Return Blog export sets from a native ILIAS course ZIP."""
+    """Return blog export sets from a native ILIAS course ZIP."""
 
-    manifest_name = next(
-        (name for name in archive.namelist() if name.lstrip("/") == "manifest.xml"),
-        None,
-    )
-    if manifest_name is None:
-        raise ValueError("manifest.xml racine introuvable")
-
-    root = ET.fromstring(archive.read(manifest_name))
-    results: list[dict[str, str]] = []
-
-    for element in root:
-        if _local_name(element.tag) != "ExportSet":
-            continue
-        if element.attrib.get("Type") != "blog":
-            continue
-
-        path = element.attrib.get("Path", "").lstrip("/")
-        match = re.search(r"__blog_(\d+)$", path)
-        results.append(
-            {
-                "object_id": match.group(1) if match else "",
-                "path": path,
-                "type": "blog",
-            }
-        )
-
-    return results
-
+    return find_export_sets(archive, "blog")
 
 def parse_blogs(archive_path: str | PurePosixPath) -> list[dict[str, Any]]:
     """Parse every Blog contained in a native ILIAS course ZIP."""
