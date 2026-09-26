@@ -41,6 +41,7 @@ from ilias2moodle.report import write_reports
 from ilias2moodle.wiki_package import (
     enrich_document_wikis,
     extract_wiki_assets,
+    recover_missing_wiki_structures,
 )
 
 
@@ -116,6 +117,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Répertoire contenant les pièces jointes Forum récupérées "
             "depuis ILIAS, indexées par forum_<obj>/post_<id>."
+        ),
+    )
+    prepare_export.add_argument(
+        "--wiki-content-recovery",
+        type=Path,
+        default=None,
+        help=(
+            "Répertoire contenant les contenus Wiki courants récupérés "
+            "depuis ILIAS, indexés par wiki_<obj>."
         ),
     )
     return parser
@@ -222,6 +232,7 @@ def _prepare_export(
     mediacast_media_recovery: Path | None = None,
     mediaobject_recovery: Path | None = None,
     forum_attachment_recovery: Path | None = None,
+    wiki_content_recovery: Path | None = None,
 ) -> int:
     document = _parse_export_document(zip_path, ilias_version)
 
@@ -276,10 +287,38 @@ def _prepare_export(
             "Répertoire Forum recovery introuvable : "
             f"{forum_attachment_recovery}"
         )
+    if (
+        wiki_content_recovery is not None
+        and not wiki_content_recovery.is_dir()
+    ):
+        raise FileNotFoundError(
+            "Répertoire Wiki recovery introuvable : "
+            f"{wiki_content_recovery}"
+        )
+
+    wiki_recovery_result = {
+        "recovered": {
+            "wiki_structures_recovered": 0,
+            "wiki_pages_recovered": 0,
+        },
+        "missing": [],
+    }
+    if wiki_content_recovery is not None:
+        wiki_recovery_result = recover_missing_wiki_structures(
+            document,
+            zip_path,
+            wiki_content_recovery,
+            mediaobject_recovery=mediaobject_recovery,
+        )
 
     content_page_result = extract_content_page_assets(document, zip_path, output)
     glossary_result = extract_glossary_assets(document, zip_path, output)
-    wiki_result = extract_wiki_assets(document, zip_path, output)
+    wiki_result = extract_wiki_assets(
+        document,
+        zip_path,
+        output,
+        mediaobject_recovery=mediaobject_recovery,
+    )
     exercise_result = extract_exercise_assets(document, zip_path, output)
     forum_result = extract_forum_assets(
         document,
@@ -340,6 +379,14 @@ def _prepare_export(
         mediacast_recovery_result["missing"]
     )
 
+    package["extracted"]["wiki_structures_recovered"] = (
+        wiki_recovery_result["recovered"]["wiki_structures_recovered"]
+    )
+    package["extracted"]["wiki_pages_recovered"] = (
+        wiki_recovery_result["recovered"]["wiki_pages_recovered"]
+    )
+    package["missing"].extend(wiki_recovery_result["missing"])
+
     package["exercise_irss_recovery"] = {
         "enabled": exercise_irss_recovery is not None,
         "collections_recovered": (
@@ -363,6 +410,17 @@ def _prepare_export(
         ),
     }
 
+    package["wiki_content_recovery"] = {
+        "enabled": wiki_content_recovery is not None,
+        "wiki_structures_recovered": (
+            wiki_recovery_result["recovered"]["wiki_structures_recovered"]
+        ),
+        "wiki_pages_recovered": (
+            wiki_recovery_result["recovered"]["wiki_pages_recovered"]
+        ),
+        "missing_count": len(wiki_recovery_result["missing"]),
+    }
+
     package["missing_count"] = len(package["missing"])
     (output / "package.json").write_text(
         json.dumps(package, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -380,6 +438,9 @@ def _prepare_export(
         "exercise_irss_recovery": package["exercise_irss_recovery"],
         "mediacast_media_recovery": package[
             "mediacast_media_recovery"
+        ],
+        "wiki_content_recovery": package[
+            "wiki_content_recovery"
         ],
     }
     print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -408,6 +469,7 @@ def main(argv: list[str] | None = None) -> int:
             args.mediacast_media_recovery,
             args.mediaobject_recovery,
             args.forum_attachment_recovery,
+            args.wiki_content_recovery,
         )
 
     parser.error("Commande inconnue")
