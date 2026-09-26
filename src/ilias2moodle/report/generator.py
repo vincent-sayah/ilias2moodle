@@ -9,7 +9,7 @@ from typing import Any
 
 from ilias2moodle.model import MigrationDocument, MigrationItem
 
-SUPPORTED_PHASE1_TYPES = {
+SUPPORTED_REPORT_TYPES = {
     "folder",
     "file",
     "url",
@@ -23,6 +23,10 @@ SUPPORTED_PHASE1_TYPES = {
     "learning_module",
     "test",
     "question_pool",
+    "forum",
+    "mediacast",
+    "blog",
+    "media_pool",
 }
 
 
@@ -38,7 +42,7 @@ def build_report(document: MigrationDocument) -> dict[str, Any]:
     unsupported = [
         {"source_id": item.source_id, "type": item.type, "title": item.title}
         for item in all_items
-        if item.type not in SUPPORTED_PHASE1_TYPES
+        if item.type not in SUPPORTED_REPORT_TYPES
     ]
     return {
         "schema_version": document.schema_version,
