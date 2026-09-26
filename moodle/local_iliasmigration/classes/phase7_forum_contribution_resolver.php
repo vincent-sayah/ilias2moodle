@@ -115,6 +115,11 @@ final class phase7_forum_contribution_resolver {
         $structure = $this->read_structure($forumref);
 
         $sourceinstance = trim((string) ($plan['source']['instance'] ?? ''));
+        $sourceinstanceplaceholder = in_array(
+            strtolower($sourceinstance),
+            ['', 'unknown-ilias-instance', 'unknown', 'n/a'],
+            true
+        );
         $sourcecourse = trim((string) ($document['course']['source_id'] ?? ''));
 
         if ($sourcecourse === '') {
@@ -147,7 +152,7 @@ final class phase7_forum_contribution_resolver {
 
         foreach ($authorids as $sourceuserid) {
             $mappingresolution = $this->resolve_user_mapping(
-                $sourceinstance,
+                $sourceinstanceplaceholder ? '' : $sourceinstance,
                 $sourceuserid
             );
             $mapping = $mappingresolution['mapping'];
@@ -218,7 +223,10 @@ final class phase7_forum_contribution_resolver {
             static fn(string $value): bool => $value !== ''
         )));
 
-        $mappingsourceinstance = $sourceinstance;
+        $mappingsourceinstance = $sourceinstanceplaceholder
+            ? ''
+            : $sourceinstance;
+
         if ($mappingsourceinstance === '' && count($resolvedinstances) === 1) {
             $mappingsourceinstance = $resolvedinstances[0];
         }
@@ -486,6 +494,7 @@ final class phase7_forum_contribution_resolver {
             'source' => [
                 'lms' => 'ILIAS',
                 'package_instance' => $sourceinstance,
+                'package_instance_is_placeholder' => $sourceinstanceplaceholder,
                 'mapping_instance' => $mappingsourceinstance,
                 'course_object_id' => $sourcecourse,
                 'forum_ref_id' => $forumref,
