@@ -67,6 +67,34 @@ function phase73scorm_status_name(?int $status): ?string
     };
 }
 
+/**
+ * Read the persisted package attempt counter without triggering ILIAS writes.
+ *
+ * ILIAS 10 getAttemptsForUser() dereferences a null row when no sahs_user
+ * record exists. This guarded read preserves the same source of truth while
+ * safely returning zero for a user who never opened the package.
+ */
+function phase73scorm_lookup_attempts(int $objId, int $userId): int
+{
+    global $DIC;
+
+    $db = $DIC->database();
+
+    $set = $db->queryF(
+        'SELECT package_attempts FROM sahs_user WHERE obj_id = %s AND user_id = %s',
+        ['integer', 'integer'],
+        [$objId, $userId]
+    );
+
+    $row = $db->fetchAssoc($set);
+
+    if (!$row || $row['package_attempts'] === null) {
+        return 0;
+    }
+
+    return (int) $row['package_attempts'];
+}
+
 $options = getopt(
     '',
     [
@@ -274,7 +302,10 @@ try {
             $trackedInCourseCount++;
         }
 
-        $attempts = $module->getAttemptsForUser($userId);
+        $attempts = phase73scorm_lookup_attempts(
+            $objId,
+            $userId
+        );
         $attemptCount += $attempts;
 
         // Safe read: do not create or refresh a missing LP row.
@@ -334,6 +365,16 @@ try {
 
         if ($scoData) {
             $usersWithScoDataCount++;
+
+            if (!$tracked) {
+                $tracked = true;
+                $trackedInCourseCount++;
+            }
+        }
+
+        if ($attempts > 0 && !$tracked) {
+            $tracked = true;
+            $trackedInCourseCount++;
         }
 
         $scoRecordCount += count($scoData);
