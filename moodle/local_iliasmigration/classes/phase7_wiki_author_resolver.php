@@ -392,6 +392,8 @@ final class phase7_wiki_author_resolver {
                 'fallback_by_login_email_name' => false,
                 'persistent_global_user_mapping_required' => true,
                 'dry_run_writes' => false,
+                'apply_write_scope' =>
+                    'WIKI_PAGES_AND_CURRENT_WIKI_VERSION_METADATA_ONLY',
             ],
             'counts' => [
                 'pages' => count($pages),
@@ -409,7 +411,7 @@ final class phase7_wiki_author_resolver {
             'ready_for_apply' => $blocked === 0,
             'apply_required' => $blocked === 0
                 && $currentmetadatareconcile > 0,
-            'apply_implemented' => false,
+            'apply_implemented' => true,
             'apply_reason' => $blocked > 0
                 ? 'WIKI_AUTHOR_OR_PAGE_MAPPING_BLOCKED'
                 : ($currentmetadatareconcile > 0
