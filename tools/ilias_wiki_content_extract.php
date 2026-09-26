@@ -263,8 +263,7 @@ try {
         );
     }
 
-    $wiki = new ilObjWiki($wikiRef);
-    $startPageTitle = (string) $wiki->getStartPage();
+    $startPageTitle = (string) ilObjWiki::_lookupStartPage($wikiObjId);
 
     $dataService = new \ILIAS\Wiki\InternalDataService();
     $repoService = new \ILIAS\Wiki\InternalRepoService(
