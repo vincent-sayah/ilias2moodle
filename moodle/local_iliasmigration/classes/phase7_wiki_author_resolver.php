@@ -117,6 +117,7 @@ final class phase7_wiki_author_resolver {
         $currentmetadatakeep = 0;
         $currentmetadatareconcile = 0;
         $historyonly = 0;
+        $technicalhistoryissues = 0;
 
         foreach ($pagesource as $sourcepageid => $sourcepage) {
             if (!is_array($sourcepage)) {
@@ -203,6 +204,22 @@ final class phase7_wiki_author_resolver {
                 }
             }
 
+            $versionnumbers = array_values(array_map(
+                static fn(\stdClass $version): int =>
+                    (int) $version->version,
+                $versions
+            ));
+            sort($versionnumbers, SORT_NUMERIC);
+
+            $technicalhistorysafe = count($versionnumbers) === 2
+                && $versionnumbers === [0, 1]
+                && $currentversion
+                && (int) $currentversion->version === 1;
+
+            if (!$technicalhistorysafe) {
+                $technicalhistoryissues++;
+            }
+
             $expectededitor = (int) (
                 $editorresolution['target_user_id'] ?? 0
             );
@@ -229,7 +246,8 @@ final class phase7_wiki_author_resolver {
                 && !empty($editorresolution['ready'])
                 && $createdts !== null
                 && $modifiedts !== null
-                && $currentversion;
+                && $currentversion
+                && $technicalhistorysafe;
 
             $currentmetadatamatch = $ready
                 && $pageownermatch
@@ -301,6 +319,13 @@ final class phase7_wiki_author_resolver {
                         'timecreated' => (int) $currentversion->timecreated,
                     ]
                     : null,
+                'technical_history' => [
+                    'version_numbers' => $versionnumbers,
+                    'expected_version_numbers' => [0, 1],
+                    'current_version_must_be' => 1,
+                    'safe_for_metadata_reconciliation' =>
+                        $technicalhistorysafe,
+                ],
                 'checks' => [
                     'page_last_editor_matches' => $pageownermatch,
                     'current_version_author_matches' => $versionownermatch,
@@ -312,6 +337,9 @@ final class phase7_wiki_author_resolver {
                 'current_metadata_classification' => $ready
                     ? 'MIGRATE'
                     : 'UNSUPPORTED',
+                'creation_author_classification' => 'HISTORY_ONLY',
+                'creation_author_reason' =>
+                    'MOODLE_WIKI_PAGE_HAS_NO_SEPARATE_CREATOR_FIELD_AND_VERSION_ZERO_IS_TECHNICAL',
                 'history_classification' => 'HISTORY_ONLY',
                 'history_reason' =>
                     'FULL_ILIAS_WIKI_REVISION_HISTORY_NOT_EXTRACTED',
@@ -319,7 +347,9 @@ final class phase7_wiki_author_resolver {
             ];
         }
 
-        $blocked = $mappingissues + $authorissues;
+        $blocked = $mappingissues
+            + $authorissues
+            + $technicalhistoryissues;
 
         return [
             'phase' => '7.6',
@@ -357,6 +387,8 @@ final class phase7_wiki_author_resolver {
                 'full_revision_history' => 'HISTORY_ONLY',
                 'current_page_metadata' => 'MIGRATE_WHEN_SAFE',
                 'technical_moodle_version_zero_preserved' => true,
+                'apply_requires_exact_versions_zero_and_one' => true,
+                'creation_author_identity' => 'HISTORY_ONLY',
                 'fallback_by_login_email_name' => false,
                 'persistent_global_user_mapping_required' => true,
                 'dry_run_writes' => false,
@@ -369,6 +401,7 @@ final class phase7_wiki_author_resolver {
                 'current_metadata_reconcile' =>
                     $currentmetadatareconcile,
                 'history_only' => $historyonly,
+                'technical_history_issues' => $technicalhistoryissues,
                 'blocked_items' => $blocked,
             ],
             'authors' => $authors,
