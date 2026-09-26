@@ -6,7 +6,6 @@ from pathlib import PurePosixPath
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from ilias2moodle.ilias.export_sets import find_export_sets
 
 from ilias2moodle.ilias.content_page import (
     ContentPageParser,
@@ -15,6 +14,7 @@ from ilias2moodle.ilias.content_page import (
     _text_descendant,
 )
 
+from ilias2moodle.ilias.export_sets import find_export_sets
 
 def _records(root: ET.Element, entity: str) -> list[ET.Element]:
     wanted = entity.lower()
