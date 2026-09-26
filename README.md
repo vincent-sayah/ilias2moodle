@@ -273,8 +273,8 @@ moodle/local_iliasmigration
 Version courante :
 
 ```text
-0.20.0-rc1
-2026092604
+0.20.0-rc2
+2026092605
 ```
 
 La Phase 6.5 dispose d’implémentations fonctionnelles validées sur le POC réel pour Content Page, Glossaire, Wiki, Exercice, Forum, Mediacast, Blog et Media Pool. Les dépendances d’identité différées ont ensuite été traitées en Phase 7 : auteurs et contributions Forum, auteurs Blog, ainsi que l’auteur courant et les dates des pages Wiki. Les données ne disposant pas d’un équivalent sûr restent explicitement classées `HISTORY_ONLY`, `NO_DATA` ou `DEFERRED`.
@@ -354,7 +354,7 @@ Deux sujets restent volontairement hors du périmètre de la release candidate d
 - l'objet ILIAS Groupe complet (#22), classé DEFERRED / HISTORY_ONLY tant qu'un mapping conteneur + contenus + restrictions n'est pas validé ;
 - les tests avancés de progression multi-utilisateurs (#41), qui nécessitent un POC enrichi.
 
-La branche `final-poc-validation` est utilisée pour la validation end-to-end et la préparation de la release candidate.
+La release candidate courante est `0.20.0-rc2`. Elle corrige le défaut d'installation neuve MySQL/MariaDB découvert lors du test de `v0.20.0-rc1` sur une Moodle 5.0.2 vierge (#50). Le tag `v0.20.0-rc1` reste conservé pour la traçabilité.
 
 ## Licence
 
