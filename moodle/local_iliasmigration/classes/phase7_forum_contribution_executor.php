@@ -39,15 +39,18 @@ final class phase7_forum_contribution_executor {
         int $categoryid,
         string $forumref
     ): array {
-        global $CFG, $DB, $USER;
+        global $CFG, $DB, $USER, $COURSE, $PAGE;
 
         require_once($CFG->dirroot . '/mod/forum/lib.php');
         require_once($CFG->libdir . '/filelib.php');
 
         if (!class_exists('mod_forum_post_form')) {
             $postformcandidates = [
+                $CFG->dirroot . '/mod/forum/classes/post_form.php',
                 $CFG->dirroot . '/mod/forum/post_form.php',
+                $CFG->dirroot . '/public/mod/forum/classes/post_form.php',
                 $CFG->dirroot . '/public/mod/forum/post_form.php',
+                dirname($CFG->dirroot) . '/public/mod/forum/classes/post_form.php',
                 dirname($CFG->dirroot) . '/public/mod/forum/post_form.php',
             ];
 
@@ -132,7 +135,12 @@ final class phase7_forum_contribution_executor {
             MUST_EXIST
         );
 
+        $modulecontext = \context_module::instance($cmid);
         $originaluser = $USER;
+        $originalcourse = $COURSE;
+
+        $COURSE = $course;
+        $PAGE->set_context($modulecontext);
 
         $createddiscussions = 0;
         $keptdiscussions = 0;
@@ -534,6 +542,9 @@ final class phase7_forum_contribution_executor {
         } finally {
             if ($originaluser instanceof \stdClass) {
                 \core\session\manager::set_user($originaluser);
+            }
+            if ($originalcourse instanceof \stdClass) {
+                $COURSE = $originalcourse;
             }
         }
 
