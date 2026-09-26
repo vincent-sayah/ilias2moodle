@@ -20,7 +20,7 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Exercice | `exc` | `mod_assign` | 6.5 | validé — #17 |
 | Forum | `frm` | `mod_forum` | 6.5 + 7 | validé structure + contributions/auteurs/assets — #18, #42 |
 | Mediacast | `mcst` | `mod_data` | 6.5 | validé — #19 ; MP4 local + URL externe |
-| Blog | `blog` | `mod_data` | 6.5 | validé — #20 ; billets + images, auteurs Moodle Phase 7 |
+| Blog | `blog` | `mod_data` | 6.5 + 7 | validé — #20, #44 ; billets + images + auteurs |
 | Media Pool / galerie média | `mep` | `mod_data` | 6.5 | validé — #21 ; images + MP4 + COPage + dossiers |
 | Groupe | `grp` | Non migré automatiquement pour l’instant ; nécessite conteneur + membres + restrictions + contenus | 7 | différé — #22 |
 | Learning Progress | — | Completion / historique | 7 | POC validé : 0 donnée migrable, 2 `HISTORY_ONLY`, 21 `NO_DATA` — #37 |
@@ -150,3 +150,20 @@ Résultat :
 Une anomalie réelle a été détectée et corrigée pendant le POC : un fichier volumineux (`handout.pdf`, 896549 octets) n'avait pas été transféré par le chemin de brouillon Forum alors que le post portait `attachment=1`. La politique finale importe donc les pièces jointes historiques via la File API Moodle directement dans `mod_forum/attachment`, puis vérifie taille et SHA-1. Les discussions et posts restent créés via les API Forum.
 
 Le package natif peut contenir `source.instance=unknown-ilias-instance`. Cette valeur est traitée comme un placeholder ; l'instance canonique des mappings Phase 7 est alors résolue uniquement à partir d'un mapping utilisateur GLOBAL unique, sans fallback par login, email ou nom.
+
+
+## Phase 7.5 — Blog : rattachement des auteurs
+
+Le POC réel `Blog ILIAS obj_id=732/ref_id=247 -> Moodle mod_data CMID=61 / instance=3` ne nécessite aucune écriture supplémentaire.
+
+Les deux billets conservent `source_author=il_0_usr_6`. Le format strict est résolu vers l'utilisateur ILIAS `6`, puis vers l'unique mapping GLOBAL persistant `ILIAS 6 -> Moodle 2/admin`.
+
+Les records existants sont déjà :
+- posting 12 -> record 3 -> `userid=2` ;
+- posting 13 -> record 4 -> `userid=2`.
+
+Le propriétaire Moodle correspond donc exactement à l'auteur source résolu pour les deux billets. Le dry-run retourne `owner_matches=2`, `owner_changes_required=0`, `apply_required=false` et `writes_performed=false`.
+
+Les deux images historiques restent présentes dans `mod_data/content` : `tous.png` et `trio.png`.
+
+Aucun rapprochement par login, email ou nom n'est autorisé. Une future réattribution n'est permise que si le record source expose un identifiant auteur au format strict `il_0_usr_<id>` et si cet id possède un mapping GLOBAL Moodle unique.
