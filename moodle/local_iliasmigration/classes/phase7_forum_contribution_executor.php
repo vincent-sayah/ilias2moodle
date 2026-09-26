@@ -225,6 +225,27 @@ final class phase7_forum_contribution_executor {
                             );
                         }
 
+                        $rootcreated = $this->source_time(
+                            (string) ($root['create_date'] ?? ''),
+                            time()
+                        );
+                        $rootmodified = $this->source_time(
+                            (string) ($root['update_date'] ?? ''),
+                            $rootcreated
+                        );
+                        $repairedattachments = $this->sync_post_attachments(
+                            $rootpostid,
+                            (array) ($root['assets'] ?? []),
+                            $modulecontext,
+                            (int) $root['target_author_user_id'],
+                            $rootcreated,
+                            $rootmodified
+                        );
+                        if ($repairedattachments > 0) {
+                            $createdattachments += $repairedattachments;
+                            $writes = true;
+                        }
+
                         $keptdiscussions++;
                         $keptposts++;
                     } else if (($threadplan['action'] ?? '') === 'CREATE') {
@@ -243,12 +264,6 @@ final class phase7_forum_contribution_executor {
                             $created
                         );
 
-                        [$attachmentdraft, $attachmentcount] =
-                            $this->create_attachment_draft(
-                                (array) ($root['assets'] ?? []),
-                                $authorid
-                            );
-
                         $discussiondata = (object) [
                             'course' => $courseid,
                             'forum' => $forumid,
@@ -266,15 +281,9 @@ final class phase7_forum_contribution_executor {
                             'timenow' => $created,
                         ];
 
-                        if ($attachmentdraft > 0) {
-                            $discussiondata->attachments = $attachmentdraft;
-                        }
-
                         $discussionid = (int) forum_add_discussion(
                             $discussiondata,
-                            $attachmentdraft > 0
-                                ? $attachmentdraft
-                                : null,
+                            null,
                             null,
                             $authorid
                         );
@@ -302,6 +311,14 @@ final class phase7_forum_contribution_executor {
                             $modified
                         );
 
+                        $attachmentcount = $this->sync_post_attachments(
+                            $rootpostid,
+                            (array) ($root['assets'] ?? []),
+                            $modulecontext,
+                            $authorid,
+                            $created,
+                            $modified
+                        );
                         $createdattachments += $attachmentcount;
                         $createddiscussions++;
                         $createdposts++;
@@ -428,6 +445,27 @@ final class phase7_forum_contribution_executor {
                                 );
                             }
 
+                            $postcreated = $this->source_time(
+                                (string) ($postplan['create_date'] ?? ''),
+                                time()
+                            );
+                            $postmodified = $this->source_time(
+                                (string) ($postplan['update_date'] ?? ''),
+                                $postcreated
+                            );
+                            $repairedattachments = $this->sync_post_attachments(
+                                $targetpostid,
+                                (array) ($postplan['assets'] ?? []),
+                                $modulecontext,
+                                (int) $postplan['target_author_user_id'],
+                                $postcreated,
+                                $postmodified
+                            );
+                            if ($repairedattachments > 0) {
+                                $createdattachments += $repairedattachments;
+                                $writes = true;
+                            }
+
                             $posttargets[$sourcepostid] = $targetpostid;
                             $keptposts++;
                             continue;
@@ -448,12 +486,6 @@ final class phase7_forum_contribution_executor {
 
                         $messageitemid = file_get_unused_draft_itemid();
 
-                        [$attachmentdraft, $attachmentcount] =
-                            $this->create_attachment_draft(
-                                (array) ($postplan['assets'] ?? []),
-                                $authorid
-                            );
-
                         $postdata = (object) [
                             'discussion' => $discussionid,
                             'parent' => (int) $posttargets[$parentsourceid],
@@ -464,16 +496,14 @@ final class phase7_forum_contribution_executor {
                             'messageformat' => FORMAT_HTML,
                             'messagetrust' => 0,
                             'itemid' => $messageitemid,
-                            'attachments' => $attachmentdraft,
+                            'attachments' => 0,
                             'mailnow' => 0,
                             'isprivatereply' => 0,
                         ];
 
                         $targetpostid = (int) forum_add_new_post(
                             $postdata,
-                            $attachmentdraft > 0
-                                ? $attachmentdraft
-                                : null
+                            null
                         );
 
                         if ($targetpostid <= 0) {
@@ -493,6 +523,15 @@ final class phase7_forum_contribution_executor {
 
                         $this->normalise_post_metadata(
                             $targetpostid,
+                            $created,
+                            $modified
+                        );
+
+                        $attachmentcount = $this->sync_post_attachments(
+                            $targetpostid,
+                            (array) ($postplan['assets'] ?? []),
+                            $modulecontext,
+                            $authorid,
                             $created,
                             $modified
                         );
@@ -594,10 +633,16 @@ final class phase7_forum_contribution_executor {
         );
     }
 
-    private function create_attachment_draft(
+    private function sync_post_attachments(
+        int $postid,
         array $assets,
-        int $userid
-    ): array {
+        \context_module $context,
+        int $userid,
+        int $created,
+        int $modified
+    ): int {
+        global $DB;
+
         $attachments = array_values(array_filter(
             $assets,
             static fn(array $asset): bool =>
@@ -617,14 +662,12 @@ final class phase7_forum_contribution_executor {
         }
 
         if (!$attachments) {
-            return [0, 0];
+            return 0;
         }
 
-        $draftid = file_get_unused_draft_itemid();
-        $context = \context_user::instance($userid);
         $fs = get_file_storage();
         $seen = [];
-        $count = 0;
+        $createdcount = 0;
 
         foreach ($attachments as $asset) {
             $path = $this->resolve_relative_file(
@@ -648,23 +691,68 @@ final class phase7_forum_contribution_executor {
             }
             $seen[$filename] = true;
 
-            $fs->create_file_from_pathname(
+            $sourcehash = sha1_file($path);
+            if ($sourcehash === false) {
+                throw new \coding_exception(
+                    'Unable to hash Forum source attachment: ' . $filename
+                );
+            }
+
+            $existing = $fs->get_file(
+                $context->id,
+                'mod_forum',
+                'attachment',
+                $postid,
+                '/',
+                $filename
+            );
+
+            if ($existing) {
+                if ((int) $existing->get_filesize() !== (int) filesize($path)
+                        || $existing->get_contenthash() !== $sourcehash) {
+                    throw new \coding_exception(
+                        'Existing Forum attachment differs from source: '
+                        . $filename
+                    );
+                }
+                continue;
+            }
+
+            $stored = $fs->create_file_from_pathname(
                 [
                     'contextid' => (int) $context->id,
-                    'component' => 'user',
-                    'filearea' => 'draft',
-                    'itemid' => $draftid,
+                    'component' => 'mod_forum',
+                    'filearea' => 'attachment',
+                    'itemid' => $postid,
                     'filepath' => '/',
                     'filename' => $filename,
-                    'timecreated' => time(),
-                    'timemodified' => time(),
+                    'userid' => $userid,
+                    'timecreated' => $created,
+                    'timemodified' => $modified,
                 ],
                 $path
             );
-            $count++;
+
+            if (!$stored
+                    || (int) $stored->get_filesize() !== (int) filesize($path)
+                    || $stored->get_contenthash() !== $sourcehash) {
+                throw new \coding_exception(
+                    'Forum attachment verification failed after File API import: '
+                    . $filename
+                );
+            }
+
+            $createdcount++;
         }
 
-        return [$draftid, $count];
+        $DB->set_field(
+            'forum_posts',
+            'attachment',
+            '1',
+            ['id' => $postid]
+        );
+
+        return $createdcount;
     }
 
     private function normalise_post_metadata(
