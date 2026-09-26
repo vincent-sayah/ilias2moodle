@@ -320,6 +320,42 @@ php local/iliasmigration/cli/phase7_progress_dry_run.php \
 
 Le résultat POC retourne `ready_for_apply=false`, `apply_implemented=false` et `writes_performed=false`. Cette absence d'apply est volontaire : aucune donnée n'est classée `MIGRATE`.
 
+
+## Phase 7.4 — Forum : auteurs et contributions
+
+La Phase 7.4 complète le conteneur Forum créé en Phase 6.5.5 avec ses contributions historiques après résolution fiable des auteurs.
+
+POC validé :
+- Forum ILIAS `obj_id=807/ref_id=275` -> Moodle `CMID=59 / instance=6` ;
+- auteurs : `6 -> 2/admin`, `401 -> 5/stagiaire.1`, `402 -> 6/stagiaire.2` ;
+- 2 discussions ;
+- 7 posts ;
+- 3 pièces jointes ;
+- 9 mappings persistants (`forumdiscussion` / `forumpost`) ;
+- arbre parent/enfant préservé ;
+- aucun envoi différé de messages historiques ;
+- apply final idempotent avec `writes_performed=false`.
+
+Le dry-run est disponible avec :
+
+```bash
+php local/iliasmigration/cli/phase7_forum_dry_run.php \
+  --source=/tmp/forum807_prepare/migration.json \
+  --category=9 \
+  --forum-ref=275
+```
+
+L'apply :
+
+```bash
+php local/iliasmigration/cli/phase7_forum_apply.php \
+  --source=/tmp/forum807_prepare/migration.json \
+  --category=9 \
+  --forum-ref=275
+```
+
+Les discussions et posts passent par les API Forum. Les pièces jointes historiques sont synchronisées via la File API dans `mod_forum/attachment`, avec vérification taille + hash et réparation ciblée d'un fichier manquant. Un second passage inchangé ne crée ni discussion, ni post, ni fichier, ni mapping.
+
 ## Principes d'écriture
 
 Les écritures de contenu passent par les API Moodle du module cible, les outils core du module et la File API. Le plugin n'écrit pas directement les contenus pédagogiques dans les tables cœur Moodle en contournant les API/outils du module.
