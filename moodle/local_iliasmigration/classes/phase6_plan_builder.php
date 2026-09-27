@@ -124,6 +124,15 @@ final class phase6_plan_builder {
                 $operation['content_policy'] = $operation['exported_question_file_count'] > 0
                     ? 'EXPORTED_CONTENT_AVAILABLE'
                     : 'CONTAINER_ONLY';
+                $operation['migration_questions_path'] = (string) (
+                    $metadata['migration_questions_path'] ?? ''
+                );
+                $operation['normalized_question_count'] = (int) (
+                    $metadata['normalized_question_count'] ?? 0
+                );
+                $operation['normalized_unsupported_count'] = (int) (
+                    $metadata['normalized_unsupported_count'] ?? 0
+                );
                 if (!empty($mapping['legacy_mapping'])) {
                     $operation['legacy_sourceinstance_mapping'] = true;
                 }
@@ -163,7 +172,20 @@ final class phase6_plan_builder {
                 $operation['normalized_total_max_score'] = (float) (
                     $metadata['normalized_total_max_score'] ?? 0.0
                 );
-                $operation['question_storage_policy'] = 'QUIZ_PRIVATE_QUESTION_BANK';
+                $sharedpoolref = trim((string) (
+                    $metadata['shared_question_pool_ref_id'] ?? ''
+                ));
+                $sharedpoolpath = trim((string) (
+                    $metadata['shared_question_pool_questions_path'] ?? ''
+                ));
+
+                if ($sharedpoolref !== '' && $sharedpoolpath !== '') {
+                    $operation['question_storage_policy'] = 'SHARED_QUESTION_BANK';
+                    $operation['shared_question_pool_ref_id'] = $sharedpoolref;
+                    $operation['shared_question_pool_questions_path'] = $sharedpoolpath;
+                } else {
+                    $operation['question_storage_policy'] = 'QUIZ_PRIVATE_QUESTION_BANK';
+                }
                 $operation['qtype_map'] = self::QTYPE_MAP;
                 if (!empty($mapping['legacy_mapping'])) {
                     $operation['legacy_sourceinstance_mapping'] = true;

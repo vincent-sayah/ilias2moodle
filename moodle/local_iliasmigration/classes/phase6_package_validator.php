@@ -334,7 +334,10 @@ final class phase6_package_validator {
 
         $operation['quiz_preview'] = [
             'title' => (string) ($quiz['title'] ?? $operation['title'] ?? ''),
-            'question_storage_policy' => 'QUIZ_PRIVATE_QUESTION_BANK',
+            'question_storage_policy' => (string) (
+                $operation['question_storage_policy']
+                    ?? 'QUIZ_PRIVATE_QUESTION_BANK'
+            ),
             'question_count' => $questioncount,
             'total_max_score' => $totalscore,
             'questions' => $preview,

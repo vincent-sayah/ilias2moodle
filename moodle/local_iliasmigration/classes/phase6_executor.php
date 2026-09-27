@@ -160,11 +160,6 @@ final class phase6_executor {
         int $sectionnumber
     ): array {
         $requested = (string) $operation['action'];
-        if ((int) ($operation['exported_question_file_count'] ?? 0) !== 0) {
-            throw new \coding_exception(
-                'Phase 6 apply currently expects the validated POC question pool to be container-only.'
-            );
-        }
 
         $description = (string) ($operation['description'] ?? '');
         $moduledata = (object) [
@@ -201,6 +196,118 @@ final class phase6_executor {
             throw new \coding_exception('Unable to create/resolve the Moodle Question Bank default category.');
         }
 
+        $questioncount = 0;
+        $contentimported = false;
+        $effectiveqtypes = [];
+
+        $questionspath = trim(
+            (string) ($operation['migration_questions_path'] ?? '')
+        );
+
+        if (
+            (int) ($operation['exported_question_file_count'] ?? 0) > 0
+            && $questionspath === ''
+        ) {
+            throw new \coding_exception(
+                'ILIAS Question Pool content was exported but no normalized '
+                . 'questions.json is available.'
+            );
+        }
+
+        if ($questionspath !== '') {
+            $questions = $this->read_json_relative(
+                $questionspath
+            );
+
+            $built = (new phase6_moodle_xml_builder())->build(
+                $questions,
+                (string) $operation['source_ref_id']
+            );
+
+            $descriptors = is_array($built['questions'] ?? null)
+                ? $built['questions']
+                : [];
+
+            $declaredcount = (int) (
+                $operation['normalized_question_count'] ?? 0
+            );
+
+            if (
+                !$descriptors
+                || (
+                    $declaredcount > 0
+                    && count($descriptors) !== $declaredcount
+                )
+            ) {
+                throw new \coding_exception(
+                    'Normalized ILIAS Question Pool question count is invalid.'
+                );
+            }
+
+            if ($requested === 'CREATE') {
+                $questionids = $this->import_moodle_xml(
+                    (string) $built['xml'],
+                    $category,
+                    $context,
+                    $course,
+                    count($descriptors)
+                );
+
+                foreach ($descriptors as $index => $descriptor) {
+                    $qid = (int) $questionids[$index];
+
+                    $this->verify_question_identity(
+                        $qid,
+                        $descriptor
+                    );
+
+                    $this->save_mapping(
+                        $sourcecourseid,
+                        (string) $descriptor['mapping_ref'],
+                        (string) ($operation['source_obj_id'] ?? ''),
+                        'question',
+                        $qid,
+                        $sourceversion
+                    );
+                }
+
+                $contentimported = true;
+            } else {
+                foreach ($descriptors as $descriptor) {
+                    $mapping = $this->find_mapping(
+                        $sourcecourseid,
+                        (string) $descriptor['mapping_ref'],
+                        'question'
+                    );
+
+                    if (
+                        !$mapping
+                        || (int) $mapping->targetid <= 0
+                    ) {
+                        throw new \coding_exception(
+                            'Mapped ILIAS Question Pool is missing a '
+                            . 'persistent question mapping; safe UPDATE '
+                            . 'is refused.'
+                        );
+                    }
+
+                    $this->verify_question_identity(
+                        (int) $mapping->targetid,
+                        $descriptor
+                    );
+                }
+            }
+
+            foreach ($descriptors as $descriptor) {
+                $qtype = (string) $descriptor['effective_qtype'];
+
+                $effectiveqtypes[$qtype] =
+                    ($effectiveqtypes[$qtype] ?? 0) + 1;
+            }
+
+            $questioncount = count($descriptors);
+        }
+
         $this->save_mapping(
             $sourcecourseid,
             (string) $operation['source_ref_id'],
@@ -217,7 +324,9 @@ final class phase6_executor {
         $result['instance_id'] = $instanceid;
         $result['moodle_section'] = $sectionnumber;
         $result['question_category_id'] = (int) $category->id;
-        $result['question_count'] = 0;
+        $result['question_content_imported'] = $contentimported;
+        $result['question_count'] = $questioncount;
+        $result['effective_qtypes'] = $effectiveqtypes;
         return $result;
     }
 
@@ -241,6 +350,27 @@ final class phase6_executor {
             throw new \coding_exception('Phase 6 Moodle XML question count differs from quiz order count.');
         }
 
+        $sharedpoolref = trim(
+            (string) ($operation['shared_question_pool_ref_id'] ?? '')
+        );
+
+        $sharedpoolcategory = null;
+
+        if ($sharedpoolref !== '') {
+            $descriptors =
+                $this->resolve_shared_question_descriptors(
+                    $operation,
+                    $descriptors
+                );
+
+            $sharedpoolcategory =
+                $this->resolve_shared_question_category(
+                    $course,
+                    $sourcecourseid,
+                    $sharedpoolref
+                );
+        }
+
         $requested = (string) $operation['action'];
         $totalmax = (float) ($quizdocument['total_max_score'] ?? 0.0);
         $description = (string) ($operation['description'] ?? '');
@@ -257,35 +387,111 @@ final class phase6_executor {
             $cmid = (int) $created->coursemodule;
             $instanceid = (int) $created->instance;
             $context = \context_module::instance($cmid);
-            $category = question_get_default_category($context->id, true);
-            if (!$category) {
-                throw new \coding_exception('Unable to resolve the Quiz private question category.');
-            }
-
-            $questionids = $this->import_moodle_xml(
-                (string) $built['xml'],
-                $category,
-                $context,
-                $course,
-                count($descriptors)
-            );
-
             $questionbyident = [];
-            foreach ($descriptors as $index => $descriptor) {
-                $qid = (int) $questionids[$index];
-                $this->verify_question_identity($qid, $descriptor);
-                $questionbyident[(string) $descriptor['source_ident']] = [
-                    'id' => $qid,
-                    'descriptor' => $descriptor,
-                ];
-                $this->save_mapping(
-                    $sourcecourseid,
-                    (string) $descriptor['mapping_ref'],
-                    (string) $operation['source_obj_id'],
-                    'question',
-                    $qid,
-                    $sourceversion
+
+            if ($sharedpoolref !== '') {
+                $category = $sharedpoolcategory;
+
+                foreach ($descriptors as $descriptor) {
+                    $stable = trim(
+                        (string) ($descriptor['external_id'] ?? '')
+                    );
+
+                    if ($stable === '') {
+                        $stable = trim(
+                            (string) ($descriptor['source_ident'] ?? '')
+                        );
+                    }
+
+                    $poolmapping = $this->find_mapping(
+                        $sourcecourseid,
+                        $sharedpoolref . ':' . $stable,
+                        'question'
+                    );
+
+                    if (
+                        !$poolmapping
+                        || (int) $poolmapping->targetid <= 0
+                    ) {
+                        throw new \coding_exception(
+                            'Linked Question Pool question mapping '
+                            . 'is missing: ' . $stable
+                        );
+                    }
+
+                    $qid = (int) $poolmapping->targetid;
+
+                    $this->verify_question_identity(
+                        $qid,
+                        $descriptor
+                    );
+
+                    $questionbyident[
+                        (string) $descriptor['source_ident']
+                    ] = [
+                        'id' => $qid,
+                        'descriptor' => $descriptor,
+                    ];
+
+                    // Test and pool references intentionally map to the
+                    // same Moodle question.
+                    $this->save_mapping(
+                        $sourcecourseid,
+                        (string) $descriptor['mapping_ref'],
+                        (string) $operation['source_obj_id'],
+                        'question',
+                        $qid,
+                        $sourceversion
+                    );
+                }
+
+                $contentimported = false;
+            } else {
+                $category = question_get_default_category(
+                    $context->id,
+                    true
                 );
+
+                if (!$category) {
+                    throw new \coding_exception(
+                        'Unable to resolve the Quiz private question category.'
+                    );
+                }
+
+                $questionids = $this->import_moodle_xml(
+                    (string) $built['xml'],
+                    $category,
+                    $context,
+                    $course,
+                    count($descriptors)
+                );
+
+                foreach ($descriptors as $index => $descriptor) {
+                    $qid = (int) $questionids[$index];
+
+                    $this->verify_question_identity(
+                        $qid,
+                        $descriptor
+                    );
+
+                    $questionbyident[
+                        (string) $descriptor['source_ident']
+                    ] = [
+                        'id' => $qid,
+                        'descriptor' => $descriptor,
+                    ];
+
+                    $this->save_mapping(
+                        $sourcecourseid,
+                        (string) $descriptor['mapping_ref'],
+                        (string) $operation['source_obj_id'],
+                        'question',
+                        $qid,
+                        $sourceversion
+                    );
+                }
+
+                $contentimported = true;
             }
 
             $quiz = $DB->get_record('quiz', ['id' => $instanceid, 'course' => $course->id], '*', MUST_EXIST);
@@ -317,16 +523,27 @@ final class phase6_executor {
                 ->recompute_quiz_sumgrades();
 
             $performed = 'CREATED';
-            $contentimported = true;
         } else {
             $cmid = (int) $operation['target_id'];
             $cm = get_coursemodule_from_id('quiz', $cmid, $course->id, false, MUST_EXIST);
             $this->assert_module_section($cm, $course, $sectionnumber, 'Quiz');
             $instanceid = (int) $cm->instance;
             $context = \context_module::instance($cmid);
-            $category = question_get_default_category($context->id, false);
-            if (!$category) {
-                throw new \coding_exception('Mapped Moodle Quiz no longer has a private question category.');
+
+            if ($sharedpoolref !== '') {
+                $category = $sharedpoolcategory;
+            } else {
+                $category = question_get_default_category(
+                    $context->id,
+                    false
+                );
+
+                if (!$category) {
+                    throw new \coding_exception(
+                        'Mapped Moodle Quiz no longer has a '
+                        . 'private question category.'
+                    );
+                }
             }
 
             $quiz = $DB->get_record('quiz', ['id' => $instanceid, 'course' => $course->id], '*', MUST_EXIST);
@@ -353,6 +570,27 @@ final class phase6_executor {
                 // Moodle Quiz form uses quizpassword; quiz_process_options() maps it back to password.
                 // Preserve the existing value so a metadata-only update never writes password=NULL.
                 $moduleinfo->quizpassword = (string) $quiz->password;
+                // Normalize localized gradepass values before
+                // Moodle persists the grade item. With a decimal-comma
+                // locale, get_moduleinfo_data() may expose "0,00",
+                // which strict MariaDB rejects for a numeric column.
+                foreach (get_object_vars($moduleinfo) as $field => $value) {
+                    if (!preg_match('/^gradepass(?:\_\d+)?$/', $field)) {
+                        continue;
+                    }
+
+                    if ($value === null || $value === '') {
+                        unset($moduleinfo->{$field});
+                        continue;
+                    }
+
+                    if (is_string($value)) {
+                        $moduleinfo->{$field} = is_numeric($value)
+                            ? (float) $value
+                            : unformat_float($value);
+                    }
+                }
+
                 update_module($moduleinfo);
             }
             $performed = 'UPDATED';
@@ -383,6 +621,10 @@ final class phase6_executor {
         $result['moodle_section'] = $sectionnumber;
         $result['question_category_id'] = (int) $category->id;
         $result['question_content_imported'] = $contentimported;
+        $result['question_content_reused_from_qbank'] =
+            $sharedpoolref !== '';
+        $result['shared_question_pool_ref_id'] =
+            $sharedpoolref !== '' ? $sharedpoolref : null;
         $result['question_count'] = $verification['question_count'];
         $result['slot_count'] = $verification['slot_count'];
         $result['sumgrades'] = $verification['sumgrades'];
@@ -390,6 +632,183 @@ final class phase6_executor {
         $result['effective_qtypes'] = $verification['effective_qtypes'];
         $result['transforms'] = $verification['transforms'];
         return $result;
+    }
+
+    /**
+     * Replace test descriptors with the matching Question Pool Moodle identity.
+     *
+     * Test source_ident/mapping_ref are preserved for quiz ordering and
+     * traceability, while idnumber/fingerprint remain those of the pool
+     * question that was actually imported in Moodle.
+     */
+    private function resolve_shared_question_descriptors(
+        array $operation,
+        array $testdescriptors
+    ): array {
+        $poolref = trim(
+            (string) ($operation['shared_question_pool_ref_id'] ?? '')
+        );
+
+        $poolpath = trim(
+            (string) (
+                $operation['shared_question_pool_questions_path'] ?? ''
+            )
+        );
+
+        if ($poolref === '' || $poolpath === '') {
+            throw new \coding_exception(
+                'Shared Question Pool relation is incomplete.'
+            );
+        }
+
+        $poolquestions = $this->read_json_relative($poolpath);
+
+        $poolbuilt = (new phase6_moodle_xml_builder())->build(
+            $poolquestions,
+            $poolref
+        );
+
+        $poolbyexternal = [];
+
+        foreach ($poolbuilt['questions'] as $descriptor) {
+            $stable = trim(
+                (string) ($descriptor['external_id'] ?? '')
+            );
+
+            if ($stable === '') {
+                $stable = trim(
+                    (string) ($descriptor['source_ident'] ?? '')
+                );
+            }
+
+            if (
+                $stable === ''
+                || isset($poolbyexternal[$stable])
+            ) {
+                throw new \coding_exception(
+                    'Shared Question Pool has an invalid or duplicate '
+                    . 'stable question identity.'
+                );
+            }
+
+            $poolbyexternal[$stable] = $descriptor;
+        }
+
+        if (count($poolbyexternal) !== count($testdescriptors)) {
+            throw new \coding_exception(
+                'Shared Question Pool and Quiz question counts differ.'
+            );
+        }
+
+        $resolved = [];
+
+        foreach ($testdescriptors as $testdescriptor) {
+            $stable = trim(
+                (string) ($testdescriptor['external_id'] ?? '')
+            );
+
+            if ($stable === '') {
+                $stable = trim(
+                    (string) ($testdescriptor['source_ident'] ?? '')
+                );
+            }
+
+            $pooldescriptor =
+                $poolbyexternal[$stable] ?? null;
+
+            if (!is_array($pooldescriptor)) {
+                throw new \coding_exception(
+                    'Quiz question is absent from the linked '
+                    . 'Question Pool: ' . $stable
+                );
+            }
+
+            if (
+                (string) $pooldescriptor['title']
+                    !== (string) $testdescriptor['title']
+                ||
+                (string) $pooldescriptor['neutral_type']
+                    !== (string) $testdescriptor['neutral_type']
+                ||
+                (string) $pooldescriptor['effective_qtype']
+                    !== (string) $testdescriptor['effective_qtype']
+                ||
+                (string) $pooldescriptor['transform']
+                    !== (string) $testdescriptor['transform']
+                ||
+                abs(
+                    (float) $pooldescriptor['max_score']
+                    - (float) $testdescriptor['max_score']
+                ) > 0.000001
+            ) {
+                throw new \coding_exception(
+                    'Quiz/Question Pool normalized semantics differ for: '
+                    . $stable
+                );
+            }
+
+            $descriptor = $pooldescriptor;
+
+            // Preserve test-side identity for order and persistent mapping.
+            $descriptor['source_ident'] =
+                (string) $testdescriptor['source_ident'];
+            $descriptor['external_id'] =
+                (string) $testdescriptor['external_id'];
+            $descriptor['mapping_ref'] =
+                (string) $testdescriptor['mapping_ref'];
+
+            $resolved[] = $descriptor;
+        }
+
+        return $resolved;
+    }
+
+    /** Resolve the Moodle category owned by a mapped shared qbank. */
+    private function resolve_shared_question_category(
+        \stdClass $course,
+        string $sourcecourseid,
+        string $poolref
+    ): \stdClass {
+        $mapping = $this->find_mapping(
+            $sourcecourseid,
+            $poolref,
+            'qbank'
+        );
+
+        if (
+            !$mapping
+            || (int) $mapping->targetid <= 0
+        ) {
+            throw new \coding_exception(
+                'Linked ILIAS Question Pool has no Moodle qbank mapping.'
+            );
+        }
+
+        $cm = get_coursemodule_from_id(
+            'qbank',
+            (int) $mapping->targetid,
+            (int) $course->id,
+            false,
+            MUST_EXIST
+        );
+
+        $context = \context_module::instance(
+            (int) $cm->id
+        );
+
+        $category = question_get_default_category(
+            $context->id,
+            false
+        );
+
+        if (!$category) {
+            throw new \coding_exception(
+                'Linked Moodle Question Bank has no default '
+                . 'question category.'
+            );
+        }
+
+        return $category;
     }
 
     /** Complete Quiz form-compatible defaults for Moodle 5.0 create_module(). */

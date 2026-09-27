@@ -7,7 +7,10 @@ from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from ilias2moodle.ilias.qti import write_test_normalization
+from ilias2moodle.ilias.qti import (
+    parse_test_qti,
+    write_test_normalization,
+)
 from ilias2moodle.model import CourseExport, MigrationDocument, MigrationItem
 from ilias2moodle.report import write_reports
 
@@ -54,6 +57,8 @@ class MigrationPackageBuilder:
             "test_normalizations": 0,
             "normalized_questions": 0,
             "question_pool_files": 0,
+            "question_pool_normalizations": 0,
+            "normalized_pool_questions": 0,
         }
 
     def build(self, document: MigrationDocument) -> dict[str, Any]:
@@ -68,6 +73,10 @@ class MigrationPackageBuilder:
             self._extract_course_media(archive, document.course)
             for item in _walk(document.course.items):
                 self._extract_item(archive, item)
+
+        self._link_tests_to_question_pools(
+            document.course.items
+        )
 
         package = {
             "schema_version": document.schema_version,
@@ -333,17 +342,543 @@ class MigrationPackageBuilder:
         self.extracted["test_normalizations"] += 1
         self.extracted["normalized_questions"] += int(normalization["question_count"])
 
-    def _extract_question_pool(self, archive: zipfile.ZipFile, item: MigrationItem) -> None:
+    def _extract_question_pool(
+        self,
+        archive: zipfile.ZipFile,
+        item: MigrationItem,
+    ) -> None:
         migration_paths: list[str] = []
-        question_exports = item.metadata.get("question_export_files", [])
-        for index, source_path in enumerate(question_exports, start=1):
+        qti_destination: PurePosixPath | None = None
+
+        question_exports = item.metadata.get(
+            "question_export_files",
+            [],
+        )
+
+        for index, source_path in enumerate(
+            question_exports,
+            start=1,
+        ):
             source_path = str(source_path)
-            filename = Path(source_path).name or f"questions-{index}.xml"
-            destination = PurePosixPath("question_pools", item.source_id, filename)
-            if self._copy_member(archive, source_path, destination):
-                migration_paths.append(destination.as_posix())
-                self.extracted["question_pool_files"] += 1
+            filename = (
+                Path(source_path).name
+                or f"questions-{index}.xml"
+            )
+
+            destination = PurePosixPath(
+                "question_pools",
+                item.source_id,
+                filename,
+            )
+
+            if self._copy_member(
+                archive,
+                source_path,
+                destination,
+            ):
+                migration_paths.append(
+                    destination.as_posix()
+                )
+                self.extracted[
+                    "question_pool_files"
+                ] += 1
+
+                if "qti" in filename.lower():
+                    qti_destination = destination
             else:
-                self._record_missing(item.source_id, "question_pool", source_path)
+                self._record_missing(
+                    item.source_id,
+                    "question_pool",
+                    source_path,
+                )
+
         if migration_paths:
-            item.metadata["migration_question_export_files"] = migration_paths
+            item.metadata[
+                "migration_question_export_files"
+            ] = migration_paths
+
+        if qti_destination is None:
+            return
+
+        qti_path = self.output_dir.joinpath(
+            *qti_destination.parts
+        )
+
+        questions, _ = parse_test_qti(
+            qti_path.read_bytes(),
+            None,
+            source_ref_id=item.source_id,
+            source_obj_id=str(
+                item.metadata.get("obj_id", "")
+            ),
+            title=item.title,
+        )
+
+        # Reuse the neutral question schema, but expose the
+        # correct ILIAS Question Pool source identity.
+        questions["source"] = {
+            "lms": "ILIAS",
+            "question_pool_ref_id":
+                item.source_id,
+            "question_pool_obj_id": str(
+                item.metadata.get("obj_id", "")
+            ),
+        }
+
+        relative = PurePosixPath(
+            "question_pools",
+            item.source_id,
+            "questions.json",
+        )
+
+        destination = self.output_dir.joinpath(
+            *relative.parts
+        )
+
+        destination.write_text(
+            json.dumps(
+                questions,
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        item.metadata.update(
+            {
+                "migration_questions_path":
+                    relative.as_posix(),
+                "normalized_question_count":
+                    questions["question_count"],
+                "normalized_unsupported_count":
+                    questions["unsupported_count"],
+            }
+        )
+
+        self.extracted[
+            "question_pool_normalizations"
+        ] += 1
+        self.extracted[
+            "normalized_pool_questions"
+        ] += int(
+            questions["question_count"]
+        )
+
+    def _link_tests_to_question_pools(
+        self,
+        items: Iterable[MigrationItem],
+    ) -> None:
+        """Link tests to one unambiguous compatible pool."""
+
+        all_items = list(_walk(items))
+
+        pools = [
+            item
+            for item in all_items
+            if item.type == "question_pool"
+            and item.metadata.get(
+                "migration_questions_path"
+            )
+        ]
+
+        tests = [
+            item
+            for item in all_items
+            if item.type == "test"
+            and item.metadata.get(
+                "migration_questions_path"
+            )
+        ]
+
+        pool_documents: list[
+            tuple[MigrationItem, dict[str, Any]]
+        ] = []
+
+        for pool in pools:
+            relative = PurePosixPath(
+                str(
+                    pool.metadata[
+                        "migration_questions_path"
+                    ]
+                )
+            )
+
+            filename = self.output_dir.joinpath(
+                *relative.parts
+            )
+
+            if not filename.is_file():
+                continue
+
+            document = json.loads(
+                filename.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if isinstance(document, dict):
+                pool_documents.append(
+                    (pool, document)
+                )
+
+        for test in tests:
+            # Prevent stale links when prepare-export is replayed.
+            test.metadata.pop(
+                "shared_question_pool_ref_id",
+                None,
+            )
+            test.metadata.pop(
+                "shared_question_pool_questions_path",
+                None,
+            )
+
+            relative = PurePosixPath(
+                str(
+                    test.metadata[
+                        "migration_questions_path"
+                    ]
+                )
+            )
+
+            filename = self.output_dir.joinpath(
+                *relative.parts
+            )
+
+            if not filename.is_file():
+                continue
+
+            test_document = json.loads(
+                filename.read_text(
+                    encoding="utf-8"
+                )
+            )
+
+            if not isinstance(
+                test_document,
+                dict,
+            ):
+                continue
+
+            test_questions = (
+                self._questions_by_external_id(
+                    test_document
+                )
+            )
+
+            if not test_questions:
+                continue
+
+            candidates: list[
+                MigrationItem
+            ] = []
+
+            for pool, pool_document in (
+                pool_documents
+            ):
+                pool_questions = (
+                    self._questions_by_external_id(
+                        pool_document
+                    )
+                )
+
+                if not pool_questions:
+                    continue
+
+                # A Quiz can legitimately use a subset of a
+                # larger ILIAS Question Pool.
+                if not set(
+                    test_questions
+                ).issubset(
+                    pool_questions
+                ):
+                    continue
+
+                compatible = all(
+                    self._question_semantics(
+                        test_questions[external_id]
+                    )
+                    ==
+                    self._question_semantics(
+                        pool_questions[external_id]
+                    )
+                    for external_id
+                    in test_questions
+                )
+
+                if compatible:
+                    candidates.append(pool)
+
+            # Conservative behaviour:
+            #   0 compatible pools -> private Quiz bank
+            #   >1 pools           -> ambiguous, private bank
+            #   1 pool             -> safe shared bank
+            if len(candidates) != 1:
+                continue
+
+            pool = candidates[0]
+
+            test.metadata[
+                "shared_question_pool_ref_id"
+            ] = pool.source_id
+
+            test.metadata[
+                "shared_question_pool_questions_path"
+            ] = str(
+                pool.metadata[
+                    "migration_questions_path"
+                ]
+            )
+
+    @staticmethod
+    def _questions_by_external_id(
+        document: dict[str, Any],
+    ) -> dict[str, dict[str, Any]]:
+        questions = document.get(
+            "questions",
+            [],
+        )
+
+        if not isinstance(
+            questions,
+            list,
+        ):
+            return {}
+
+        result: dict[
+            str,
+            dict[str, Any],
+        ] = {}
+
+        for question in questions:
+            if not isinstance(
+                question,
+                dict,
+            ):
+                return {}
+
+            external_id = str(
+                question.get(
+                    "external_id",
+                    "",
+                )
+            ).strip()
+
+            if (
+                not external_id
+                or external_id in result
+            ):
+                return {}
+
+            result[external_id] = question
+
+        return result
+
+    @staticmethod
+    def _question_semantics(
+        question: dict[str, Any],
+    ) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "title":
+                question.get("title"),
+            "type":
+                question.get("type"),
+            "question_text":
+                question.get(
+                    "question_text"
+                ),
+            "max_score":
+                question.get("max_score"),
+        }
+
+        qtype = question.get("type")
+
+        if qtype in (
+            "single_choice",
+            "multiple_choice",
+        ):
+            result["shuffle"] = (
+                question.get("shuffle")
+            )
+            result["answers"] = [
+                {
+                    "text":
+                        answer.get("text"),
+                    "texts":
+                        answer.get("texts"),
+                    "score_if_selected":
+                        answer.get(
+                            "score_if_selected"
+                        ),
+                    "score_if_not_selected":
+                        answer.get(
+                            "score_if_not_selected"
+                        ),
+                }
+                for answer in question.get(
+                    "answers",
+                    [],
+                )
+                if isinstance(
+                    answer,
+                    dict,
+                )
+            ]
+
+        elif qtype == "numeric":
+            result.update(
+                {
+                    "num_type":
+                        question.get(
+                            "num_type"
+                        ),
+                    "lower_bound":
+                        question.get(
+                            "lower_bound"
+                        ),
+                    "upper_bound":
+                        question.get(
+                            "upper_bound"
+                        ),
+                }
+            )
+
+        elif qtype == "matching":
+            result["pairs"] = [
+                {
+                    "source_text":
+                        pair.get(
+                            "source_text"
+                        ),
+                    "target_text":
+                        pair.get(
+                            "target_text"
+                        ),
+                    "points":
+                        pair.get("points"),
+                }
+                for pair in question.get(
+                    "pairs",
+                    [],
+                )
+                if isinstance(
+                    pair,
+                    dict,
+                )
+            ]
+
+        elif qtype == "essay":
+            result[
+                "manual_grading"
+            ] = question.get(
+                "manual_grading"
+            )
+
+        elif qtype == "short_answer":
+            result[
+                "case_sensitive"
+            ] = question.get(
+                "case_sensitive"
+            )
+
+            result[
+                "accepted_answers"
+            ] = [
+                {
+                    "text":
+                        answer.get("text"),
+                    "comparison":
+                        answer.get(
+                            "comparison"
+                        ),
+                    "points":
+                        answer.get("points"),
+                }
+                for answer in question.get(
+                    "accepted_answers",
+                    [],
+                )
+                if isinstance(
+                    answer,
+                    dict,
+                )
+            ]
+
+        elif qtype == "cloze":
+            result[
+                "text_fragments"
+            ] = question.get(
+                "text_fragments"
+            )
+
+            result["gaps"] = [
+                {
+                    "accepted_answers": [
+                        {
+                            "text":
+                                answer.get(
+                                    "text"
+                                ),
+                            "comparison":
+                                answer.get(
+                                    "comparison"
+                                ),
+                            "points":
+                                answer.get(
+                                    "points"
+                                ),
+                        }
+                        for answer in gap.get(
+                            "accepted_answers",
+                            [],
+                        )
+                        if isinstance(
+                            answer,
+                            dict,
+                        )
+                    ],
+                    "max_score":
+                        gap.get(
+                            "max_score"
+                        ),
+                }
+                for gap in question.get(
+                    "gaps",
+                    [],
+                )
+                if isinstance(
+                    gap,
+                    dict,
+                )
+            ]
+
+        elif qtype == "ordering":
+            result["shuffle"] = (
+                question.get("shuffle")
+            )
+
+            result[
+                "correct_order"
+            ] = [
+                {
+                    "position":
+                        entry.get(
+                            "position"
+                        ),
+                    "text":
+                        entry.get("text"),
+                    "points":
+                        entry.get(
+                            "points"
+                        ),
+                }
+                for entry in question.get(
+                    "correct_order",
+                    [],
+                )
+                if isinstance(
+                    entry,
+                    dict,
+                )
+            ]
+
+        return result

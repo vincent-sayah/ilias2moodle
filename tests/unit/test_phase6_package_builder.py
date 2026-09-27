@@ -87,3 +87,175 @@ def test_extract_test_automatically_writes_phase6_json(tmp_path: Path) -> None:
     assert builder.extracted["test_files"] == 2
     assert builder.extracted["test_normalizations"] == 1
     assert builder.extracted["normalized_questions"] == 1
+
+
+def test_question_pool_is_normalized_and_linked_to_test(
+    tmp_path: Path,
+) -> None:
+    archive_path = tmp_path / "source.zip"
+    output_dir = tmp_path / "out"
+
+    pool_qti_path = (
+        "set_6/pool/1790441011__0__qti_712.xml"
+    )
+    test_qti_path = (
+        "set_7/test/1788628522__0__qti_713.xml"
+    )
+    structure_path = (
+        "set_7/test/1788628522__0__tst_713.xml"
+    )
+
+    # Same pedagogical question, different export-local ident.
+    pool_qti = QTI.replace(
+        'ident="q1"',
+        'ident="pool_q1"',
+        1,
+    )
+
+    with zipfile.ZipFile(
+        archive_path,
+        "w",
+    ) as archive:
+        archive.writestr(
+            pool_qti_path,
+            pool_qti,
+        )
+        archive.writestr(
+            test_qti_path,
+            QTI,
+        )
+        archive.writestr(
+            structure_path,
+            STRUCTURE,
+        )
+
+    pool = MigrationItem(
+        source_id="235",
+        type="question_pool",
+        title="bdq_sayah",
+        metadata={
+            "obj_id": "712",
+            "question_export_files": [
+                pool_qti_path,
+            ],
+        },
+    )
+
+    test = MigrationItem(
+        source_id="236",
+        type="test",
+        title="test",
+        metadata={
+            "obj_id": "713",
+            "qti_path": test_qti_path,
+            "test_structure_path":
+                structure_path,
+        },
+    )
+
+    builder = MigrationPackageBuilder(
+        archive_path,
+        output_dir,
+    )
+
+    with zipfile.ZipFile(
+        archive_path
+    ) as archive:
+        builder._members = {
+            name.lstrip("/"): name
+            for name in archive.namelist()
+        }
+
+        builder._extract_question_pool(
+            archive,
+            pool,
+        )
+        builder._extract_test(
+            archive,
+            test,
+        )
+
+    builder._link_tests_to_question_pools(
+        [pool, test]
+    )
+
+    pool_json = (
+        output_dir
+        / "question_pools"
+        / "235"
+        / "questions.json"
+    )
+
+    assert pool_json.is_file()
+
+    pool_document = json.loads(
+        pool_json.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert (
+        pool_document["source"]
+        ["question_pool_ref_id"]
+        == "235"
+    )
+    assert (
+        pool_document["source"]
+        ["question_pool_obj_id"]
+        == "712"
+    )
+    assert (
+        pool_document["question_count"]
+        == 1
+    )
+    assert (
+        pool_document["unsupported_count"]
+        == 0
+    )
+
+    assert (
+        pool.metadata[
+            "migration_questions_path"
+        ]
+        ==
+        "question_pools/235/questions.json"
+    )
+    assert (
+        pool.metadata[
+            "normalized_question_count"
+        ]
+        == 1
+    )
+    assert (
+        pool.metadata[
+            "normalized_unsupported_count"
+        ]
+        == 0
+    )
+
+    assert (
+        test.metadata[
+            "shared_question_pool_ref_id"
+        ]
+        == "235"
+    )
+    assert (
+        test.metadata[
+            "shared_question_pool_questions_path"
+        ]
+        ==
+        "question_pools/235/questions.json"
+    )
+
+    assert (
+        builder.extracted[
+            "question_pool_normalizations"
+        ]
+        == 1
+    )
+    assert (
+        builder.extracted[
+            "normalized_pool_questions"
+        ]
+        == 1
+    )
