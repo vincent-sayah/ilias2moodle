@@ -40,7 +40,7 @@ Cours POC principal :
 
 - ILIAS `ref_id=128`, `obj_id=504` ;
 - titre : `cours test migration` ;
-- cours Moodle `id=5`, shortname `ILIAS-128`.
+- cours Moodle `id=2`, shortname `ILIAS-128`.
 
 ## Principes
 
@@ -129,7 +129,7 @@ Voir [`docs/migration-format.md`](docs/migration-format.md).
 | Mediacast | `mod_data` | Validé Phase 6.5 — MP4 local + URL externe |
 | Blog | `mod_data` | Validé Phase 6.5 — billets + images ; auteurs Moodle Phase 7 |
 | Media Pool / galerie média | `mod_data` | Validé Phase 6.5 — images + MP4 + COPage + dossiers |
-| Groupe | Groupe / Groupement + restrictions si nécessaire | Phase 7 |
+| Groupe | Non migré automatiquement ; conteneur + membres + restrictions + contenus à définir | Différé (#22) |
 | Utilisateurs / inscriptions | Comptes / inscriptions / rôles | Phase 7 |
 | Progression / historique | Completion / historique | Phase 7 |
 
@@ -290,29 +290,36 @@ Résultats validés :
 - interdiction du rapprochement automatique par nom/prénom ;
 - support fonctionnel des emails partagés lorsque Moodle est configuré avec `allowaccountssameemail=1` ;
 - mapping administrateur global ILIAS `usr_id=6/root` vers Moodle `user id=2/admin` ;
-- création des comptes `stagiaire.1`, `stagiaire.2` et `stagiaire.10` ;
-- inscription des trois membres au cours Moodle `5` avec le rôle `student` ;
+- six participants résolus et inscrits sur le cours Moodle `2` ;
+- `401 -> Moodle 6`, `402 -> 7`, `410 -> 8` avec le rôle `student` ;
+- `412 -> Moodle 3` et `413 -> 4` avec le rôle `editingteacher` ;
+- `415 -> Moodle 5` avec le rôle `teacher` ;
 - mappings persistants utilisateurs et inscriptions ;
-- mots de passe initiaux générés aléatoirement, non journalisés et changement forcé au premier accès ;
+- mots de passe initiaux générés aléatoirement et non journalisés ;
 - second apply idempotent : aucun compte ni enrolment supplémentaire créé.
 
-Les auteurs/contributions Forum, Blog et Wiki ont été validés. La progression et les résultats disponibles ont été inventoriés et classifiés. Deux extensions restent hors périmètre de la RC : l’objet Groupe complet (#22) et le POC avancé de progression multi-utilisateurs (#41).
+Les auteurs/contributions Forum, Blog et Wiki ont été validés. La Phase 7.3 résout désormais les mappings de la cible fraîche, y compris l’Exercise 1 -> 4, tout en conservant les cas sans équivalent sûr en `HISTORY_ONLY` ou `NO_DATA`. Deux extensions restent hors périmètre de la RC : l’objet Groupe complet (#22) et le POC avancé de progression multi-utilisateurs (#41).
 
 ## Idempotence
 
 Les correspondances persistantes permettent de rejouer les imports sans dupliquer les objets :
 
 ```text
-ILIAS ref_id 128  → Moodle course 5
-ILIAS ref_id 230  → Moodle section 22
-ILIAS ref_id 237  → Moodle subsection CMID 14
-ILIAS ref_id 246  → Moodle subsection CMID 38
-ILIAS ref_id 240  → Moodle resource CMID 20
-ILIAS ref_id 269  → Moodle resource CMID 43
-ILIAS ref_id 275  → Moodle forum CMID 59
-ILIAS ref_id 276  → Moodle database CMID 60
-ILIAS ref_id 247  → Moodle database CMID 61
-ILIAS ref_id 278  → Moodle database CMID 62
+ILIAS ref_id 128                  → Moodle course 2
+ILIAS ref_id 241                  → Moodle SCORM CMID 18
+ILIAS ref_id 242                  → Moodle SCORM CMID 19
+ILIAS ref_id 243                  → Moodle Book CMID 20
+ILIAS ref_id 235                  → Moodle Question Bank CMID 21
+ILIAS ref_id 236                  → Moodle Quiz CMID 22
+ILIAS ref_id 270                  → Moodle Page CMID 23
+ILIAS ref_id 272                  → Moodle Glossary CMID 24
+ILIAS ref_id 273                  → Moodle Wiki CMID 25
+ILIAS ref_id 274:assignment:1..4  → Moodle Assign CMID 26..29
+ILIAS ref_id 275                  → Moodle Forum CMID 30
+ILIAS ref_id 276                  → Moodle Database CMID 31
+ILIAS ref_id 277                  → Moodle Database CMID 32
+ILIAS ref_id 278                  → Moodle Database CMID 33
+ILIAS ref_id 279                  → Moodle Wiki CMID 34
 ```
 
 Les plans utilisent notamment les états :
@@ -354,7 +361,7 @@ Deux sujets restent volontairement hors du périmètre de la release candidate d
 - l'objet ILIAS Groupe complet (#22), classé DEFERRED / HISTORY_ONLY tant qu'un mapping conteneur + contenus + restrictions n'est pas validé ;
 - les tests avancés de progression multi-utilisateurs (#41), qui nécessitent un POC enrichi.
 
-La release candidate courante est `0.20.0-rc2`. Elle corrige le défaut d'installation neuve MySQL/MariaDB découvert lors du test de `v0.20.0-rc1` sur une Moodle 5.0.2 vierge (#50). Le tag `v0.20.0-rc1` reste conservé pour la traçabilité.
+La release candidate courante est `0.20.0-rc2`. Elle corrige le défaut d'installation neuve MySQL/MariaDB découvert lors du test de `v0.20.0-rc1` sur une Moodle 5.0.2 vierge (#50). La consolidation Phase 7 a ensuite été validée sur PHP 8.3.35 avec 14/14 tests PHP réussis ; elle ne change pas encore le numéro de version. Le tag `v0.20.0-rc1` reste conservé pour la traçabilité.
 
 ## Licence
 

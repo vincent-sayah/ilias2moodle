@@ -1,220 +1,123 @@
-# Phase 7.1 — Rapprochement utilisateurs, inscriptions et rôles
+# Phase 7.1 — Utilisateurs, inscriptions et rôles
 
 ## État
 
-POC réel validé pour les identités, inscriptions, rôles et dépendance Groupe.
+Phase 7.1 validée sur le POC réel.
 
-Parent : #7.
+Cette phase établit le rapprochement fiable des identités ILIAS vers Moodle avant les traitements dépendant d'un utilisateur : inscriptions, rôles, contributions Forum, auteurs Blog, auteurs Wiki et données de progression.
 
-Sous-ticket : #34.
+L'objet ILIAS Groupe complet n'est pas inclus dans ce périmètre. Sa migration reste différée.
 
-Branche : `phase7-users-enrolments`.
+## Périmètre de validation
 
-## Objectif
+Source :
 
-Construire une couche de résolution d'identité fiable entre ILIAS et Moodle avant toute migration dépendante des utilisateurs.
+- ILIAS 10.8 ;
+- client `ilias10` ;
+- cours `obj_id=504 / ref_id=128` ;
+- titre `cours test migration`.
 
-Le périmètre comprend :
+Cible finale de validation :
 
-- utilisateurs référencés par le cours ;
-- inscriptions au cours ;
-- rôles ;
-- identifiants auteurs conservés par les objets des phases précédentes ;
-- préparation du rattachement des membres de groupes (#22).
+- Moodle 5.0.2 ;
+- cours `id=2` ;
+- shortname `ILIAS-128` ;
+- six participants inscrits.
 
-## Politique de sécurité
+## Source des identités
 
-Aucune correspondance ne sera créée à partir d'un simple nom affiché.
+Le ZIP natif ILIAS reste la source principale des contenus pédagogiques, mais il ne contient pas suffisamment d'informations pour reconstruire de manière fiable les participants et leurs rôles.
 
-Les clés candidates devront être évaluées dans cet ordre seulement après analyse du POC réel :
+La Phase 7 utilise donc une extraction complémentaire en lecture seule réalisée via les services applicatifs ILIAS.
 
-1. identifiant externe stable explicitement partagé entre ILIAS et Moodle ;
-2. login strictement égal et unique ;
-3. email normalisé strictement égal et unique ;
-4. autre identifiant institutionnel stable si réellement exporté et présent côté Moodle.
-
-Le nom/prénom seuls ne peuvent pas constituer une correspondance fiable.
-
-Toute résolution devra être classée dans un état explicite :
-
-- `MATCHED` ;
-- `UNRESOLVED` ;
-- `AMBIGUOUS` ;
-- `NOT_IN_TARGET` ;
-- éventuellement `CREATE_CANDIDATE`, sans création automatique tant que cette politique n'est pas validée.
-
-## Étape 1 — analyse du ZIP complet
-
-L'analyse doit déterminer :
-
-- quels composants ILIAS exportent des utilisateurs ou références utilisateurs ;
-- où sont stockés les membres du cours ;
-- où sont stockés les rôles ;
-- quels identifiants sont réellement disponibles ;
-- si les données sont suffisantes pour rapprocher des comptes Moodle existants ;
-- si les objets Forum, Blog, Wiki, Exercice et Groupe utilisent les mêmes identifiants.
-
-Aucune écriture Moodle ne doit être effectuée pendant cette étape.
-
-
-## Résultat du POC ZIP complet
-
-Analyse du ZIP natif `1789892867__0__crs_504.zip` :
-
-- aucun composant utilisateur/profil/membership n'est exporté avec le cours ;
-- aucune liste d'inscrits du cours n'est présente ;
-- aucune liste de membres du Groupe 743 n'est présente ;
-- une seule référence au format `il_0_usr_<id>` est présente : `il_0_usr_6` ;
-- cette identité est utilisée comme auteur de Blog, créateur de versions de fichiers et propriétaire du Groupe 743 ;
-- les identités historiques observées dans d'autres objets ne disposent pas nécessairement d'un profil exporté dans le ZIP.
-
-Conclusion : le ZIP natif reste la source de contenu, mais il est insuffisant pour la résolution des identités et inscriptions.
-
-## Source complémentaire Phase 7
-
-La Phase 7 autorise une extraction complémentaire **lecture seule au niveau applicatif ILIAS** pour les données d'identité et de membership absentes du ZIP.
-
-Cette extraction doit :
-
-- utiliser les classes/services ILIAS, pas des requêtes SQL directes du projet ;
-- cibler explicitement le cours POC et les groupes concernés ;
-- exporter uniquement les champs nécessaires au rapprochement ;
-- produire un JSON auditable ;
-- ne modifier aucune donnée ILIAS.
-
-Champs candidats :
+Cette extraction fournit notamment :
 
 - `source_user_id` ;
-- `login` ;
-- `email` ;
-- `firstname` ;
-- `lastname` ;
-- `matriculation` si disponible ;
-- `external_account` si disponible ;
-- statut actif ;
+- login ;
+- email ;
+- prénom et nom ;
 - rôle dans le cours ;
-- appartenance/role dans les groupes.
+- références nécessaires aux contributions historiques.
 
-## État Moodle POC
+Aucune donnée ILIAS n'est modifiée pendant cette extraction.
 
-Cours cible `id=5 / ILIAS-128` :
+## Politique de rapprochement
 
-- 0 utilisateur inscrit ;
-- 3 comptes globaux non supprimés ;
-- aucun `idnumber` renseigné sur ces comptes.
+Aucune correspondance n'est réalisée à partir du seul nom affiché.
 
-Aucun rapprochement automatique ne sera réalisé tant que les attributs ILIAS correspondants n'ont pas été récupérés.
+Une identité n'est considérée comme résolue que lorsqu'une correspondance suffisamment fiable et non ambiguë est disponible.
 
-
-## Dry-run Moodle réel
-
-Le dry-run Phase 7.1 sur le cours Moodle `5 / ILIAS-128` est validé :
-
-- `PHASE7_DRY_RUN_RC=0` ;
-- `writes_performed=false` ;
-- `ready_for_apply=false` ;
-- `apply_implemented=false` ;
-- `MATCHED=0` ;
-- `AMBIGUOUS=3` ;
-- `NOT_IN_TARGET=1` ;
-- `ENROL=0` ;
-- `UPDATE=0` ;
-- `DEFER=3`.
-
-Résolution réelle :
-
-- ILIAS 6 / `root` / `ilias@yourserver.com` → `NOT_IN_TARGET` ;
-- ILIAS 401 / `stagiaire.1` / `vince.syh@free.fr` → `AMBIGUOUS` ;
-- ILIAS 402 / `stagiaire.2` / `vince.syh@free.fr` → `AMBIGUOUS` ;
-- ILIAS 410 / `stagiaire.10` / `vince.syh@free.fr` → `AMBIGUOUS`.
-
-L'ambiguïté est correcte : l'email source est partagé par trois comptes ILIAS et correspond au compte Moodle `admin` (id 2). Aucun rapprochement par email n'est donc autorisé.
-
-La prochaine étape consiste à évaluer une création contrôlée de comptes Moodle dédiés en conservant les logins ILIAS uniques, puis à inscrire uniquement les comptes créés/résolus au rôle Moodle `student`. L'identité ILIAS 6 ne doit pas être créée ni inscrite automatiquement car elle n'est pas membre du cours.
-
-
-## Validation finale Phase 7.1
-
-La Phase 7.1 a été validée sur le POC réel le 20 septembre 2026.
-
-### Configuration cible
-
-- Moodle course `5 / ILIAS-128` ;
-- authentification manuelle activée ;
-- inscription manuelle activée, instance `id=10` ;
-- rôle Moodle `student id=5` ;
-- `allowaccountssameemail=1`, afin de conserver fidèlement les emails ILIAS partagés.
-
-### Mapping administrateur global
-
-Le compte ILIAS `usr_id=6 / root` est l'administrateur global ILIAS. Il est rapproché explicitement du compte administrateur global Moodle :
+Les mappings utilisateurs sont enregistrés dans `local_iliasmigration_map` avec :
 
 ```text
-ILIAS usr 6 / root
-        ↓ explicit_override
-Moodle user 2 / admin
-        ↓
-site administrator
+sourcelms      = ILIAS
+sourceinstance = ilias10
+sourcecourse   = GLOBAL
+sourceref      = <usr_id ILIAS>
+targettype     = user
+status         = READY
 ```
 
-Le mapping est accepté uniquement si la cible Moodle est réellement administrateur de site.
+Les traitements des phases suivantes réutilisent ces mappings persistants plutôt que d'effectuer un nouveau rapprochement par login, email ou nom.
 
-### Comptes de cours validés
+## Administrateur global ILIAS
 
-L’extraction applicative ILIAS finale du cours `obj_id=504 / ref_id=128` confirme six participants :
+L'identité `ILIAS usr_id=6 / root` est rapprochée explicitement avec `Moodle user id=2 / admin`.
 
-| ILIAS | Login | Moodle | Rôle ILIAS | Rôle Moodle |
-|---|---|---:|---|---|
-| 401 | `stagiaire.1` | 5 | member | student |
-| 402 | `stagiaire.2` | 6 | member | student |
-| 410 | `stagiaire.10` | 7 | member | student |
-| 412 | `stagiaire.12` | 8 | admin | editingteacher |
-| 413 | `stagiaire.13` | 9 | admin | editingteacher |
-| 415 | `stagiaire.15` | 10 | tutor | teacher |
+Ce mapping n'est accepté que si la cible Moodle est effectivement administrateur du site.
 
-Les six comptes conservent l'adresse `vince.syh@free.fr`, autorisée par la configuration fonctionnelle Moodle.
+```text
+ILIAS GLOBAL 6 -> Moodle user 2/admin
+```
 
-Politique de credentials :
+Le compte ILIAS `root` n'est pas inscrit automatiquement au cours Moodle lorsqu'il n'est pas membre du cours source.
 
-- auth Moodle `manual` ;
-- mot de passe initial aléatoire généré côté Moodle ;
-- mot de passe jamais écrit dans les rapports de migration ;
-- changement forcé au premier accès ;
-- état de remise des accès : `ADMIN_RESET_REQUIRED`.
+## Participants du cours
 
-### Mappings persistants validés
+L'extraction ILIAS finale confirme six participants pour le cours `504 / 128`.
+
+| ILIAS usr_id | Login | Moodle user_id | Rôle ILIAS | Rôle Moodle |
+|---:|---|---:|---|---|
+| 401 | `stagiaire.1` | 6 | member | student |
+| 402 | `stagiaire.2` | 7 | member | student |
+| 410 | `stagiaire.10` | 8 | member | student |
+| 412 | `stagiaire.12` | 3 | admin | editingteacher |
+| 413 | `stagiaire.13` | 4 | admin | editingteacher |
+| 415 | `stagiaire.15` | 5 | tutor | teacher |
+
+Les six utilisateurs partagent l'adresse source `vince.syh@free.fr`. La configuration de validation utilise `allowaccountssameemail=1` afin de conserver fidèlement cette caractéristique du jeu de données ILIAS.
+
+## Mappings persistants validés
 
 ```text
 ILIAS GLOBAL 6   -> Moodle user 2
-ILIAS GLOBAL 401 -> Moodle user 5
-ILIAS GLOBAL 402 -> Moodle user 6
-ILIAS GLOBAL 410 -> Moodle user 7
-ILIAS GLOBAL 412 -> Moodle user 8
-ILIAS GLOBAL 413 -> Moodle user 9
-ILIAS GLOBAL 415 -> Moodle user 10
-
-ILIAS course 504 user:401 -> Moodle enrolment
-ILIAS course 504 user:402 -> Moodle enrolment
-ILIAS course 504 user:410 -> Moodle enrolment
-ILIAS course 504 user:412 -> Moodle enrolment
-ILIAS course 504 user:413 -> Moodle enrolment
-ILIAS course 504 user:415 -> Moodle enrolment
+ILIAS GLOBAL 401 -> Moodle user 6
+ILIAS GLOBAL 402 -> Moodle user 7
+ILIAS GLOBAL 410 -> Moodle user 8
+ILIAS GLOBAL 412 -> Moodle user 3
+ILIAS GLOBAL 413 -> Moodle user 4
+ILIAS GLOBAL 415 -> Moodle user 5
 ```
 
-Ces mappings sont enregistrés avec le statut `READY`.
+Tous ces mappings sont au statut `READY`.
 
-### Idempotence et notifications
+Les six participants sont également associés à leur inscription au cours via les mappings de membership Phase 7.1.
 
-Après enrichissement du POC avec les rôles `admin` et `tutor`, l’apply final est idempotent :
+## Credentials
 
-```text
-created_user_count        = 0
-reused_user_count         = 6
-enrolled_membership_count = 0
-updated_membership_count  = 6
-```
+Les comptes créés utilisent l'authentification Moodle `manual`.
 
-Les rôles cibles sont conservés au second passage :
+La migration ne conserve ni ne transporte de mot de passe ILIAS :
+
+- un mot de passe initial aléatoire est généré ;
+- le mot de passe n'est jamais écrit dans les rapports ;
+- la remise ou réinitialisation des accès relève de l'administration Moodle selon la politique locale.
+
+## Idempotence
+
+Le second passage Phase 7.1 réutilise les six comptes existants et ne crée aucun utilisateur supplémentaire.
+
+Les rôles restent :
 
 ```text
 401 -> student
@@ -225,10 +128,50 @@ Les rôles cibles sont conservés au second passage :
 415 -> teacher
 ```
 
-Les emails de bienvenue automatiques de l’inscription manuelle Moodle sont désactivés uniquement dans le flux de migration afin qu’un traitement batch ne dépende pas de la configuration d’un processeur de messagerie.
+La Phase 7.1 est donc considérée idempotente sur le POC.
 
-### Dépendance Groupe levée
+## Dépendances des phases suivantes
 
-La dépendance d’identité de l’issue #22 est levée. Le Groupe ILIAS `obj_id=743 / ref_id=254` contient sept participants source : six sont également participants du cours parent et sont résolus vers Moodle ; `usr_id=6 / root` est membre du groupe source mais pas du cours parent et reste donc volontairement différé.
+Les mappings utilisateurs validés sont réutilisés par :
 
-La Phase 7.2 valide ensuite la création d’un Groupe Moodle simple avec ces six participants, sans auto-inscription du compte global `root`.
+```text
+Phase 7.3 -> Learning Progress / résultats
+Phase 7.4 -> auteurs et contributions Forum
+Phase 7.5 -> auteurs Blog
+Phase 7.6 -> auteurs et métadonnées Wiki
+```
+
+Aucun rapprochement indépendant par email ou nom ne doit être réalisé dans ces traitements.
+
+## Objet ILIAS Groupe
+
+L'objet ILIAS `obj_id=743 / ref_id=254 / type=grp` est un objet de dépôt indépendant et ne doit pas être assimilé à un simple Moodle Group.
+
+Une tentative initiale de représentation sous forme de Moodle Group a uniquement servi à explorer les memberships. Elle n'est plus considérée comme une migration fonctionnellement correcte et l'artefact Moodle correspondant a été supprimé.
+
+La migration de l'objet Groupe complet reste donc :
+
+```text
+DEFERRED
+```
+
+Une future prise en charge devra définir un mapping tenant compte du conteneur, des contenus enfants, des membres et des éventuelles restrictions d'accès.
+
+La résolution des identités nécessaires à cette future migration est néanmoins disponible grâce à la Phase 7.1.
+
+## Validation finale
+
+```text
+source course        = ILIAS obj_id 504 / ref_id 128
+target course        = Moodle id 2 / ILIAS-128
+
+source participants  = 6
+mapped users         = 6
+target users present = 6
+target enrolled      = 6
+identity issues      = 0
+
+global admin mapping = ILIAS 6 -> Moodle 2/admin
+```
+
+La Phase 7.1 est clôturée pour le périmètre du POC.

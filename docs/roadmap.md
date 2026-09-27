@@ -1,8 +1,8 @@
 # Roadmap
 
-## POC de référence — état au 26 septembre 2026
+## POC de référence — état au 27 septembre 2026
 
-Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7. Les cases ci-dessous décrivent le périmètre effectivement démontré sur le cours de référence ILIAS `ref_id=128 / obj_id=504` vers Moodle `course id=5 / ILIAS-128`.
+Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS `ref_id=128 / obj_id=504` vers la cible fraîche Moodle `course id=2 / ILIAS-128`.
 
 ## Phase 1 — Inventaire et analyse `[TERMINÉE]`
 
@@ -17,8 +17,7 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7. Les cases ci-dessou
 - [x] plugin Moodle installable ;
 - [x] catégories et chemin de catégories ;
 - [x] cours ;
-- [x] sections ;
-- [x] sous-sections ;
+- [x] sections et sous-sections ;
 - [x] politique des dossiers profonds ;
 - [x] ordre global ;
 - [x] mappings persistants ;
@@ -30,7 +29,7 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7. Les cases ci-dessou
 - [x] URL ;
 - [x] HTML simple ;
 - [x] liens internes ILIAS -> Moodle ;
-- [x] placements section/sous-section/section synthétique ;
+- [x] placements déterministes ;
 - [x] idempotence.
 
 ## Phase 4 — SCORM `[TERMINÉE]`
@@ -56,7 +55,6 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7. Les cases ci-dessou
 - [x] Question Bank ;
 - [x] Quiz ;
 - [x] 11 questions / 46 points ;
-- [x] transformations de scoring documentées ;
 - [x] apply idempotent et validation visuelle.
 
 ## Phase 6.5 — Objets pédagogiques étendus `[TERMINÉE]`
@@ -72,32 +70,29 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7. Les cases ci-dessou
 
 ## Phase 7 — Utilisateurs, contributions et progression `[TERMINÉE POUR LE POC]`
 
-- [x] utilisateurs — Phase 7.1 ;
-- [x] inscriptions — 6 utilisateurs du cours ;
-- [x] rôles — student/editingteacher/teacher ;
-- [x] mappings utilisateurs GLOBAL ;
-- [x] progression/résultats du POC — classification MIGRATE/PARTIAL/HISTORY_ONLY/NO_DATA ;
-- [x] Forum — 3 auteurs, 2 discussions, 7 posts, 3 pièces jointes ;
-- [x] Blog — auteurs des 2 billets validés ;
-- [x] Wiki — auteur courant et dates des 3 pages réconciliés ;
-- [x] dry-runs finaux sans écriture et état avant/après identique.
+- [x] Phase 7.1 — 6 utilisateurs, inscriptions et rôles ;
+- [x] mappings utilisateurs GLOBAL, dont `ILIAS 6/root -> Moodle 2/admin` ;
+- [x] Phase 7.3 — progression/résultats : 0 `MIGRATE`, 2 `HISTORY_ONLY`, 21 `NO_DATA` ;
+- [x] Phase 7.3 — mappings robustes `sourcecourse 504/128` et Exercise 1 -> 4 ;
+- [x] Phase 7.4 — Forum : 3 auteurs, 2 discussions, 7 posts, 3 pièces jointes ;
+- [x] Phase 7.5 — Blog : 2 auteurs/propriétaires déjà conformes, no-op ;
+- [x] Phase 7.6 — deux Wikis : auteur courant et dates réconciliés ;
+- [x] seconds passages idempotents / sans écriture.
 
-## Validation finale / Release Candidate
+## Validation de consolidation
 
-- [x] plugin de référence synchronisé avec l'installation Moodle ;
-- [x] upgrade Moodle vers le build plugin validé ;
-- [x] syntaxe PHP complète ;
-- [x] tests PHP de régression ;
-- [x] Ruff ;
-- [x] Pytest : 43 tests ;
-- [x] audit global du cours cible ;
-- [x] absence de doublons Forum / Question Bank issus de la migration ;
-- [x] Forum/Blog/Wiki en état final idempotent ;
-- [x] empreinte de base avant/après dry-runs inchangée (`STATE_DIFF_RC=0`).
+- [x] cible fraîche Moodle 5.0.2 / course id 2 ;
+- [x] PHP 8.3.35 ;
+- [x] syntaxe des resolvers Phase 7 ;
+- [x] tests PHP Phase 7.3 et 7.4 ;
+- [x] suite PHP : 14 / 14 réussis ;
+- [x] suite Python de référence : 57 tests réussis ;
+- [x] Phase 7.3 dry-run sans écriture ;
+- [x] Forum/Blog/Wiki en état final idempotent.
 
-## Backlog non bloquant pour la RC
+## Backlog non bloquant
 
-- [ ] #22 — objet ILIAS Groupe complet : `DEFERRED / HISTORY_ONLY` tant qu'un mapping conteneur + contenus + restrictions n'est pas validé ;
-- [ ] #41 — POC avancé de progression multi-utilisateurs et multi-états.
+- [ ] #22 — objet ILIAS Groupe complet : `DEFERRED` tant qu'un mapping conteneur + contenus + membres + restrictions n'est pas validé ;
+- [ ] #41 — POC avancé de progression avec données réellement migrables et états multiples.
 
-Ces deux sujets restent ouverts volontairement et ne remettent pas en cause la validation du périmètre POC couvert par la RC.
+Ces sujets restent ouverts volontairement et ne remettent pas en cause la validation du périmètre actuel.

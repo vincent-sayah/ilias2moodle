@@ -93,7 +93,7 @@ Aucun Moodle Group ne doit être créé automatiquement comme substitut de l'obj
 
 ## Phase 7.3 — Learning Progress, résultats et tentatives
 
-Le POC réel `cours 504 / ref 128` a été inventorié en lecture seule côté ILIAS puis classifié dans Moodle à partir des mappings persistants.
+Le POC réel `cours 504 / ref 128` a été inventorié en lecture seule côté ILIAS puis classifié dans Moodle à partir des mappings persistants de la cible fraîche `course id=2`.
 
 Résultat du dry-run consolidé :
 
@@ -115,10 +115,23 @@ Les deux entrées `HISTORY_ONLY` correspondent aux utilisateurs ILIAS `401/stagi
 
 Les données détaillées ont également été contrôlées :
 
-- Test `713/ref 236` : aucune tentative ni score ;
-- SCORM `719/ref 241` : aucun tracking, tentative, SCO ou score ;
-- SCORM `720/ref 242` : aucun tracking, tentative, SCO ou score ;
-- Exercice `806/ref 274` : 4 assignments mais aucune remise, note, marque, commentaire ou feedback utilisateur.
+- Test `713/ref 236` -> Moodle CMID 22 : aucune tentative ni score ;
+- SCORM `719/ref 241` -> Moodle CMID 18 : aucun tracking, tentative, SCO ou score ;
+- SCORM `720/ref 242` -> Moodle CMID 19 : aucun tracking, tentative, SCO ou score ;
+- Exercice `806/ref 274` -> Moodle CMID 26 à 29 : aucune remise, note, marque, commentaire ou feedback utilisateur.
+
+Les mappings d'objets supportent la différence historique entre `sourcecourse=obj_id 504` dans l'inventaire Phase 7.3 et `sourcecourse=ref_id 128` dans les mappings persistants. Un fallback n'est accepté que s'il est non ambigu.
+
+L'Exercice utilise un mapping 1 -> N explicite :
+
+```text
+274:assignment:1 -> CMID 26
+274:assignment:2 -> CMID 27
+274:assignment:3 -> CMID 28
+274:assignment:4 -> CMID 29
+```
+
+Le fallback par préfixe enfant est limité à l'Exercice, exige le même `sourceobj` et refuse les candidats répartis sur plusieurs couples `sourceinstance/sourcecourse`.
 
 Politique validée :
 
@@ -131,68 +144,66 @@ completed/failed futur        -> conversion seulement après validation sémanti
 
 Aucun apply Phase 7.3 n'est exécuté sur ce POC, car il n'existe aucune donnée classée `MIGRATE`. Le dry-run reste volontairement sans écriture Moodle.
 
-
 ## Phase 7.4 — Forum : auteurs et contributions
 
-Le POC réel `Forum ILIAS obj_id=807/ref_id=275 -> Moodle CMID=59 / instance=6` est validé de bout en bout.
+Le POC réel `Forum ILIAS obj_id=807/ref_id=275 -> Moodle CMID=30 / instance=2` est validé de bout en bout.
 
 Résultat :
-- 3 auteurs source résolus uniquement par mappings persistants : `6 -> Moodle 2`, `401 -> Moodle 5`, `402 -> Moodle 6` ;
-- 2 discussions créées ;
-- 7 posts créés ;
+
+- 3 auteurs source résolus uniquement par mappings persistants : `6 -> Moodle 2`, `401 -> Moodle 6`, `402 -> Moodle 7` ;
+- 2 discussions ;
+- 7 posts ;
 - arbre parent/enfant conservé ;
 - dates source conservées ;
 - 3 pièces jointes présentes dans `mod_forum/attachment` ;
 - 9 mappings persistants de contribution : 2 `forumdiscussion` + 7 `forumpost` ;
-- notifications neutralisées pour les contributions historiques ;
-- dernier apply strictement idempotent : 0 création, 0 fichier, 0 mapping, `writes_performed=false`.
+- second dry-run : toutes les contributions sont `KEEP` et les 3 assets sont vérifiés ;
+- second apply strictement idempotent : aucune création, aucun fichier, aucun mapping, `writes_performed=false`.
 
-Une anomalie réelle a été détectée et corrigée pendant le POC : un fichier volumineux (`handout.pdf`, 896549 octets) n'avait pas été transféré par le chemin de brouillon Forum alors que le post portait `attachment=1`. La politique finale importe donc les pièces jointes historiques via la File API Moodle directement dans `mod_forum/attachment`, puis vérifie taille et SHA-1. Les discussions et posts restent créés via les API Forum.
+Le resolver expose `apply_implemented=true`, conformément à l'executor Phase 7.4 validé.
 
 Le package natif peut contenir `source.instance=unknown-ilias-instance`. Cette valeur est traitée comme un placeholder ; l'instance canonique des mappings Phase 7 est alors résolue uniquement à partir d'un mapping utilisateur GLOBAL unique, sans fallback par login, email ou nom.
 
-
 ## Phase 7.5 — Blog : rattachement des auteurs
 
-Le POC réel `Blog ILIAS obj_id=732/ref_id=247 -> Moodle mod_data CMID=61 / instance=3` ne nécessite aucune écriture supplémentaire.
+Le POC réel `Blog ILIAS obj_id=812/ref_id=277 -> Moodle mod_data CMID=32 / instance=2` ne nécessite aucune écriture supplémentaire.
 
-Les deux billets conservent `source_author=il_0_usr_6`. Le format strict est résolu vers l'utilisateur ILIAS `6`, puis vers l'unique mapping GLOBAL persistant `ILIAS 6 -> Moodle 2/admin`.
+Les deux billets exposent l'auteur source ILIAS `usr_id=6/root`, résolu vers l'unique mapping GLOBAL `ILIAS 6 -> Moodle 2/admin`.
 
-Les records existants sont déjà :
-- posting 12 -> record 3 -> `userid=2` ;
-- posting 13 -> record 4 -> `userid=2`.
+Les deux records Moodle existants ont déjà `userid=2`. Le dry-run final retourne donc :
 
-Le propriétaire Moodle correspond donc exactement à l'auteur source résolu pour les deux billets. Le dry-run retourne `owner_matches=2`, `owner_changes_required=0`, `apply_required=false` et `writes_performed=false`.
+```text
+owner_matches=2
+owner_changes_required=0
+apply_required=false
+writes_performed=false
+```
 
-Les deux images historiques restent présentes dans `mod_data/content` : `tous.png` et `trio.png`.
+Aucun rapprochement par login, email ou nom n'est autorisé.
 
-Aucun rapprochement par login, email ou nom n'est autorisé. Une future réattribution n'est permise que si le record source expose un identifiant auteur au format strict `il_0_usr_<id>` et si cet id possède un mapping GLOBAL Moodle unique.
-
+Le POC courant est un no-op ; un executor générique de réattribution restera nécessaire pour un futur cas où le resolver retournerait `REASSIGN_OWNER`.
 
 ## Phase 7.6 — Wiki : auteurs et métadonnées des pages courantes
 
-Le POC réel `Wiki ILIAS obj_id=801/ref_id=273 -> Moodle CMID=55 / instance=1 / subwiki=1` est validé.
+Deux Wikis du POC ont été validés :
 
-Source ILIAS 10 relue en lecture seule :
-- page 11 / page1 : création 2026-09-18 15:24:28 ; dernière modification 2026-09-19 07:07:53 ;
-- page 12 / page2 : création 2026-09-19 07:07:59 ; dernière modification 2026-09-19 07:11:38 ;
-- page 13 / page3 : création 2026-09-19 07:11:42 ; dernière modification 2026-09-19 07:13:33 ;
-- créateur et dernier éditeur : ILIAS user 6/root pour les 3 pages ;
-- mapping GLOBAL : `ILIAS 6 -> Moodle 2/admin`.
+- `obj_id=801/ref_id=273 -> Moodle CMID=25 / instance=1 / subwiki=1` ;
+- `obj_id=823/ref_id=279 -> Moodle CMID=34 / instance=2 / subwiki=2`.
+
+Le créateur et dernier éditeur observés sur les pages source sont résolus via le mapping GLOBAL `ILIAS 6/root -> Moodle 2/admin`.
 
 Politique appliquée :
+
 - `wiki_pages.userid` <- dernier éditeur source mappé ;
 - `wiki_pages.timecreated` <- date de création source ;
 - `wiki_pages.timemodified` <- dernière modification source ;
-- version Moodle courante (version 1) : `userid` + `timecreated` <- dernier éditeur/date source ;
+- version Moodle courante : auteur/date source ;
 - version 0 technique Moodle : inchangée ;
-- contenu, liens, assets : inchangés ;
-- identité du créateur distincte : `HISTORY_ONLY` car Moodle Wiki ne possède pas de champ créateur séparé ;
-- historique complet des révisions ILIAS : `HISTORY_ONLY`.
+- contenu, liens et assets : inchangés ;
+- identité du créateur distincte et historique complet des révisions ILIAS : `HISTORY_ONLY`.
 
-Le resolver refuse l'apply si le Wiki n'a plus exactement les versions `[0,1]` avec version courante `1`, afin de ne pas écraser une modification Moodle postérieure à la migration.
+Validation :
 
-Validation finale :
-- premier apply : 3 pages mises à jour, 3 versions courantes mises à jour, aucune nouvelle page/version ;
-- dry-run suivant : 3 `KEEP`, 0 réconciliation ;
-- second apply : `writes_performed=false`.
+- Wiki 273 : premier apply réconcilie 3 pages, second apply `writes_performed=false` ;
+- Wiki 279 : premier apply réconcilie 2 pages, second apply `writes_performed=false`.
+

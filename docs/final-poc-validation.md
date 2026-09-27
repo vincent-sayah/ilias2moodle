@@ -1,156 +1,177 @@
-# Validation finale du POC — 0.20.0-rc1
+# Validation finale du POC — 0.20.0-rc2
 
-Date : 26 septembre 2026
+Date de consolidation : 27 septembre 2026
 
 ## Périmètre
 
 Cours source :
+
 - ILIAS 10.8 ;
-- cours `obj_id=504`, `ref_id=128` ;
+- cours `obj_id=504 / ref_id=128` ;
 - titre `cours test migration`.
 
-Cible :
+Cible fraîche de validation :
+
 - Moodle 5.0.2 ;
-- cours `id=5` ;
+- cours `id=2` ;
 - shortname `ILIAS-128`.
 
 Plugin :
+
 - `local_iliasmigration` ;
-- release candidate `0.20.0-rc1` ;
-- build `2026092604` ;
+- release candidate courante `0.20.0-rc2` ;
+- build `2026092605` ;
 - compatibilité minimale déclarée : Moodle 4.5.
 
 ## Validation du code
 
-Validation réalisée sur la branche `final-poc-validation` :
-- syntaxe PHP de l'ensemble du plugin : OK ;
-- tests PHP de régression : OK ;
-- Ruff : OK ;
-- Pytest : 43 tests réussis.
+La validation de consolidation est exécutée sur la cible Moodle avec PHP 8.3.35.
 
-## Installation Moodle
-
-Avant synchronisation, le plugin installé était en `0.17.0-alpha / 2026092003`.
-
-La version de référence `0.20.0-alpha / 2026092603` a été synchronisée vers `/var/www/moodle/local/iliasmigration` :
-- sauvegarde préalable : `/tmp/local_iliasmigration_before_rc_20260926.tar.gz` ;
-- SHA-256 : `3ee732697f259db356909562e0d4362c8bfd22b947797bd32e1f32bd17be432a` ;
-- `diff -qr` après synchronisation : aucune différence ;
-- upgrade Moodle : succès ;
-- second upgrade : aucune mise à jour nécessaire.
-
-Le build RC `2026092604` ne contient ensuite qu'une promotion de maturité/version et de la documentation ; aucun changement de schéma n'est associé à ce build.
-
-## Audit du cours cible
-
-État observé :
-- 6 utilisateurs inscrits ;
-- 3 rôles `student` ;
-- 2 rôles `editingteacher` ;
-- 1 rôle `teacher` ;
-- 0 Moodle Group issu du faux mapping initial ;
-- 67 mappings persistants associés à `sourcecourse=128` ;
-- 7 mappings utilisateurs GLOBAL.
-
-Tous les mappings observés sont au statut `READY`.
-
-Le total de 32 `course_modules` inclut des objets Moodle locaux/préexistants et ne représente donc pas le nombre d'objets migrés.
-
-Objets locaux explicitement qualifiés :
-- Forum `Annonces`, CMID 13, type `news` ;
-- Question Bank `bdq_moodle`, CMID 37 ;
-- label `gfhfgh`, CMID 50 ;
-- Glossaire `test`, CMID 54.
-
-Ces objets n'ont pas été créés par la migration ILIAS.
-
-## Forum
-
-Forum ILIAS `ref_id=275 / obj_id=807` :
-- Moodle CMID 59 / instance 6 ;
-- type `general` ;
-- 2 discussions ;
-- 7 posts ;
-- 3 auteurs source résolus ;
-- 3 pièces jointes physiques :
-  - `user et clef ssh.docx` ;
-  - `all_corrections.pdf` ;
-  - `handout.pdf`.
-
-Dry-run final :
-- 2 discussions `KEEP` ;
-- 7 posts `KEEP` ;
-- 3 assets vérifiés ;
-- 0 asset manquant ;
-- 0 item bloqué ;
-- `writes_performed=false`.
-
-## Blog
-
-Blog ILIAS `ref_id=247 / obj_id=732` :
-- Moodle `mod_data` CMID 61 / instance 3 ;
-- 2 billets ;
-- auteur source `il_0_usr_6` ;
-- mapping `ILIAS 6 -> Moodle 2/admin` ;
-- les deux records sont déjà propriétaires `userid=2` ;
-- 2 images physiques : `tous.png`, `trio.png`.
-
-Dry-run final :
-- 2 propriétaires conformes ;
-- 0 réattribution nécessaire ;
-- 0 item bloqué ;
-- `apply_required=false` ;
-- `writes_performed=false`.
-
-## Wiki
-
-Wiki ILIAS `ref_id=273 / obj_id=801` :
-- Moodle CMID 55 / instance 1 / subwiki 1 ;
-- 3 pages ;
-- auteur courant source : ILIAS user 6/root -> Moodle 2/admin ;
-- dates de création et dernière modification source restaurées ;
-- version courante Moodle 1 réconciliée ;
-- version 0 technique Moodle conservée.
-
-Dry-run final :
-- 3 pages `KEEP` ;
-- 0 métadonnée à réconcilier ;
-- 0 problème d'historique technique ;
-- historique complet ILIAS : `HISTORY_ONLY` ;
-- `apply_required=false` ;
-- `writes_performed=false`.
-
-## Idempotence finale
-
-Empreinte avant les dry-runs finaux :
-- `course_modules=32` ;
-- `mappings=80` ;
-- `course128_mappings=67` ;
-- `global_users=7` ;
-- `enrolments=6` ;
-- `forum_discussions=2` ;
-- `forum_posts=7` ;
-- `blog_records=2` ;
-- `wiki_pages=3`.
-
-Après les dry-runs Forum, Blog et Wiki, les valeurs sont strictement identiques.
-
-Résultat :
+Résultat de la suite PHP autonome :
 
 ```text
-STATE_DIFF_RC=0
+TOTAL=14
+PASSED=14
+FAILED=0
+PHP_SUITE_RC=0
 ```
 
-## Données volontairement non migrées
+Les deux tests ajoutés pour la consolidation Phase 7 valident :
 
-Deux extensions restent hors du périmètre de cette release candidate :
-- #22 — objet ILIAS Groupe complet : `DEFERRED / HISTORY_ONLY` ;
-- #41 — progression avancée multi-utilisateurs / multi-états.
+- le flag Forum `apply_implemented=true` ;
+- la résolution des mappings Phase 7.3, y compris le fallback unique et l'Exercise 1 -> N.
 
-La Phase 7.3 du POC courant a également conservé explicitement les cas sans équivalent sûr en `HISTORY_ONLY` ou `NO_DATA`, plutôt que de produire des données approximatives.
+La suite Python de référence de la Phase 6.5 reste à 57 tests réussis.
+
+Le PHP 7.4.29 installé localement sous Windows n'est pas un environnement de qualification : il ne supporte pas plusieurs constructions PHP 8 déjà utilisées par le projet.
+
+## Objets cibles de référence
+
+La migration fraîche du cours `128` vers le cours Moodle `2` a produit les cibles de référence suivantes :
+
+| Source ILIAS | Cible Moodle |
+|---|---|
+| SCORM ref 241 | CMID 18 |
+| SCORM ref 242 | CMID 19 |
+| Learning Module ref 243 | CMID 20 |
+| Question Pool ref 235 | CMID 21 |
+| Test ref 236 | CMID 22 |
+| Content Page ref 270 | CMID 23 |
+| Glossaire ref 272 | CMID 24 |
+| Wiki ref 273 | CMID 25 |
+| Exercice ref 274 | CMID 26 à 29 |
+| Forum ref 275 | CMID 30 |
+| Mediacast ref 276 | CMID 31 |
+| Blog ref 277 | CMID 32 |
+| Media Pool ref 278 | CMID 33 |
+| Wiki ref 279 | CMID 34 |
+
+L'Exercice est volontairement un mapping 1 -> N : les quatre unités ILIAS deviennent quatre activités `mod_assign`.
+
+## Phase 7.1 — utilisateurs, inscriptions et rôles
+
+Six participants source sont résolus et inscrits :
+
+| ILIAS | Moodle | Rôle Moodle |
+|---:|---:|---|
+| 401 | 6 | student |
+| 402 | 7 | student |
+| 410 | 8 | student |
+| 412 | 3 | editingteacher |
+| 413 | 4 | editingteacher |
+| 415 | 5 | teacher |
+
+Le compte global `ILIAS 6/root` est mappé explicitement vers `Moodle 2/admin` sans inscription automatique au cours.
+
+Le second passage réutilise les mêmes comptes, inscriptions et rôles.
+
+## Phase 7.3 — progression et résultats
+
+Le dry-run consolidé est strictement sans écriture :
+
+```text
+writes_performed = false
+ready_for_apply  = false
+apply_reason     = POC_HAS_NO_MIGRATABLE_PHASE73_DATA
+
+MIGRATE      = 0
+PARTIAL      = 0
+HISTORY_ONLY = 2
+UNSUPPORTED  = 0
+NO_DATA      = 21
+```
+
+Les mappings d'objets sont désormais résolus même lorsque les mappings persistants utilisent `sourcecourse=128` alors que l'inventaire source porte `obj_id=504`.
+
+Pour l'Exercice `obj_id=806 / ref_id=274`, les quatre mappings enfants sont résolus explicitement :
+
+```text
+274:assignment:1 -> CMID 26
+274:assignment:2 -> CMID 27
+274:assignment:3 -> CMID 28
+274:assignment:4 -> CMID 29
+```
+
+Le resolver accepte ce fallback 1 -> N uniquement lorsqu'un seul couple `sourceinstance/sourcecourse` est possible ; un résultat ambigu est bloqué.
+
+## Phase 7.4 — Forum
+
+Forum ILIAS `obj_id=807 / ref_id=275` :
+
+- Moodle CMID 30 / instance 2 ;
+- 3 auteurs source résolus ;
+- 2 discussions ;
+- 7 posts ;
+- 3 pièces jointes ;
+- second dry-run : 2 discussions `KEEP`, 7 posts `KEEP`, 3 assets vérifiés ;
+- second apply : aucune création supplémentaire, `writes_performed=false`.
+
+Le resolver annonce désormais correctement que l'apply Forum est implémenté.
+
+## Phase 7.5 — Blog
+
+Blog ILIAS `obj_id=812 / ref_id=277` :
+
+- Moodle `mod_data` CMID 32 / instance 2 ;
+- 2 billets ;
+- auteur source ILIAS `usr_id=6/root` ;
+- cible Moodle `user 2/admin`.
+
+Les deux records possèdent déjà le bon propriétaire. Le dry-run final retourne donc 0 changement, `apply_required=false` et `writes_performed=false`.
+
+Un executor générique de réattribution restera nécessaire pour un futur POC où le resolver retournerait `REASSIGN_OWNER`.
+
+## Phase 7.6 — Wiki
+
+Deux Wikis ont été validés :
+
+- `obj_id=801 / ref_id=273` -> Moodle CMID 25 / instance 1 / subwiki 1 ;
+- `obj_id=823 / ref_id=279` -> Moodle CMID 34 / instance 2 / subwiki 2.
+
+Pour les deux objets :
+
+- auteur courant résolu vers `Moodle 2/admin` ;
+- dates source réconciliées ;
+- version courante Moodle mise à jour ;
+- version 0 technique conservée ;
+- contenu et assets inchangés ;
+- second apply : `writes_performed=false`.
+
+## Objet Groupe
+
+L'objet ILIAS `obj_id=743 / ref_id=254` reste volontairement différé.
+
+Un simple Moodle Group n'est pas un équivalent fonctionnel d'un objet ILIAS `grp`, qui peut être un conteneur de dépôt avec membres, contenus et restrictions.
+
+La tentative initiale de Moodle Group a été supprimée et ne fait pas partie de l'état final validé.
 
 ## Conclusion
 
-Le périmètre POC couvert par les phases 1 à 7 est reproductible, audité et idempotent sur la cible de validation.
+Le périmètre POC couvert par les phases 1 à 7 est reproductible et idempotent sur la cible fraîche Moodle 5.0.2.
 
-La release candidate `0.20.0-rc1` peut être utilisée pour figer ce périmètre avant toute extension fonctionnelle supplémentaire.
+Les éléments volontairement hors périmètre restent :
+
+- #22 — migration complète de l'objet ILIAS Groupe ;
+- #41 — POC enrichi de progression avec états réellement migrables.
+
+La release candidate courante reste `0.20.0-rc2`. Cette consolidation documentaire ne modifie ni le numéro de version ni le schéma du plugin.
