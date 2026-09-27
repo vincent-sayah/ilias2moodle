@@ -155,3 +155,175 @@ def test_forum_package_extracts_structure_attachments_and_media(
         == 1
     )
     assert "forum_structure" not in item.metadata
+
+
+def test_forum_package_recovery_clears_resolved_missing_asset(
+    tmp_path: Path,
+) -> None:
+    import hashlib
+
+    archive_path = tmp_path / "course.zip"
+    base = "set_34/1800000000__0__frm_807"
+
+    # Deliberately do not put handout.pdf in the native ZIP.
+    with zipfile.ZipFile(archive_path, "w"):
+        pass
+
+    source_path = (
+        f"{base}/components/ILIAS/Forum/set_0/"
+        "expDir_1/handout.pdf"
+    )
+
+    structure = {
+        "schema_version": "1.0",
+        "source": {
+            "lms": "ILIAS",
+            "object_id": "807",
+            "ref_id": "275",
+            "export_base": base,
+        },
+        "title": "test migration forum",
+        "description": "POC Forum",
+        "threads": [
+            {
+                "source_id": "6",
+                "posts": [
+                    {
+                        "source_id": "18",
+                        "parent_source_id": "0",
+                        "attachments": [
+                            {
+                                "filename": "handout.pdf",
+                                "relative_path": (
+                                    "components/ILIAS/Forum/"
+                                    "set_0/expDir_1/handout.pdf"
+                                ),
+                                "archive_path": source_path,
+                                "kind": "attachment",
+                                "embedded": False,
+                                "size": 0,
+                            }
+                        ],
+                        "media_objects": [],
+                    }
+                ],
+            }
+        ],
+        "thread_count": 1,
+        "post_count": 1,
+        "attachment_count": 1,
+        "media_object_count": 0,
+        "source_author_ids": ["6"],
+        "missing_assets": [
+            {
+                "post_id": "18",
+                "kind": "attachment",
+                "source_path": (
+                    "components/ILIAS/Forum/"
+                    "set_0/expDir_1/handout.pdf"
+                ),
+            }
+        ],
+        "user_data_policy": {
+            "authors_resolved_to_moodle": False,
+            "target_phase": "7",
+        },
+    }
+
+    item = MigrationItem(
+        source_id="275",
+        type="forum",
+        title="test migration forum",
+        metadata={
+            "ilias_type": "frm",
+            "obj_id": "807",
+            "forum_export_base": base,
+            "forum_structure": structure,
+        },
+    )
+
+    document = MigrationDocument(
+        course=CourseExport(
+            source_id="128",
+            title="cours test migration",
+            items=[item],
+        )
+    )
+
+    recovery = tmp_path / "recovery"
+    recovery_post = (
+        recovery / "forum_807" / "post_18"
+    )
+    recovery_post.mkdir(parents=True)
+
+    recovered_file = recovery_post / "handout.pdf"
+    recovered_file.write_bytes(b"recovered-forum-file")
+
+    sha256 = hashlib.sha256(
+        recovered_file.read_bytes()
+    ).hexdigest()
+
+    manifest = {
+        "forum_obj_id": 807,
+        "post_id": 18,
+        "filename": "handout.pdf",
+        "output_name": "handout.pdf",
+        "size": recovered_file.stat().st_size,
+        "sha256": sha256,
+        "status": "OK",
+    }
+
+    (
+        recovery_post / "manifest.json"
+    ).write_text(
+        json.dumps(manifest),
+        encoding="utf-8",
+    )
+
+    output_dir = tmp_path / "package"
+
+    result = extract_forum_assets(
+        document,
+        archive_path,
+        output_dir,
+        attachment_recovery=recovery,
+    )
+
+    assert result["missing"] == []
+
+    assert (
+        result["extracted"][
+            "forum_attachment_files_recovered"
+        ]
+        == 1
+    )
+
+    saved = json.loads(
+        (
+            output_dir
+            / "forums/275/structure.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    assert saved["missing_assets"] == []
+
+    attachment = (
+        saved["threads"][0]["posts"][0][
+            "attachments"
+        ][0]
+    )
+
+    assert (
+        attachment["recovery_status"]
+        == "RECOVERED"
+    )
+
+    assert (
+        attachment["migration_path"]
+        == "forums/275/attachments/18/handout.pdf"
+    )
+
+    assert (
+        output_dir
+        / "forums/275/attachments/18/handout.pdf"
+    ).read_bytes() == b"recovered-forum-file"

@@ -275,6 +275,16 @@ def extract_forum_assets(
                                 copied = True
                                 recovered = True
 
+                                # The native ZIP did not contain this file,
+                                # so its source metadata may report size=0.
+                                # Record the verified recovered file size.
+                                attachment["size"] = int(
+                                    recovery["size"]
+                                )
+                                attachment["recovery_sha256"] = str(
+                                    recovery["sha256"]
+                                )
+
                         if copied:
                             attachment[
                                 "migration_path"
@@ -358,6 +368,62 @@ def extract_forum_assets(
                                         source_path,
                                 }
                             )
+
+            # Reconcile missing_assets after extraction/recovery.
+            # A source asset that now has a migration_path is available
+            # in the normalized package and must no longer be reported
+            # as missing.
+            unresolved_assets: list[dict[str, str]] = []
+
+            for thread in structure.get("threads", []):
+                if not isinstance(thread, dict):
+                    continue
+
+                for post in thread.get("posts", []):
+                    if not isinstance(post, dict):
+                        continue
+
+                    post_id = str(
+                        post.get("source_id", "")
+                    )
+
+                    for asset_key in (
+                        "attachments",
+                        "media_objects",
+                    ):
+                        for asset in post.get(
+                            asset_key,
+                            [],
+                        ):
+                            if not isinstance(asset, dict):
+                                continue
+
+                            if asset.get("migration_path"):
+                                continue
+
+                            unresolved_assets.append(
+                                {
+                                    "post_id": post_id,
+                                    "kind": str(
+                                        asset.get(
+                                            "kind",
+                                            "",
+                                        )
+                                    ),
+                                    "source_path": str(
+                                        asset.get(
+                                            "relative_path",
+                                            "",
+                                        )
+                                        or asset.get(
+                                            "archive_path",
+                                            "",
+                                        )
+                                    ),
+                                }
+                            )
+
+            structure["missing_assets"] = unresolved_assets
 
             structure_path = PurePosixPath(
                 *forum_root.parts,

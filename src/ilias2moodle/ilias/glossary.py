@@ -40,6 +40,185 @@ class GlossaryParser:
     def _parse_xml(self, member: str) -> ET.Element:
         return ET.fromstring(self.archive.read(member))
 
+    def _parse_taxonomy(
+        self,
+        glossary_object_id: str,
+        show_tax: str,
+    ) -> dict[str, Any]:
+        """Inspect an exported Glossary taxonomy conservatively.
+
+        ILIAS may export a Taxonomy component even when ShowTax is
+        disabled. Such a component is considered safely empty only
+        when it contains exactly the technical root taxonomy/tree
+        records and the usage points back to this Glossary.
+        """
+
+        enabled = show_tax not in {
+            "",
+            "0",
+            "n",
+            "N",
+            "false",
+            "False",
+        }
+
+        component = self._component_export("Taxonomy")
+
+        if component is None:
+            return {
+                "enabled": enabled,
+                "export_component_present": False,
+                "classification": "absent",
+                "taxonomy_count": 0,
+                "tree_node_count": 0,
+                "root_node_count": 0,
+                "business_node_count": 0,
+                "usage_count": 0,
+                "usage_object_ids": [],
+                "unknown_entities": [],
+                "taxonomies": [],
+            }
+
+        root = self._parse_xml(component)
+
+        taxonomies: list[dict[str, str]] = []
+        tree_nodes: list[dict[str, str]] = []
+        usages: list[dict[str, str]] = []
+        unknown_entities: list[str] = []
+
+        for record in root.iter():
+            if _local_name(record.tag) != "Rec":
+                continue
+
+            entity = record.attrib.get("Entity", "").strip()
+
+            if entity == "tax":
+                tax = _first_descendant(record, "Tax")
+                if tax is not None:
+                    taxonomies.append(
+                        {
+                            "id": _text_descendant(tax, "Id"),
+                            "title": _text_descendant(
+                                tax,
+                                "Title",
+                            ),
+                        }
+                    )
+                continue
+
+            if entity == "tax_tree":
+                tree = _first_descendant(
+                    record,
+                    "TaxTree",
+                )
+                if tree is not None:
+                    tree_nodes.append(
+                        {
+                            "taxonomy_id":
+                                _text_descendant(
+                                    tree,
+                                    "TaxId",
+                                ),
+                            "child":
+                                _text_descendant(
+                                    tree,
+                                    "Child",
+                                ),
+                            "parent":
+                                _text_descendant(
+                                    tree,
+                                    "Parent",
+                                ),
+                            "depth":
+                                _text_descendant(
+                                    tree,
+                                    "Depth",
+                                ),
+                            "title":
+                                _text_descendant(
+                                    tree,
+                                    "Title",
+                                ),
+                        }
+                    )
+                continue
+
+            if entity == "tax_usage":
+                usage = _first_descendant(
+                    record,
+                    "TaxUsage",
+                )
+                if usage is not None:
+                    usages.append(
+                        {
+                            "taxonomy_id":
+                                _text_descendant(
+                                    usage,
+                                    "TaxId",
+                                ),
+                            "object_id":
+                                _text_descendant(
+                                    usage,
+                                    "ObjId",
+                                ),
+                        }
+                    )
+                continue
+
+            # Any future/unknown Taxonomy entity remains unsafe
+            # until its migration semantics are explicitly known.
+            if entity:
+                unknown_entities.append(entity)
+
+        root_nodes = [
+            node
+            for node in tree_nodes
+            if node["parent"] == "0"
+            and node["depth"] == "1"
+        ]
+
+        business_node_count = (
+            len(tree_nodes) - len(root_nodes)
+        )
+
+        usage_object_ids = [
+            usage["object_id"]
+            for usage in usages
+        ]
+
+        inactive_empty = (
+            not enabled
+            and len(taxonomies) == 1
+            and len(tree_nodes) == 1
+            and len(root_nodes) == 1
+            and business_node_count == 0
+            and len(usages) == 1
+            and usage_object_ids
+                == [glossary_object_id]
+            and not unknown_entities
+        )
+
+        return {
+            "enabled": enabled,
+            "export_component_present": True,
+            "classification": (
+                "inactive_empty"
+                if inactive_empty
+                else "requires_review"
+            ),
+            "taxonomy_count": len(taxonomies),
+            "tree_node_count": len(tree_nodes),
+            "root_node_count": len(root_nodes),
+            "business_node_count":
+                business_node_count,
+            "usage_count": len(usages),
+            "usage_object_ids":
+                usage_object_ids,
+            "unknown_entities":
+                sorted(set(unknown_entities)),
+            "taxonomies": taxonomies,
+        }
+
     def parse(self) -> dict[str, Any]:
         glossary_component = self._component_export("Glossary")
         copage_component = self._component_export("COPage")
@@ -120,10 +299,13 @@ class GlossaryParser:
             }
             terms.append(term)
 
-        show_tax = _text_descendant(glossary, "ShowTax")
-        taxonomy_component_present = any(
-            name.startswith(f"{self.base}/components/ILIAS/Taxonomy/")
-            for name in self.names
+        show_tax = _text_descendant(
+            glossary,
+            "ShowTax",
+        )
+        taxonomy = self._parse_taxonomy(
+            object_id,
+            show_tax,
         )
 
         return {
@@ -142,10 +324,7 @@ class GlossaryParser:
                 "show_taxonomy": show_tax,
                 "glossary_menu_active": _text_descendant(glossary, "GloMenuActive"),
             },
-            "taxonomy": {
-                "enabled": show_tax not in {"", "0", "n", "N", "false", "False"},
-                "export_component_present": taxonomy_component_present,
-            },
+            "taxonomy": taxonomy,
             "terms": terms,
             "media": media,
             "files": files,

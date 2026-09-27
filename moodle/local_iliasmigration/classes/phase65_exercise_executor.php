@@ -453,6 +453,27 @@ final class phase65_exercise_executor {
             $moduleinfo->assignsubmission_onlinetext_enabled =
                 $onlineenabled ? 1 : 0;
 
+            // Ilias2Moodle: normalize localized gradepass values.
+            // get_moduleinfo_data() may return values such as "0,00"
+            // when Moodle uses a locale with a decimal comma.
+            // update_module() expects database-safe numeric values.
+            foreach (get_object_vars($moduleinfo) as $field => $value) {
+                if (!preg_match('/^gradepass(?:_\\d+)?$/', $field)) {
+                    continue;
+                }
+
+                if ($value === null || $value === '') {
+                    unset($moduleinfo->{$field});
+                    continue;
+                }
+
+                if (is_string($value)) {
+                    $moduleinfo->{$field} = is_numeric($value)
+                        ? (float) $value
+                        : unformat_float($value);
+                }
+            }
+
             update_module($moduleinfo);
 
             $instanceid = (int) $cm->instance;

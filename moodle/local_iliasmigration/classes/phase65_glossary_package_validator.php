@@ -195,12 +195,23 @@ final class phase65_glossary_package_validator {
             return ['terms' => 0, 'assets' => 0];
         }
 
-        $taxonomy = is_array($structure['taxonomy'] ?? null) ? $structure['taxonomy'] : [];
-        if (!empty($taxonomy['enabled']) || !empty($taxonomy['export_component_present'])) {
+        $taxonomy = is_array($structure['taxonomy'] ?? null)
+            ? $structure['taxonomy']
+            : [];
+        $taxonomyenabled = !empty($taxonomy['enabled']);
+        $taxonomypresent = !empty($taxonomy['export_component_present']);
+        $taxonomyclassification = (string) ($taxonomy['classification'] ?? '');
+
+        // ILIAS can export the technical Taxonomy root even when ShowTax=0.
+        // Accept only the explicitly parsed inactive/root-only case. Any
+        // active, populated, unknown or legacy-unclassified taxonomy remains
+        // blocked until its Moodle semantics are implemented.
+        if ($taxonomyenabled
+                || ($taxonomypresent && $taxonomyclassification !== 'inactive_empty')) {
             $this->block(
                 $operation,
                 'GLOSSARY_TAXONOMY_NOT_VALIDATED',
-                'Glossary taxonomy export is present but has not yet been validated on the POC.'
+                'Glossary taxonomy is active or contains taxonomy data that has not been validated for Moodle migration.'
             );
             return ['terms' => 0, 'assets' => 0];
         }
@@ -301,8 +312,18 @@ final class phase65_glossary_package_validator {
             'asset_count' => count($assetpaths),
             'media_count' => count(is_array($structure['media'] ?? null) ? $structure['media'] : []),
             'file_count' => count(is_array($structure['files'] ?? null) ? $structure['files'] : []),
-            'taxonomy_enabled' => false,
-            'taxonomy_export_present' => false,
+            'taxonomy_enabled' => $taxonomyenabled,
+            'taxonomy_export_present' => $taxonomypresent,
+            'taxonomy_classification' => $taxonomyclassification,
+            'taxonomy_count' => (int) ($taxonomy['taxonomy_count'] ?? 0),
+            'taxonomy_business_node_count' => (int) (
+                $taxonomy['business_node_count'] ?? 0
+            ),
+            'taxonomy_unknown_entities' => array_values(
+                is_array($taxonomy['unknown_entities'] ?? null)
+                    ? $taxonomy['unknown_entities']
+                    : []
+            ),
             'fingerprint_sha256' => (string) ($render['fingerprint_sha256'] ?? ''),
             'terms' => array_values(array_map(
                 static function(array $term): array {

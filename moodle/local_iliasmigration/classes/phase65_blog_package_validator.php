@@ -297,15 +297,6 @@ final class phase65_blog_package_validator {
             return $this->empty_summary();
         }
 
-        if ((int) ($structure['file_count'] ?? 0) > 0) {
-            $this->block(
-                $operation,
-                'BLOG_EMBEDDED_FILES_NOT_VALIDATED',
-                'Embedded Blog file-list assets are not part of the validated Phase 6.5.7 POC.'
-            );
-            return $this->empty_summary();
-        }
-
         $assetcount = $this->validate_assets($operation, $structure);
         if (($operation['action'] ?? '') === 'BLOCKED') {
             return $this->empty_summary();
@@ -557,12 +548,18 @@ final class phase65_blog_package_validator {
 
                 $locationtype = (string) ($item['location_type'] ?? '');
                 $mime = strtolower((string) ($item['mime_type'] ?? ''));
+
+                $supportedmime = str_starts_with(
+                    $mime,
+                    'image/'
+                ) || $mime === 'video/mp4';
+
                 if ($locationtype !== 'LocalFile'
-                        || !str_starts_with($mime, 'image/')) {
+                        || !$supportedmime) {
                     $this->block(
                         $operation,
                         'BLOG_MEDIA_TYPE_NOT_VALIDATED',
-                        'The Phase 6.5.7 POC currently validates embedded local image media only.'
+                        'Blog Phase 6.5.7 validates local image media and local MP4 video media only.'
                     );
                     return 0;
                 }
@@ -572,20 +569,68 @@ final class phase65_blog_package_validator {
         }
 
         foreach ((array) ($structure['files'] ?? []) as $file) {
-            if (!is_array($file)
-                    || empty($file['migration_path'])) {
-                continue;
-            }
-
-            $path = (string) $file['migration_path'];
-            if ($this->resolve_relative_file($path) === null) {
+            if (!is_array($file)) {
                 $this->block(
                     $operation,
-                    'BLOG_FILE_MISSING',
-                    'A normalized Blog file is missing from the migration package.'
+                    'BLOG_FILE_INVALID',
+                    'A normalized Blog file entry is invalid.'
                 );
                 return 0;
             }
+
+            $path = trim(
+                (string) ($file['migration_path'] ?? '')
+            );
+            $size = (int) (
+                $file['migration_size'] ?? 0
+            );
+            $sha256 = strtolower(
+                trim(
+                    (string) (
+                        $file['migration_sha256'] ?? ''
+                    )
+                )
+            );
+
+            $resolved = $path !== ''
+                ? $this->resolve_relative_file($path)
+                : null;
+
+            if ($resolved === null
+                    || $size <= 0
+                    || !preg_match(
+                        '/^[0-9a-f]{64}$/',
+                        $sha256
+                    )) {
+                $this->block(
+                    $operation,
+                    'BLOG_FILE_PACKAGE_INVALID',
+                    'A Blog file-list asset is missing its validated file, size or SHA-256.'
+                );
+                return 0;
+            }
+
+            $actualsize = filesize($resolved);
+            $actualsha256 = hash_file(
+                'sha256',
+                $resolved
+            );
+
+            if ($actualsize === false
+                    || $actualsha256 === false
+                    || (int) $actualsize !== $size
+                    || !hash_equals(
+                        $sha256,
+                        strtolower($actualsha256)
+                    )) {
+                $this->block(
+                    $operation,
+                    'BLOG_FILE_INTEGRITY_ERROR',
+                    'A Blog file-list asset no longer matches its normalized size/SHA-256.'
+                );
+                return 0;
+            }
+
             $assets++;
         }
 

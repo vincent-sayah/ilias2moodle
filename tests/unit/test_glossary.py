@@ -5,7 +5,7 @@ import json
 import zipfile
 from pathlib import Path
 
-from ilias2moodle.ilias.glossary import parse_glossaries
+from ilias2moodle.ilias.glossary import GlossaryParser, parse_glossaries
 
 
 def _write(archive: zipfile.ZipFile, name: str, content: str | bytes) -> None:
@@ -106,3 +106,154 @@ def test_glossary_parser_preserves_terms_definitions_and_media(tmp_path: Path) -
     assert glossary["unsupported_components"] == []
 
     json.dumps(glossary, ensure_ascii=False)
+
+
+def test_glossary_inactive_root_only_taxonomy_is_safe_empty(
+    tmp_path: Path,
+) -> None:
+    archive_path = tmp_path / "taxonomy-empty.zip"
+    base = "set_31/1790441011__0__glo_797"
+
+    taxonomy = """<Export>
+<ExportItem Id="800">
+<DataSet>
+<Rec Entity="tax">
+<Tax>
+<Id>800</Id>
+<Title>test taxonomie</Title>
+<Description></Description>
+<SortingMode>0</SortingMode>
+</Tax>
+</Rec>
+<Rec Entity="tax_tree">
+<TaxTree>
+<TaxId>800</TaxId>
+<Child>2</Child>
+<Parent>0</Parent>
+<Depth>1</Depth>
+<Type></Type>
+<Title>Root node for taxonomy 800</Title>
+<OrderNr>0</OrderNr>
+</TaxTree>
+</Rec>
+<Rec Entity="tax_usage">
+<TaxUsage>
+<TaxId>800</TaxId>
+<ObjId>797</ObjId>
+</TaxUsage>
+</Rec>
+</DataSet>
+</ExportItem>
+</Export>"""
+
+    with zipfile.ZipFile(
+        archive_path,
+        "w",
+    ) as archive:
+        _write(
+            archive,
+            (
+                f"{base}/components/ILIAS/"
+                "Taxonomy/set_0/export.xml"
+            ),
+            taxonomy,
+        )
+
+    with zipfile.ZipFile(archive_path) as archive:
+        parser = GlossaryParser(
+            archive,
+            base,
+        )
+        result = parser._parse_taxonomy(
+            "797",
+            "0",
+        )
+
+    assert result["enabled"] is False
+    assert result[
+        "export_component_present"
+    ] is True
+    assert (
+        result["classification"]
+        == "inactive_empty"
+    )
+    assert result["taxonomy_count"] == 1
+    assert result["tree_node_count"] == 1
+    assert result["root_node_count"] == 1
+    assert result["business_node_count"] == 0
+    assert result["usage_count"] == 1
+    assert result["usage_object_ids"] == ["797"]
+    assert result["unknown_entities"] == []
+
+
+def test_glossary_taxonomy_with_business_node_requires_review(
+    tmp_path: Path,
+) -> None:
+    archive_path = tmp_path / "taxonomy-real.zip"
+    base = "set_31/1790441011__0__glo_797"
+
+    taxonomy = """<Export>
+<ExportItem Id="800">
+<DataSet>
+<Rec Entity="tax">
+<Tax>
+<Id>800</Id>
+<Title>test taxonomie</Title>
+</Tax>
+</Rec>
+<Rec Entity="tax_tree">
+<TaxTree>
+<TaxId>800</TaxId>
+<Child>2</Child>
+<Parent>0</Parent>
+<Depth>1</Depth>
+<Title>Root node for taxonomy 800</Title>
+</TaxTree>
+</Rec>
+<Rec Entity="tax_tree">
+<TaxTree>
+<TaxId>800</TaxId>
+<Child>3</Child>
+<Parent>2</Parent>
+<Depth>2</Depth>
+<Title>Catégorie réelle</Title>
+</TaxTree>
+</Rec>
+<Rec Entity="tax_usage">
+<TaxUsage>
+<TaxId>800</TaxId>
+<ObjId>797</ObjId>
+</TaxUsage>
+</Rec>
+</DataSet>
+</ExportItem>
+</Export>"""
+
+    with zipfile.ZipFile(
+        archive_path,
+        "w",
+    ) as archive:
+        _write(
+            archive,
+            (
+                f"{base}/components/ILIAS/"
+                "Taxonomy/set_0/export.xml"
+            ),
+            taxonomy,
+        )
+
+    with zipfile.ZipFile(archive_path) as archive:
+        parser = GlossaryParser(
+            archive,
+            base,
+        )
+        result = parser._parse_taxonomy(
+            "797",
+            "0",
+        )
+
+    assert (
+        result["classification"]
+        == "requires_review"
+    )
+    assert result["business_node_count"] == 1

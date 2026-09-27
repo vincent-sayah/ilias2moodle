@@ -265,9 +265,11 @@ final class phase65_blog_renderer {
         }
 
         $mime = strtolower((string) ($selected['mime_type'] ?? ''));
-        if (!str_starts_with($mime, 'image/')) {
+
+        if (!str_starts_with($mime, 'image/')
+                && $mime !== 'video/mp4') {
             throw new \coding_exception(
-                'Only image media are validated for Blog apply.'
+                'Only image and MP4 video media are validated for Blog apply.'
             );
         }
 
@@ -280,9 +282,37 @@ final class phase65_blog_renderer {
         );
         $caption = trim((string) ($selected['caption'] ?? ''));
 
+        if ($mime === 'video/mp4') {
+            $source = '<source src="'
+                . $this->escape($url)
+                . '" type="video/mp4">';
+
+            $fallback = '<a class="mediafallbacklink" href="'
+                . $this->escape($url)
+                . '">'
+                . $this->escape($title)
+                . '</a>';
+
+            $html = '<figure><video controls="controls" '
+                . 'preload="metadata" '
+                . 'style="max-width:100%;height:auto;">'
+                . $source
+                . $fallback
+                . '</video>';
+
+            if ($caption !== '') {
+                $html .= '<figcaption>'
+                    . $this->escape($caption)
+                    . '</figcaption>';
+            }
+
+            return $html . "</figure>\n";
+        }
+
         $html = '<figure><img class="img-fluid" src="'
             . $this->escape($url)
             . '" alt="' . $this->escape($title) . '">';
+
         if ($caption !== '') {
             $html .= '<figcaption>' . $this->escape($caption)
                 . '</figcaption>';
