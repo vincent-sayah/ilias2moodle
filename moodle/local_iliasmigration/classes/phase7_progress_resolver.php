@@ -37,8 +37,10 @@ final class phase7_progress_resolver {
 
         $clientid = trim((string) ($progress['source']['client_id'] ?? ''));
         $sourcecourse = trim((string) ($progress['course']['object_id'] ?? ''));
+        $sourcecourseref = trim((string) ($progress['course']['ref_id'] ?? ''));
 
-        if ($clientid === '' || $sourcecourse === '') {
+        if ($clientid === '' || $sourcecourse === ''
+                || $sourcecourseref === '') {
             throw new \moodle_exception(
                 'Phase 7.3 progress inventory is missing client/course identifiers.'
             );
@@ -122,17 +124,15 @@ final class phase7_progress_resolver {
             $title = (string) ($object['title'] ?? '');
             $mode = (string) ($object['lp_mode_name'] ?? '');
 
-            $maps = $DB->get_records(
-                'local_iliasmigration_map',
-                [
-                    'sourcelms' => 'ILIAS',
-                    'sourceinstance' => $clientid,
-                    'sourcecourse' => $sourcecourse,
-                    'sourceref' => $sourceref,
-                ],
-                'id ASC',
-                'id,sourceobj,targettype,targetid,status'
+            $mappingresolution = $this->resolve_object_mappings(
+                $clientid,
+                $sourcecourse,
+                $sourcecourseref,
+                $sourceref,
+                $sourceobj,
+                $type === 'exc'
             );
+            $maps = $mappingresolution['mappings'];
 
             $maprows = [];
             foreach ($maps as $map) {
@@ -155,6 +155,11 @@ final class phase7_progress_resolver {
                 'title' => $title,
                 'lp_mode' => $mode,
                 'mapping_count' => count($maprows),
+                'mapping_resolution' => (string) $mappingresolution['resolution'],
+                'mapping_sourceinstance' => $mappingresolution['sourceinstance'],
+                'mapping_sourcecourse' => $mappingresolution['sourcecourse'],
+                'mapping_ambiguous' => (bool) $mappingresolution['ambiguous'],
+                'mapping_candidate_count' => (int) $mappingresolution['candidate_count'],
                 'mappings' => $maprows,
             ];
 
@@ -216,19 +221,26 @@ final class phase7_progress_resolver {
 
         foreach ($detailed as $item) {
             $ref = (string) ($item['source_ref_id'] ?? '');
-            $maps = $DB->get_records(
-                'local_iliasmigration_map',
-                [
-                    'sourcelms' => 'ILIAS',
-                    'sourceinstance' => $clientid,
-                    'sourcecourse' => $sourcecourse,
-                    'sourceref' => $ref,
-                ],
-                'id ASC',
-                'id,sourceobj,targettype,targetid,status'
+            $detailsourceobj = (string) ($item['source_object_id'] ?? '');
+            $allowchildprefix =
+                ($item['source_kind'] ?? '') === 'exercise_results';
+
+            $mappingresolution = $this->resolve_object_mappings(
+                $clientid,
+                $sourcecourse,
+                $sourcecourseref,
+                $ref,
+                $detailsourceobj,
+                $allowchildprefix
             );
+            $maps = $mappingresolution['mappings'];
 
             $item['object_mapping_count'] = count($maps);
+            $item['object_mapping_resolution'] = (string) $mappingresolution['resolution'];
+            $item['object_mapping_sourceinstance'] = $mappingresolution['sourceinstance'];
+            $item['object_mapping_sourcecourse'] = $mappingresolution['sourcecourse'];
+            $item['object_mapping_ambiguous'] = (bool) $mappingresolution['ambiguous'];
+            $item['object_mapping_candidate_count'] = (int) $mappingresolution['candidate_count'];
             $item['object_mappings'] = array_values(array_map(
                 static function($map): array {
                     return [
@@ -320,6 +332,186 @@ final class phase7_progress_resolver {
             'ready_for_apply' => false,
             'apply_implemented' => false,
             'apply_reason' => 'POC_HAS_NO_MIGRATABLE_PHASE73_DATA',
+        ];
+    }
+
+    /**
+     * Resolve object mappings across the identifiers used by historical phases.
+     *
+     * Exact client/course matches are preferred. Cross-instance fallbacks are
+     * accepted only when all candidates belong to one sourceinstance/sourcecourse
+     * pair. Exercise child mappings may additionally resolve ref:assignment:*
+     * entries when explicitly enabled.
+     */
+    private function resolve_object_mappings(
+        string $clientid,
+        string $sourcecourse,
+        string $sourcecourseref,
+        string $sourceref,
+        string $sourceobj = '',
+        bool $allowchildprefix = false
+    ): array {
+        global $DB;
+
+        $fields =
+            'id,sourceinstance,sourcecourse,sourceobj,targettype,targetid,status';
+
+        $exact = $DB->get_records(
+            'local_iliasmigration_map',
+            [
+                'sourcelms' => 'ILIAS',
+                'sourceinstance' => $clientid,
+                'sourcecourse' => $sourcecourse,
+                'sourceref' => $sourceref,
+            ],
+            'id ASC',
+            $fields
+        );
+
+        if ($exact) {
+            return [
+                'mappings' => $exact,
+                'resolution' => 'EXACT_CLIENT_AND_COURSE_OBJECT_ID',
+                'sourceinstance' => $clientid,
+                'sourcecourse' => $sourcecourse,
+                'ambiguous' => false,
+                'candidate_count' => count($exact),
+            ];
+        }
+
+        $exactref = $DB->get_records(
+            'local_iliasmigration_map',
+            [
+                'sourcelms' => 'ILIAS',
+                'sourceinstance' => $clientid,
+                'sourcecourse' => $sourcecourseref,
+                'sourceref' => $sourceref,
+            ],
+            'id ASC',
+            $fields
+        );
+
+        if ($exactref) {
+            return [
+                'mappings' => $exactref,
+                'resolution' => 'EXACT_CLIENT_AND_COURSE_REF_ID',
+                'sourceinstance' => $clientid,
+                'sourcecourse' => $sourcecourseref,
+                'ambiguous' => false,
+                'candidate_count' => count($exactref),
+            ];
+        }
+
+        $candidates = $DB->get_records_select(
+            'local_iliasmigration_map',
+            'sourcelms = ? AND sourceref = ?'
+                . ' AND (sourcecourse = ? OR sourcecourse = ?)',
+            [
+                'ILIAS',
+                $sourceref,
+                $sourcecourse,
+                $sourcecourseref,
+            ],
+            'id ASC',
+            $fields
+        );
+
+        if (!$candidates
+                && $allowchildprefix
+                && $sourceobj !== '') {
+            $childlike = $DB->sql_like_escape($sourceref . ':') . '%';
+
+            $childcandidates = $DB->get_records_select(
+                'local_iliasmigration_map',
+                'sourcelms = ? AND sourceobj = ? AND '
+                    . $DB->sql_like('sourceref', '?')
+                    . ' AND (sourcecourse = ? OR sourcecourse = ?)',
+                [
+                    'ILIAS',
+                    $sourceobj,
+                    $childlike,
+                    $sourcecourse,
+                    $sourcecourseref,
+                ],
+                'id ASC',
+                $fields
+            );
+
+            if ($childcandidates) {
+                $childgroups = [];
+
+                foreach ($childcandidates as $row) {
+                    $key = (string) $row->sourceinstance
+                        . "\n"
+                        . (string) $row->sourcecourse;
+                    $childgroups[$key][] = $row;
+                }
+
+                if (count($childgroups) !== 1) {
+                    return [
+                        'mappings' => [],
+                        'resolution' => 'AMBIGUOUS_CHILD_PREFIX_MAPPING',
+                        'sourceinstance' => null,
+                        'sourcecourse' => null,
+                        'ambiguous' => true,
+                        'candidate_count' => count($childcandidates),
+                    ];
+                }
+
+                $resolvedchildren = reset($childgroups);
+                $firstchild = reset($resolvedchildren);
+
+                return [
+                    'mappings' => $resolvedchildren,
+                    'resolution' => 'UNIQUE_CHILD_PREFIX_MAPPING',
+                    'sourceinstance' => (string) $firstchild->sourceinstance,
+                    'sourcecourse' => (string) $firstchild->sourcecourse,
+                    'ambiguous' => false,
+                    'candidate_count' => count($resolvedchildren),
+                ];
+            }
+        }
+
+        if (!$candidates) {
+            return [
+                'mappings' => [],
+                'resolution' => 'MISSING',
+                'sourceinstance' => null,
+                'sourcecourse' => null,
+                'ambiguous' => false,
+                'candidate_count' => 0,
+            ];
+        }
+
+        $groups = [];
+        foreach ($candidates as $row) {
+            $key = (string) $row->sourceinstance
+                . "\n"
+                . (string) $row->sourcecourse;
+            $groups[$key][] = $row;
+        }
+
+        if (count($groups) !== 1) {
+            return [
+                'mappings' => [],
+                'resolution' => 'AMBIGUOUS_FALLBACK_MAPPING',
+                'sourceinstance' => null,
+                'sourcecourse' => null,
+                'ambiguous' => true,
+                'candidate_count' => count($candidates),
+            ];
+        }
+
+        $resolved = reset($groups);
+        $first = reset($resolved);
+
+        return [
+            'mappings' => $resolved,
+            'resolution' => 'UNIQUE_FALLBACK_MAPPING',
+            'sourceinstance' => (string) $first->sourceinstance,
+            'sourcecourse' => (string) $first->sourcecourse,
+            'ambiguous' => false,
+            'candidate_count' => count($resolved),
         ];
     }
 

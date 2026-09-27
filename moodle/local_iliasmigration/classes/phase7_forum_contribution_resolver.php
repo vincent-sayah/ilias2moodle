@@ -603,7 +603,7 @@ final class phase7_forum_contribution_resolver {
             'threads' => $threads,
             'posts' => $posts,
             'ready_for_apply' => $ready,
-            'apply_implemented' => false,
+            'apply_implemented' => true,
         ];
     }
 
