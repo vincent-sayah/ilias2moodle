@@ -1,4 +1,4 @@
-# Validation finale du POC — 0.20.0-rc2
+# Validation finale du POC — 0.20.0-rc3
 
 Date de consolidation : 27 septembre 2026
 
@@ -19,8 +19,8 @@ Cible fraîche de validation :
 Plugin :
 
 - `local_iliasmigration` ;
-- release candidate courante `0.20.0-rc2` ;
-- build `2026092605` ;
+- release candidate courante `0.20.0-rc3` ;
+- build `2026092701` ;
 - compatibilité minimale déclarée : Moodle 4.5.
 
 ## Validation du code
@@ -174,4 +174,4 @@ Les éléments volontairement hors périmètre restent :
 - #22 — migration complète de l'objet ILIAS Groupe ;
 - #41 — POC enrichi de progression avec états réellement migrables.
 
-La release candidate courante reste `0.20.0-rc2`. Cette consolidation documentaire ne modifie ni le numéro de version ni le schéma du plugin.
+La release candidate courante est `0.20.0-rc3`. Ce build formalise la consolidation Phase 7 validée sur la cible fraîche ; aucun changement de schéma n'est associé à cette promotion.
