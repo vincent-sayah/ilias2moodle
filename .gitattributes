@@ -1,0 +1,31 @@
+# Normalize project text files to LF on every platform.
+*.php  text eol=lf
+*.py   text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.xml  text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.sh   text eol=lf
+*.toml text eol=lf
+*.csv  text eol=lf
+
+.gitignore text eol=lf
+LICENSE    text eol=lf
+
+# Keep common packaged/binary assets binary.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.tar  binary
+*.docx binary
+*.pptx binary
+*.xlsx binary
+*.mp3  binary
+*.mp4  binary
+*.wav  binary
