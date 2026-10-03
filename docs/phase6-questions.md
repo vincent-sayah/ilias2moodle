@@ -299,3 +299,34 @@ désormais passer chaque question `multianswer` générée dans
 `qtype_multianswer_validate_question()`, sans écriture en base. Une syntaxe
 Cloze que Moodle refuserait à l'import bloque donc désormais le dry-run avant
 tout `--apply`.
+
+## Fractions QCM non standards Moodle
+
+Le premier apply Phase 6 du cours RC4 `ref_id=282` a révélé cinq
+`assMultipleChoice` dont les scores positifs ILIAS sont répartis exactement
+en `0,34 / 0,33 / 0,33` sur 1 point, ou
+`0,68 / 0,66 / 0,66` sur 2 points.
+
+Le qformat XML Moodle, lorsqu'il est utilisé avec `matchgrades=error`, refuse
+ces fractions car elles ne figurent pas dans
+`question_bank::fraction_options_full()`. Les arrondir à des fractions Moodle
+standards modifierait le barème ILIAS et n'est donc pas accepté.
+
+Lorsque les conditions suivantes sont réunies :
+
+- type neutre `multiple_choice` ;
+- aucun score pour une option non sélectionnée ;
+- au moins une fraction sélectionnée non standard pour Moodle ;
+- somme exacte des scores positifs = `max_score` ILIAS ;
+
+la Phase 6 applique désormais la politique
+`MULTICHOICE_NONSTANDARD_FRACTIONS_TO_CLOZE`.
+
+La question devient une seule question Moodle Cloze contenant une interaction
+`MULTIRESPONSE`. Les pourcentages ILIAS sont conservés tels quels, par
+exemple `%34%`, `%33%`, `%33%`. Le slot du Quiz conserve le
+`max_score` ILIAS, donc le score absolu reste inchangé.
+
+Le préflight vérifie également chaque `multichoice` restant avec
+`match_grade_options(..., 'error')`, afin qu'une future fraction native
+incompatible soit bloquée au dry-run au lieu d'échouer pendant l'import réel.
