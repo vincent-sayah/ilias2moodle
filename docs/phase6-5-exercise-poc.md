@@ -158,6 +158,11 @@ Pour chaque fichier récupéré, le package conserve notamment :
 - la provenance `ilias_irss` ;
 - le chemin final dans le package.
 
+Une collection IRSS valide peut légitimement être vide. Si le manifest
+correspond à l'UUID attendu avec `resource_count=0` et `files=[]`, la
+collection est considérée comme résolue avec zéro fichier de consigne et la
+contrainte `instruction_collection_not_embedded` est levée.
+
 Un manifest absent ou invalide, un `resource_count` incohérent, un fichier
 absent, un lien symbolique, une taille incohérente ou un SHA-256 incorrect
 laisse l'unité bloquée. Aucun fichier IRSS non vérifié n'est accepté

@@ -279,6 +279,118 @@ def test_exercise_package_recovers_irss_instruction_files(
     assert saved_file["source"] == "ilias_irss"
 
 
+
+def test_exercise_irss_empty_collection_is_resolved(
+    tmp_path: Path,
+) -> None:
+    uuid = "496f99f9-f8c3-48ab-9714-a6a54886877e"
+
+    recovery_root = tmp_path / "irss"
+    collection_root = recovery_root / uuid
+    collection_root.mkdir(parents=True)
+
+    (collection_root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "collection_uuid": uuid,
+                "client_id": "ilias10",
+                "files": [],
+                "resource_count": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    structure = {
+        "schema_version": "1.0",
+        "source": {
+            "lms": "ILIAS",
+            "object_id": "1005",
+            "ref_id": "356",
+            "export_base": "set_39/example__0__exc_1005",
+        },
+        "title": "Exercice sans fichiers de consigne",
+        "description": "",
+        "assignments": [
+            {
+                "source_id": "5",
+                "title": "tache1",
+                "instruction": "<p>rendre copie 1</p>",
+                "instruction_collection": uuid,
+                "instruction_collection_kind": (
+                    "resource_collection_uuid"
+                ),
+                "instruction_files": [],
+                "instruction_files_embedded": False,
+                "type": {
+                    "key": "file_upload",
+                    "migration_support": "supported",
+                },
+                "automatic_ready": False,
+                "migration_constraints": [
+                    "instruction_collection_not_embedded"
+                ],
+                "phase7_dependencies": [],
+            }
+        ],
+        "blocking_features": [
+            {
+                "assignment_id": "5",
+                "feature": (
+                    "instruction_collection_not_embedded"
+                ),
+            }
+        ],
+        "export_issues": [
+            {
+                "assignment_id": "5",
+                "feature": (
+                    "instruction_collection_not_embedded"
+                ),
+            }
+        ],
+    }
+
+    item = MigrationItem(
+        source_id="356",
+        type="exercise",
+        title="Exercice sans fichiers de consigne",
+        metadata={
+            "ilias_type": "exc",
+            "obj_id": "1005",
+            "exercise_structure": structure,
+        },
+    )
+
+    document = MigrationDocument(
+        course=CourseExport(
+            source_id="282",
+            title="Cours test RC 0.20",
+            items=[item],
+        )
+    )
+
+    result = recover_exercise_instruction_files(
+        document,
+        recovery_root,
+    )
+
+    assert result["missing"] == []
+    assert result["recovered"]["collections_recovered"] == 1
+    assert result["recovered"]["instruction_files_recovered"] == 0
+
+    assignment = structure["assignments"][0]
+
+    assert assignment["recovery_status"] == "RECOVERED"
+    assert assignment["instruction_files"] == []
+    assert assignment["instruction_files_recovered"] is True
+    assert assignment["migration_constraints"] == []
+    assert assignment["automatic_ready"] is True
+
+    assert structure["blocking_features"] == []
+    assert structure["export_issues"] == []
+
+
 def test_exercise_irss_missing_manifest_keeps_assignment_blocked(
     tmp_path: Path,
 ) -> None:
