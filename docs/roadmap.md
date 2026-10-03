@@ -88,7 +88,12 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS 
 - [x] suite PHP : 14 / 14 réussis ;
 - [x] suite Python de référence : 57 tests réussis ;
 - [x] Phase 7.3 dry-run sans écriture ;
-- [x] Forum/Blog/Wiki en état final idempotent.
+- [x] Forum/Blog/Wiki en état final idempotent ;
+- [x] RC3 : 89 fichiers PHP lintés sans erreur ;
+- [x] RC3 : copie installée strictement identique à la candidate ;
+- [x] RC3 : aucun CRLF dans le plugin installé ;
+- [x] RC3 : premier upgrade Moodle réussi ;
+- [x] RC3 : second upgrade sans mise à jour nécessaire.
 
 ## Backlog non bloquant
 

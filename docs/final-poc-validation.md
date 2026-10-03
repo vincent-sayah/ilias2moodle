@@ -45,6 +45,44 @@ La suite Python de référence de la Phase 6.5 reste à 57 tests réussis.
 
 Le PHP 7.4.29 installé localement sous Windows n'est pas un environnement de qualification : il ne supporte pas plusieurs constructions PHP 8 déjà utilisées par le projet.
 
+## Qualification d'installation rc3
+
+Qualification réalisée le 3 octobre 2026 sur la cible fraîche Moodle 5.0.2 / PHP 8.3.35.
+
+Contrôles avant upgrade :
+
+```text
+PHP_FILES   = 89
+PHP_LINT_RC = 0
+COPY_DIFF_RC = 0
+CRLF installés = 0
+```
+
+Le répertoire installé `/var/www/moodle/local/iliasmigration` est strictement identique à la candidate rc3 normalisée utilisée pour la qualification.
+
+Premier upgrade Moodle :
+
+```text
+local_iliasmigration -> Succès
+UPGRADE1_RC=0
+```
+
+Après purge des caches, la version installée reste :
+
+```text
+0.20.0-rc3
+2026092701
+```
+
+Second upgrade :
+
+```text
+Aucune mise à jour nécessaire
+UPGRADE2_RC=0
+```
+
+La promotion rc3 est donc validée à la fois sur le code, l'installation réelle et l'idempotence de l'upgrade Moodle.
+
 ## Objets cibles de référence
 
 La migration fraîche du cours `128` vers le cours Moodle `2` a produit les cibles de référence suivantes :
