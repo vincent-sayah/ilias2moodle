@@ -26,6 +26,15 @@ final class phase65_wiki_renderer {
         $assets = [];
         $links = [];
         $fingerprintparts = [];
+        $exportedpageids = [];
+        foreach ($pages as $page) {
+            if (is_array($page)) {
+                $sourceid = (string) ($page['source_id'] ?? '');
+                if ($sourceid !== '') {
+                    $exportedpageids[$sourceid] = true;
+                }
+            }
+        }
 
         foreach ($pages as $page) {
             if (!is_array($page)) {
@@ -48,7 +57,7 @@ final class phase65_wiki_renderer {
             $contentrenderer = new phase65_content_renderer();
             $result = $contentrenderer->render(
                 $pagestructure,
-                static function(array $link): array {
+                static function(array $link) use ($exportedpageids): array {
                     $target = (string) ($link['target'] ?? '');
                     $targettype = (string) ($link['target_type'] ?? '');
                     $sourceid = (string) ($link['source_ref_id'] ?? '');
@@ -57,6 +66,17 @@ final class phase65_wiki_renderer {
                             || preg_match('/(?:^|_)wpg_(\d+)$/', $target, $matches) === 1) {
                         if ($sourceid === '' && isset($matches[1])) {
                             $sourceid = (string) $matches[1];
+                        }
+                        if ($sourceid === '' || !isset($exportedpageids[$sourceid])) {
+                            return [
+                                'status' => 'WIKI_PAGE_UNRESOLVED',
+                                'reason' => 'PAGE_NOT_EXPORTED',
+                                'candidate_count' => 0,
+                                'url' => '',
+                                'fallback_url' => '',
+                                'link_scope' => 'wiki_page',
+                                'wiki_page_source_id' => $sourceid,
+                            ];
                         }
                         return [
                             'status' => 'WIKI_PAGE_REFERENCE',
