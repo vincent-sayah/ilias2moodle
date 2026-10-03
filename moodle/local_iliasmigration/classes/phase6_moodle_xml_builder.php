@@ -73,6 +73,18 @@ final class phase6_moodle_xml_builder {
         if ($type === 'multiple_choice' && $this->has_unselected_scoring($question)) {
             $effectiveqtype = 'multianswer';
             $transform = 'MULTICHOICE_BINARY_DECISIONS_TO_CLOZE';
+        } else if (
+            $type === 'multiple_choice'
+            && $this->has_nonstandard_selected_fractions($question)
+        ) {
+            if (!$this->can_preserve_multiple_choice_as_multiresponse($question)) {
+                throw new \coding_exception(
+                    'ILIAS Multiple Choice uses non-standard Moodle fractions '
+                    . 'that cannot be preserved exactly as one Cloze MULTIRESPONSE question.'
+                );
+            }
+            $effectiveqtype = 'multianswer';
+            $transform = 'MULTICHOICE_NONSTANDARD_FRACTIONS_TO_CLOZE';
         }
         if ($type === 'kprim') {
             $effectiveqtype = 'multichoice';
@@ -113,6 +125,9 @@ final class phase6_moodle_xml_builder {
         }
         if ($descriptor['transform'] === 'MULTICHOICE_BINARY_DECISIONS_TO_CLOZE') {
             return $this->render_binary_multichoice_cloze($question, $descriptor);
+        }
+        if ($descriptor['transform'] === 'MULTICHOICE_NONSTANDARD_FRACTIONS_TO_CLOZE') {
+            return $this->render_fractional_multichoice_cloze($question, $descriptor);
         }
         if ($descriptor['transform'] === 'KPRIM_COMBINATIONS_TO_MULTICHOICE') {
             return $this->render_kprim_combinations_multichoice($question, $descriptor);
@@ -420,7 +435,72 @@ final class phase6_moodle_xml_builder {
     }
 
     /**
-     * ILIAS Kprim -> one Moodle single-choice question enumerating all binary
+     * ILIAS MCMR with exact non-standard fractions -> one Moodle Cloze
+     * MULTIRESPONSE subquestion. This avoids qformat_xml's fixed fraction
+     * whitelist while preserving each selected-answer fraction exactly.
+     */
+    private function render_fractional_multichoice_cloze(
+        array $question,
+        array $descriptor
+    ): string {
+        $maxscore = (float) ($descriptor['max_score'] ?? 0.0);
+        $answers = array_values(array_filter(
+            (array) ($question['answers'] ?? []),
+            'is_array'
+        ));
+
+        if ($maxscore <= 0.0 || count($answers) < 2) {
+            throw new \coding_exception(
+                'Fractional Multiple Choice transform requires at least two answers and a positive score.'
+            );
+        }
+
+        $parts = [];
+        $positive = 0.0;
+        foreach ($answers as $answer) {
+            $score = (float) ($answer['score_if_selected'] ?? 0.0);
+            $unselected = (float) ($answer['score_if_not_selected'] ?? 0.0);
+            if (abs($unselected) > 0.000000001) {
+                throw new \coding_exception(
+                    'Fractional Multiple Choice transform does not accept unselected-option scoring.'
+                );
+            }
+
+            $fraction = 100.0 * $score / $maxscore;
+            if ($fraction > 100.000001 || $fraction < -100.000001) {
+                throw new \coding_exception(
+                    'Fractional Multiple Choice answer fraction is outside Moodle Cloze limits.'
+                );
+            }
+            if ($score > 0.0) {
+                $positive += $score;
+            }
+
+            $label = $this->cloze_escape((string) ($answer['text'] ?? ''));
+            if (abs($fraction - 100.0) < 0.000001) {
+                $prefix = '=';
+            } else if (abs($fraction) < 0.000001) {
+                $prefix = '';
+            } else {
+                $prefix = '%' . $this->number($fraction) . '%';
+            }
+            $parts[] = $prefix . $label;
+        }
+
+        if (abs($positive - $maxscore) > 0.000001) {
+            throw new \coding_exception(
+                'Fractional Multiple Choice positive scores do not sum to the ILIAS maximum score.'
+            );
+        }
+
+        $body = (string) ($question['question_text'] ?? '');
+        $body .= '<div class="ilias2moodle-fractional-multichoice">';
+        $body .= '{1:MULTIRESPONSE:' . implode('~', $parts) . '}';
+        $body .= '</div>';
+
+        $xml = $this->header('cloze', $descriptor, $body, false);
+        return $xml . "  </question>\n";
+    }
 
     /**
      * ILIAS Kprim -> one Moodle single-choice question enumerating all binary
@@ -739,6 +819,73 @@ final class phase6_moodle_xml_builder {
             }
         }
         return false;
+    }
+
+    /**
+     * True when at least one selected-answer fraction would be rejected by
+     * Moodle XML import with matchgrades=error.
+     */
+    private function has_nonstandard_selected_fractions(array $question): bool {
+        $maxscore = (float) ($question['max_score'] ?? 0.0);
+        if ($maxscore <= 0.0) {
+            return false;
+        }
+
+        foreach (($question['answers'] ?? []) as $answer) {
+            if (!is_array($answer)) {
+                continue;
+            }
+            $fraction = (float) ($answer['score_if_selected'] ?? 0.0) / $maxscore;
+            if (!$this->is_moodle_standard_fraction($fraction)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The Cloze MULTIRESPONSE parser normalizes positive fractions to 1.0.
+     * Exact preservation is therefore safe only when ILIAS positive selected
+     * scores already sum to the question maximum and unselected scoring is 0.
+     */
+    private function can_preserve_multiple_choice_as_multiresponse(array $question): bool {
+        $maxscore = (float) ($question['max_score'] ?? 0.0);
+        if ($maxscore <= 0.0) {
+            return false;
+        }
+
+        $positive = 0.0;
+        $count = 0;
+        foreach (($question['answers'] ?? []) as $answer) {
+            if (!is_array($answer)) {
+                continue;
+            }
+            $count++;
+            if (abs((float) ($answer['score_if_not_selected'] ?? 0.0)) > 0.000000001) {
+                return false;
+            }
+            $score = (float) ($answer['score_if_selected'] ?? 0.0);
+            if ($score > 0.0) {
+                $positive += $score;
+            }
+        }
+
+        return $count >= 2 && abs($positive - $maxscore) <= 0.000001;
+    }
+
+    /** Match Moodle core's strict XML-import fraction policy. */
+    private function is_moodle_standard_fraction(float $fraction): bool {
+        global $CFG;
+
+        if (!function_exists('match_grade_options')) {
+            require_once($CFG->libdir . '/questionlib.php');
+        }
+
+        return match_grade_options(
+            \question_bank::fraction_options_full(),
+            $fraction,
+            'error'
+        ) !== false;
     }
 
     /** Escape XML text nodes/attributes. */
