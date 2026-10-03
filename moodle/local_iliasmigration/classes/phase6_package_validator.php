@@ -45,6 +45,8 @@ final class phase6_package_validator {
         $checkedtests = 0;
         $blockedtests = 0;
         $questionpools = 0;
+        $checkedcontentpools = 0;
+        $blockedpools = 0;
         $containeronlypools = 0;
         $scoringreviews = 0;
 
@@ -59,6 +61,7 @@ final class phase6_package_validator {
                     'exported_question_file_count' => $count,
                     'content_policy' => (string) ($operation['content_policy'] ?? ''),
                 ];
+
                 if ($count === 0) {
                     $containeronlypools++;
                     $plan['warnings'][] = [
@@ -66,6 +69,13 @@ final class phase6_package_validator {
                         'source_ref_id' => (string) ($operation['source_ref_id'] ?? ''),
                         'message' => 'The ILIAS question pool is exported as a container only. No question content will be invented or copied into the Moodle shared question bank.',
                     ];
+                    continue;
+                }
+
+                $checkedcontentpools++;
+                $this->validate_question_pool($operation);
+                if (($operation['action'] ?? '') === 'BLOCKED') {
+                    $blockedpools++;
                 }
                 continue;
             }
@@ -103,7 +113,9 @@ final class phase6_package_validator {
         $phase4ready = !isset($plan['phase4_package']) || !empty($plan['phase4_package']['ready']);
         $phase5ready = !isset($plan['phase5_package']) || !empty($plan['phase5_package']['ready']);
         $phase6prerequisites = !empty($plan['phase6_prerequisites']['ready']);
-        $packagechecksready = $checkedtests > 0 && $blockedtests === 0;
+        $packagechecksready = $checkedtests > 0
+            && $blockedtests === 0
+            && $blockedpools === 0;
         $prerequisitesready = $phase3ready && $phase4ready && $phase5ready && $phase6prerequisites;
 
         $plan['phase6_package'] = [
@@ -111,6 +123,8 @@ final class phase6_package_validator {
             'checked_tests' => $checkedtests,
             'blocked_tests' => $blockedtests,
             'question_pools' => $questionpools,
+            'checked_content_question_pools' => $checkedcontentpools,
+            'blocked_question_pools' => $blockedpools,
             'container_only_question_pools' => $containeronlypools,
             'scoring_review_count' => $scoringreviews,
             'package_checks_ready' => $packagechecksready,
@@ -128,6 +142,152 @@ final class phase6_package_validator {
         }
 
         return $plan;
+    }
+
+    /**
+     * Validate one normalized ILIAS Question Pool content package.
+     */
+    private function validate_question_pool(array &$operation): void {
+        $questionspath = trim(
+            (string) ($operation['migration_questions_path'] ?? '')
+        );
+        $questionsfile = $this->resolve_relative_file($questionspath);
+
+        if ($questionsfile === null) {
+            $this->block_question_pool(
+                $operation,
+                'PHASE6_QBANK_NORMALIZED_FILE_MISSING',
+                'Question Pool content was exported but questions.json is missing from the migration package.'
+            );
+            return;
+        }
+
+        $raw = file_get_contents($questionsfile);
+        if ($raw === false) {
+            $this->block_question_pool(
+                $operation,
+                'PHASE6_QBANK_JSON_READ_FAILED',
+                'Unable to read Question Pool questions.json.'
+            );
+            return;
+        }
+
+        try {
+            $questions = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            $this->block_question_pool(
+                $operation,
+                'PHASE6_QBANK_JSON_INVALID',
+                'Invalid Question Pool questions.json: ' . $exception->getMessage()
+            );
+            return;
+        }
+
+        if (!is_array($questions)
+                || ($questions['schema_version'] ?? null) !== '1.0'
+                || !is_array($questions['questions'] ?? null)) {
+            $this->block_question_pool(
+                $operation,
+                'PHASE6_QBANK_DOCUMENT_INVALID',
+                'Question Pool questions.json must use schema_version 1.0 and contain a questions array.'
+            );
+            return;
+        }
+
+        $expectedref = (string) ($operation['source_ref_id'] ?? '');
+        $source = is_array($questions['source'] ?? null) ? $questions['source'] : [];
+        if ((string) ($source['lms'] ?? '') !== 'ILIAS'
+                || (string) ($source['question_pool_ref_id'] ?? '') !== $expectedref) {
+            $this->block_question_pool(
+                $operation,
+                'PHASE6_QBANK_SOURCE_MISMATCH',
+                'Normalized Question Pool source identity does not match the planned ILIAS pool.'
+            );
+            return;
+        }
+
+        $list = $questions['questions'];
+        $questioncount = (int) ($questions['question_count'] ?? -1);
+        if ($questioncount <= 0 || $questioncount !== count($list)) {
+            $this->block_question_pool(
+                $operation,
+                'PHASE6_QBANK_QUESTION_COUNT_MISMATCH',
+                'Question Pool question_count does not match questions.json content.'
+            );
+            return;
+        }
+
+        $byident = [];
+        $typecounts = [];
+        foreach ($list as $question) {
+            if (!is_array($question)) {
+                $this->block_question_pool(
+                    $operation,
+                    'PHASE6_QBANK_QUESTION_INVALID',
+                    'Every normalized Question Pool question must be an object.'
+                );
+                return;
+            }
+
+            $ident = trim((string) ($question['source_ident'] ?? ''));
+            $type = (string) ($question['type'] ?? '');
+            $maxscore = (float) ($question['max_score'] ?? 0.0);
+
+            if ($ident === '' || isset($byident[$ident])) {
+                $this->block_question_pool(
+                    $operation,
+                    'PHASE6_QBANK_QUESTION_IDENT_INVALID',
+                    'Question Pool source_ident values must be present and unique.'
+                );
+                return;
+            }
+            if (!isset(self::QTYPE_MAP[$type])) {
+                $this->block_question_pool(
+                    $operation,
+                    'PHASE6_QBANK_QUESTION_TYPE_UNSUPPORTED',
+                    'Unsupported normalized Question Pool question type: ' . $type
+                );
+                return;
+            }
+            if ($maxscore <= 0.0) {
+                $this->block_question_pool(
+                    $operation,
+                    'PHASE6_QBANK_QUESTION_SCORE_INVALID',
+                    'Question Pool questions must have a positive max_score.'
+                );
+                return;
+            }
+
+            $byident[$ident] = true;
+            $typecounts[$type] = ($typecounts[$type] ?? 0) + 1;
+        }
+
+        $unsupported = (int) ($questions['unsupported_count'] ?? -1);
+        $declaredcount = (int) ($operation['normalized_question_count'] ?? 0);
+        $declaredunsupported = (int) ($operation['normalized_unsupported_count'] ?? 0);
+
+        if ($unsupported !== 0
+                || $declaredunsupported !== 0
+                || $declaredcount !== $questioncount) {
+            $this->block_question_pool(
+                $operation,
+                'PHASE6_QBANK_DECLARED_METADATA_MISMATCH',
+                'Question Pool normalized counters are inconsistent or still contain unsupported questions.'
+            );
+            return;
+        }
+
+        $operation['question_pool_validation'] = array_merge(
+            (array) ($operation['question_pool_validation'] ?? []),
+            [
+                'status' => 'OK',
+                'questions_path' => $questionspath,
+                'questions_sha256' => hash_file('sha256', $questionsfile) ?: null,
+                'question_count' => $questioncount,
+                'type_counts' => $typecounts,
+                'unsupported_count' => $unsupported,
+            ]
+        );
     }
 
     /**
@@ -438,6 +598,23 @@ final class phase6_package_validator {
             return null;
         }
         return $resolved;
+    }
+
+    private function block_question_pool(
+        array &$operation,
+        string $code,
+        string $message
+    ): void {
+        $operation['action'] = 'BLOCKED';
+        $operation['reason'] = $code;
+        $operation['question_pool_validation'] = array_merge(
+            (array) ($operation['question_pool_validation'] ?? []),
+            [
+                'status' => 'BLOCKED',
+                'code' => $code,
+                'message' => $message,
+            ]
+        );
     }
 
     /**
