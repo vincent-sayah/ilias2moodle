@@ -83,6 +83,28 @@ UPGRADE2_RC=0
 
 La promotion rc3 est donc validée à la fois sur le code, l'installation réelle et l'idempotence de l'upgrade Moodle.
 
+
+
+### Paquet canonique rc3
+
+Le paquet de distribution retenu est :
+
+```text
+local_iliasmigration-0.20.0-rc3.tar.gz
+SHA256 06705a2162b2f01584a4f6adb584c2278d99d3988eec0309ccce1d1b7e66397a
+```
+
+Validation du paquet :
+
+```text
+version = 0.20.0-rc3
+build = 2026092701
+CRLF = 0
+FINAL_PACKAGE_DIFF_RC=0
+```
+
+Le paquet doit être construit depuis `HEAD` à la racine du dépôt, en sélectionnant `moodle/local_iliasmigration`, puis repacké avec `local_iliasmigration/` comme racine d'archive. Il ne faut pas utiliser `git archive HEAD:moodle/local_iliasmigration`, car ce mode de sous-arbre ne tient pas compte du `.gitattributes` racine lors de la production de l'archive sous Git for Windows.
+
 ## Objets cibles de référence
 
 La migration fraîche du cours `128` vers le cours Moodle `2` a produit les cibles de référence suivantes :

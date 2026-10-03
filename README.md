@@ -363,6 +363,19 @@ Deux sujets restent volontairement hors du périmètre de la release candidate d
 
 La release candidate courante est `0.20.0-rc3`. Elle reprend la correction d'installation neuve MySQL/MariaDB introduite en `0.20.0-rc2` et ajoute la consolidation Phase 7 validée sur PHP 8.3.35 avec 14/14 tests PHP réussis. La RC3 a ensuite été installée et qualifiée sur une Moodle 5.0.2 fraîche : 89 fichiers PHP sans erreur de syntaxe, copie candidate strictement identique après déploiement, aucun CRLF installé, premier upgrade réussi et second upgrade sans mise à jour nécessaire. Le tag `v0.20.0-rc1` reste conservé pour la traçabilité.
 
+
+
+### Paquet de distribution rc3
+
+Le paquet canonique du plugin est :
+
+```text
+local_iliasmigration-0.20.0-rc3.tar.gz
+SHA256 06705a2162b2f01584a4f6adb584c2278d99d3988eec0309ccce1d1b7e66397a
+```
+
+Il a été généré depuis la racine du commit Git, puis repacké sur le seul répertoire `local_iliasmigration`. Cette méthode garantit la prise en compte de `.gitattributes` et évite les conversions CRLF du working tree Windows. Le paquet final contient 0 fichier CRLF et son contenu est strictement identique au plugin qualifié sur `moodle50rc` (`FINAL_PACKAGE_DIFF_RC=0`).
+
 ## Licence
 
 ILIAS2Moodle est distribué sous la licence **GNU General Public License v3.0 or later** (`GPL-3.0-or-later`).
