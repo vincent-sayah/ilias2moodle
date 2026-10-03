@@ -294,3 +294,78 @@ def test_parse_real_ilias_kprim_all_or_nothing_scoring() -> None:
 
     assert quiz["ordered_question_count"] == 1
     assert quiz["total_max_score"] == 1
+
+
+NUMERIC_CLOZE_QTI = """<?xml version="1.0"?>
+<questestinterop>
+  <assessment ident="test_numeric_cloze" title="Test global">
+    <section>
+      <item ident="il_0_qst_1432" title="PSC1 - Alerte (9)">
+        <itemmetadata><qtimetadata>
+          <qtimetadatafield><fieldlabel>QUESTIONTYPE</fieldlabel><fieldentry>assClozeTest</fieldentry></qtimetadatafield>
+          <qtimetadatafield><fieldlabel>externalId</fieldlabel><fieldentry>621a5af0b301c3.62272955</fieldentry></qtimetadatafield>
+          <qtimetadatafield><fieldlabel>textgaprating</fieldlabel><fieldentry>ci</fieldentry></qtimetadatafield>
+        </qtimetadata></itemmetadata>
+        <presentation>
+          <material><mattext texttype="text/xhtml">&lt;h3&gt;Je dois composer :&lt;/h3&gt;</mattext></material>
+          <material><mattext texttype="text/xhtml">&lt;h3&gt;</mattext></material>
+          <response_num ident="gap_0" numtype="Decimal" rcardinality="Single"><render_fib fibtype="Decimal"/></response_num>
+          <material><mattext texttype="text/xhtml">&lt;/h3&gt;&lt;h3&gt;</mattext></material>
+          <response_num ident="gap_1" numtype="Decimal" rcardinality="Single"><render_fib fibtype="Decimal"/></response_num>
+          <material><mattext texttype="text/xhtml">&lt;/h3&gt;&lt;h3&gt;</mattext></material>
+          <response_num ident="gap_2" numtype="Decimal" rcardinality="Single"><render_fib fibtype="Decimal"/></response_num>
+          <material><mattext texttype="text/xhtml">&lt;/h3&gt;&lt;h3&gt;</mattext></material>
+          <response_num ident="gap_3" numtype="Decimal" rcardinality="Single"><render_fib fibtype="Decimal"/></response_num>
+          <material><mattext texttype="text/xhtml">&lt;/h3&gt;</mattext></material>
+        </presentation>
+        <resprocessing>
+          <outcomes><decvar/></outcomes>
+          <respcondition><conditionvar><varequal respident="gap_0">18</varequal></conditionvar><setvar action="Add">0.5</setvar></respcondition>
+          <respcondition><conditionvar><varequal respident="gap_1">15</varequal></conditionvar><setvar action="Add">0.5</setvar></respcondition>
+          <respcondition><conditionvar><varequal respident="gap_2">112</varequal></conditionvar><setvar action="Add">0.5</setvar></respcondition>
+          <respcondition><conditionvar><varequal respident="gap_3">114</varequal></conditionvar><setvar action="Add">0.5</setvar></respcondition>
+        </resprocessing>
+      </item>
+    </section>
+  </assessment>
+</questestinterop>
+"""
+
+
+def test_parse_real_ilias_numeric_cloze_gaps() -> None:
+    questions, quiz = parse_test_qti(
+        NUMERIC_CLOZE_QTI,
+        source_ref_id="331",
+        source_obj_id="947",
+        title="Test global",
+    )
+
+    assert questions["question_count"] == 1
+    assert questions["unsupported_count"] == 0
+
+    question = questions["questions"][0]
+    assert question["type"] == "cloze"
+    assert question["max_score"] == 2
+    assert len(question["gaps"]) == 4
+    assert [gap["input_type"] for gap in question["gaps"]] == [
+        "numeric",
+        "numeric",
+        "numeric",
+        "numeric",
+    ]
+    assert [gap["num_type"] for gap in question["gaps"]] == [
+        "Decimal",
+        "Decimal",
+        "Decimal",
+        "Decimal",
+    ]
+    assert [
+        gap["accepted_answers"][0]["text"]
+        for gap in question["gaps"]
+    ] == ["18", "15", "112", "114"]
+    assert [
+        gap["max_score"]
+        for gap in question["gaps"]
+    ] == [0.5, 0.5, 0.5, 0.5]
+
+    assert quiz["total_max_score"] == 2
