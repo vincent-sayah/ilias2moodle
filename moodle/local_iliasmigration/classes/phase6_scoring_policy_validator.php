@@ -158,9 +158,23 @@ final class phase6_scoring_policy_validator {
 
                 $qtypes = [];
                 $transforms = [];
-                foreach ($descriptors as $descriptor) {
+                foreach ($descriptors as $index => $descriptor) {
                     $qtype = (string) ($descriptor['effective_qtype'] ?? '');
                     $qtypes[$qtype] = ($qtypes[$qtype] ?? 0) + 1;
+
+                    if ($qtype === 'multianswer') {
+                        $xmlquestion = $parsed->question[$index] ?? null;
+                        if ($xmlquestion === null) {
+                            throw new \coding_exception(
+                                'Generated Moodle Cloze question is missing from the XML preflight document.'
+                            );
+                        }
+                        $this->assert_core_multianswer_accepts(
+                            (string) $xmlquestion->questiontext->text,
+                            (string) ($descriptor['source_ident'] ?? '')
+                        );
+                    }
+
                     if (($descriptor['transform'] ?? 'NATIVE') !== 'NATIVE') {
                         $transforms[] = [
                             'source_ident' => (string) ($descriptor['source_ident'] ?? ''),
@@ -238,6 +252,46 @@ final class phase6_scoring_policy_validator {
         }
 
         return $plan;
+    }
+
+    /**
+     * Run generated Cloze text through Moodle core's own embedded-answer parser.
+     * This is read-only and catches syntax accepted by XML but rejected by
+     * qtype_multianswer during the real import.
+     */
+    private function assert_core_multianswer_accepts(
+        string $questiontext,
+        string $sourceident
+    ): void {
+        global $CFG;
+
+        require_once(
+            $CFG->dirroot . '/question/type/multianswer/questiontype.php'
+        );
+
+        $parsed = qtype_multianswer_extract_question([
+            'text' => $questiontext,
+            'format' => FORMAT_HTML,
+            'itemid' => '',
+        ]);
+        $errors = qtype_multianswer_validate_question($parsed);
+
+        if ($errors) {
+            throw new \coding_exception(
+                'Generated Moodle Cloze failed the Moodle core parser for '
+                . $sourceident
+                . ': '
+                . implode(' ', array_values($errors))
+            );
+        }
+
+        if (empty($parsed->options->questions)) {
+            throw new \coding_exception(
+                'Generated Moodle Cloze contains no core-recognized embedded answer for '
+                . $sourceident
+                . '.'
+            );
+        }
     }
 
     /** Parse generated XML without network access or entity substitution. */
