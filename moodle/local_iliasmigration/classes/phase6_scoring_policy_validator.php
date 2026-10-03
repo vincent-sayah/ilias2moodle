@@ -30,6 +30,9 @@ final class phase6_scoring_policy_validator {
         $matchingmediatransforms = 0;
         $transformedquestions = 0;
         $preflightblocked = 0;
+        $checkedcontentpools = 0;
+        $poolpreflightblocked = 0;
+        $pooltransformedquestions = 0;
 
         foreach ($plan['operations'] as &$operation) {
             if (($operation['kind'] ?? '') !== 'test'
@@ -293,6 +296,138 @@ final class phase6_scoring_policy_validator {
         }
         unset($operation);
 
+        // Exported Question Pool content is imported through the same Moodle XML
+        // path as quiz-private questions. Preflight it with the same builder and
+        // core parsers so dry-run covers all questions that apply will write.
+        foreach ($plan['operations'] as &$operation) {
+            if (($operation['kind'] ?? '') !== 'question_pool'
+                    || ($operation['content_policy'] ?? '') !== 'EXPORTED_CONTENT_AVAILABLE'
+                    || ($operation['question_pool_validation']['status'] ?? '') !== 'OK') {
+                continue;
+            }
+
+            $action = (string) ($operation['action'] ?? '');
+            if (!in_array($action, ['CREATE', 'UPDATE'], true)) {
+                continue;
+            }
+
+            $questionsfile = $this->resolve_relative_file(
+                (string) ($operation['migration_questions_path'] ?? '')
+            );
+            if ($questionsfile === null) {
+                $operation['action'] = 'BLOCKED';
+                $operation['reason'] = 'PHASE6_QBANK_MOODLE_XML_PREFLIGHT_FAILED';
+                $operation['question_pool_validation']['moodle_xml_preflight'] = [
+                    'status' => 'BLOCKED',
+                    'code' => 'PHASE6_QBANK_MOODLE_XML_PREFLIGHT_FAILED',
+                    'message' => 'Question Pool questions.json is unavailable for Moodle XML preflight.',
+                ];
+                $poolpreflightblocked++;
+                continue;
+            }
+
+            $questions = $this->read_json($questionsfile);
+            if ($questions === null || !is_array($questions['questions'] ?? null)) {
+                $operation['action'] = 'BLOCKED';
+                $operation['reason'] = 'PHASE6_QBANK_MOODLE_XML_PREFLIGHT_FAILED';
+                $operation['question_pool_validation']['moodle_xml_preflight'] = [
+                    'status' => 'BLOCKED',
+                    'code' => 'PHASE6_QBANK_MOODLE_XML_PREFLIGHT_FAILED',
+                    'message' => 'Question Pool questions.json cannot be decoded for Moodle XML preflight.',
+                ];
+                $poolpreflightblocked++;
+                continue;
+            }
+
+            $checkedcontentpools++;
+            $poolref = (string) ($operation['source_ref_id'] ?? '');
+
+            try {
+                $built = (new phase6_moodle_xml_builder())->build($questions, $poolref);
+                $xml = (string) ($built['xml'] ?? '');
+                $descriptors = is_array($built['questions'] ?? null)
+                    ? $built['questions']
+                    : [];
+                $parsed = $this->parse_xml_without_network($xml);
+                $expectedcount = (int) (
+                    $questions['question_count'] ?? count($questions['questions'])
+                );
+
+                if ($parsed === null
+                        || count($parsed->question) !== $expectedcount
+                        || count($descriptors) !== $expectedcount) {
+                    throw new \coding_exception(
+                        'Generated Question Pool Moodle XML question count differs from questions.json.'
+                    );
+                }
+
+                $qtypes = [];
+                $transforms = [];
+                foreach ($descriptors as $index => $descriptor) {
+                    $qtype = (string) ($descriptor['effective_qtype'] ?? '');
+                    $qtypes[$qtype] = ($qtypes[$qtype] ?? 0) + 1;
+
+                    $xmlquestion = $parsed->question[$index] ?? null;
+                    if ($xmlquestion === null) {
+                        throw new \coding_exception(
+                            'Generated Question Pool Moodle question is missing from XML preflight.'
+                        );
+                    }
+
+                    if ($qtype === 'multianswer') {
+                        $this->assert_core_multianswer_accepts(
+                            (string) $xmlquestion->questiontext->text,
+                            (string) ($descriptor['source_ident'] ?? '')
+                        );
+                    } else if ($qtype === 'multichoice') {
+                        $this->assert_core_multichoice_fractions_accept(
+                            $xmlquestion,
+                            (string) ($descriptor['source_ident'] ?? '')
+                        );
+                    } else if ($qtype === 'match') {
+                        $this->assert_native_matching_complete(
+                            $xmlquestion,
+                            (string) ($descriptor['source_ident'] ?? '')
+                        );
+                    }
+
+                    if (($descriptor['transform'] ?? 'NATIVE') !== 'NATIVE') {
+                        $pooltransformedquestions++;
+                        $transforms[] = [
+                            'source_ident' => (string) ($descriptor['source_ident'] ?? ''),
+                            'policy' => (string) ($descriptor['transform'] ?? ''),
+                            'effective_moodle_qtype' => $qtype,
+                            'max_score' => (float) ($descriptor['max_score'] ?? 0.0),
+                        ];
+                    }
+                }
+
+                $operation['question_pool_validation']['moodle_xml_preflight'] = [
+                    'status' => 'OK',
+                    'sha256' => hash('sha256', $xml),
+                    'bytes' => strlen($xml),
+                    'question_count' => count($descriptors),
+                    'effective_qtype_counts' => $qtypes,
+                    'score_preserving_transforms' => $transforms,
+                ];
+            } catch (\Throwable $exception) {
+                $poolpreflightblocked++;
+                $operation['action'] = 'BLOCKED';
+                $operation['reason'] = 'PHASE6_QBANK_MOODLE_XML_PREFLIGHT_FAILED';
+                $operation['question_pool_validation']['moodle_xml_preflight'] = [
+                    'status' => 'BLOCKED',
+                    'code' => 'PHASE6_QBANK_MOODLE_XML_PREFLIGHT_FAILED',
+                    'message' => $exception->getMessage(),
+                ];
+                $plan['warnings'][] = [
+                    'code' => 'PHASE6_QBANK_MOODLE_XML_PREFLIGHT_FAILED',
+                    'source_ref_id' => $poolref,
+                    'message' => $exception->getMessage(),
+                ];
+            }
+        }
+        unset($operation);
+
         if (isset($plan['phase6_package'])) {
             if ($addedreviews > 0) {
                 $plan['phase6_package']['scoring_review_count'] =
@@ -306,16 +441,32 @@ final class phase6_scoring_policy_validator {
                 $matchingmediatransforms;
             $plan['phase6_package']['score_preserving_transform_count'] = $transformedquestions;
             $plan['phase6_package']['moodle_xml_preflight_blocked_tests'] = $preflightblocked;
-            $plan['phase6_package']['moodle_xml_preflight_ready'] = $preflightblocked === 0;
-            $plan['phase6_package']['scoring_policy_ready'] = $preflightblocked === 0;
+            $plan['phase6_package']['checked_content_question_pool_preflights'] =
+                $checkedcontentpools;
+            $plan['phase6_package']['moodle_xml_preflight_blocked_question_pools'] =
+                $poolpreflightblocked;
+            $plan['phase6_package']['question_pool_score_preserving_transform_count'] =
+                $pooltransformedquestions;
+            $plan['phase6_package']['moodle_xml_preflight_ready'] =
+                $preflightblocked === 0 && $poolpreflightblocked === 0;
+            $plan['phase6_package']['scoring_policy_ready'] =
+                $preflightblocked === 0 && $poolpreflightblocked === 0;
             $plan['phase6_package']['apply_implemented'] = true;
             if ($preflightblocked > 0) {
                 $plan['phase6_package']['blocked_tests'] =
                     (int) ($plan['phase6_package']['blocked_tests'] ?? 0) + $preflightblocked;
                 $plan['phase6_package']['ready'] = false;
             }
+            if ($poolpreflightblocked > 0) {
+                $plan['phase6_package']['blocked_question_pools'] =
+                    (int) ($plan['phase6_package']['blocked_question_pools'] ?? 0)
+                    + $poolpreflightblocked;
+                $plan['phase6_package']['ready'] = false;
+            }
             $plan['phase6_package']['apply_ready'] =
-                !empty($plan['phase6_package']['ready']) && $preflightblocked === 0;
+                !empty($plan['phase6_package']['ready'])
+                && $preflightblocked === 0
+                && $poolpreflightblocked === 0;
         }
 
         // The old structural-validator warning is replaced by explicit policies.
