@@ -539,25 +539,41 @@ def _short_answer_question(item: ET.Element) -> dict[str, Any]:
 
 def _cloze_question(item: ET.Element) -> dict[str, Any]:
     gaps: list[dict[str, Any]] = []
-    for response in _descendants(item, "response_str"):
+    presentation = _first(item, "presentation")
+    responses = (
+        [
+            element
+            for element in presentation.iter()
+            if _local_name(element.tag) in {"response_str", "response_num"}
+        ]
+        if presentation is not None
+        else []
+    )
+
+    for response in responses:
         response_ident = response.attrib.get("ident", "")
         if not response_ident.startswith("gap_"):
             continue
         accepted = _accepted_answers(item, response_ident)
-        gaps.append(
-            {
-                "response_ident": response_ident,
-                "accepted_answers": accepted,
-                "max_score": max(
-                    (float(answer["points"]) for answer in accepted),
-                    default=0.0,
-                ),
-            }
-        )
+        response_kind = _local_name(response.tag)
+        gap: dict[str, Any] = {
+            "response_ident": response_ident,
+            "input_type": "numeric" if response_kind == "response_num" else "text",
+            "accepted_answers": accepted,
+            "max_score": max(
+                (float(answer["points"]) for answer in accepted),
+                default=0.0,
+            ),
+        }
+        if response_kind == "response_num":
+            gap["num_type"] = response.attrib.get("numtype", "")
+        gaps.append(gap)
 
+    metadata = _metadata(item)
     return {
         "text_fragments": _mattexts(item),
         "gaps": gaps,
+        "case_sensitive": metadata.get("textgaprating", "").lower() == "cs",
         "max_score": sum(float(gap["max_score"]) for gap in gaps),
     }
 
