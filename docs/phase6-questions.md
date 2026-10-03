@@ -243,3 +243,28 @@ Cette représentation modifie l'interaction visuelle, mais conserve :
 - la note maximale ;
 - le score de chaque combinaison, y compris le tout-ou-rien ;
 - l'identité source et l'idempotence des mappings.
+
+## Cloze ILIAS avec trous numériques
+
+Le cours RC4 `ref_id=282` a révélé un second cas réel de
+`assClozeTest` : la question `il_0_qst_1432` contient quatre
+`response_num` et non des `response_str`.
+
+Le barème source est explicite :
+
+- `gap_0 = 18` : 0,5 point ;
+- `gap_1 = 15` : 0,5 point ;
+- `gap_2 = 112` : 0,5 point ;
+- `gap_3 = 114` : 0,5 point ;
+- note maximale : 2 points.
+
+Le parseur RC4 reconnaît désormais, dans un Cloze, les réponses
+`response_str` et `response_num` dans leur ordre de présentation.
+Chaque trou normalisé indique `input_type=text|numeric`.
+
+Pour les trous numériques dont ILIAS exprime la correction avec
+`varequal`, le générateur Moodle produit une sous-question Cloze
+`NUMERICAL` avec tolérance 0. La note du trou est conservée comme
+poids de la sous-question. Les autres comparateurs numériques restent
+volontairement refusés tant qu'une politique de tolérance n'a pas été
+validée sur un export réel.
