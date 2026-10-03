@@ -369,3 +369,86 @@ def test_parse_real_ilias_numeric_cloze_gaps() -> None:
     ] == [0.5, 0.5, 0.5, 0.5]
 
     assert quiz["total_max_score"] == 2
+
+
+IMAGE_MATCHING_QTI = """<?xml version="1.0"?>
+<questestinterop>
+  <assessment ident="test_image_matching" title="Image matching">
+    <section>
+      <item ident="il_0_qst_image_match" title="Image Matching">
+        <itemmetadata><qtimetadata>
+          <qtimetadatafield><fieldlabel>QUESTIONTYPE</fieldlabel><fieldentry>assMatchingQuestion</fieldentry></qtimetadatafield>
+          <qtimetadatafield><fieldlabel>externalId</fieldlabel><fieldentry>image-match-external</fieldentry></qtimetadatafield>
+        </qtimetadata></itemmetadata>
+        <presentation>
+          <material><mattext texttype="text/xhtml">&lt;p&gt;Associez.&lt;/p&gt;</mattext></material>
+          <response_grp ident="MQ" rcardinality="Multiple">
+            <render_choice shuffle="No">
+              <response_label ident="source1" match_group="target1,target2">
+                <material>
+                  <matimage imagtype="image/png" label="source.png" embedded="base64">aGVsbG8=</matimage>
+                </material>
+              </response_label>
+              <response_label ident="source2" match_group="target1,target2">
+                <material><mattext texttype="text/plain">Source texte</mattext></material>
+              </response_label>
+              <response_label ident="target1">
+                <material><mattext texttype="text/plain">Cible texte</mattext></material>
+              </response_label>
+              <response_label ident="target2">
+                <material>
+                  <matimage imagtype="image/png" label="target.png" embedded="base64">d29ybGQ=</matimage>
+                </material>
+              </response_label>
+            </render_choice>
+          </response_grp>
+        </presentation>
+        <resprocessing>
+          <outcomes><decvar/></outcomes>
+          <respcondition>
+            <conditionvar><varsubset respident="MQ">source1,target1</varsubset></conditionvar>
+            <setvar action="Add">1</setvar>
+          </respcondition>
+          <respcondition>
+            <conditionvar><varsubset respident="MQ">source2,target2</varsubset></conditionvar>
+            <setvar action="Add">1</setvar>
+          </respcondition>
+        </resprocessing>
+      </item>
+    </section>
+  </assessment>
+</questestinterop>
+"""
+
+
+def test_parse_matching_preserves_embedded_label_images() -> None:
+    questions, quiz = parse_test_qti(
+        IMAGE_MATCHING_QTI,
+        source_ref_id="331",
+        source_obj_id="947",
+        title="Image matching",
+    )
+
+    assert questions["question_count"] == 1
+    assert questions["unsupported_count"] == 0
+
+    question = questions["questions"][0]
+    assert question["type"] == "matching"
+    assert question["has_media"] is True
+    assert question["max_score"] == 2
+
+    labels = {label["ident"]: label for label in question["labels"]}
+    assert labels["source1"]["text"] == ""
+    assert labels["source1"]["has_media"] is True
+    assert labels["source1"]["media"][0]["filename"] == "source.png"
+    assert labels["source1"]["media"][0]["data"] == "aGVsbG8="
+    assert labels["source1"]["media"][0]["valid_base64"] is True
+
+    assert labels["target2"]["text"] == ""
+    assert labels["target2"]["has_media"] is True
+    assert labels["target2"]["media"][0]["filename"] == "target.png"
+    assert labels["target2"]["media"][0]["data"] == "d29ybGQ="
+
+    assert question["pairs"][0]["source_media"]
+    assert question["pairs"][1]["target_media"]
+    assert quiz["total_max_score"] == 2
