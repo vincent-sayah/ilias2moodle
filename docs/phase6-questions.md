@@ -207,14 +207,17 @@ Le dry-run Moodle Phase 6 est présent sur `main` :
 - option CLI dans `cli/import.php` ;
 - version plugin `0.11.1-alpha`.
 
-L'apply Phase 6 est explicitement refusé. Le code n'écrit donc encore aucune banque,
-question, activité Quiz ou slot de question Moodle.
+L'apply Phase 6 est désormais implémenté via les API/outils core Moodle Question Bank
+et Quiz. Les replays utilisent les mappings persistants pour vérifier les questions et
+slots existants avant toute mise à jour ; le contenu de questions n'est pas réimporté
+lorsqu'il est déjà conforme.
 
 ## Périmètre actuel
 
-La prochaine étape est de revalider le dry-run avec les quatre revues de scoring, puis
-d'implémenter le chemin d'apply via les API/outils core Question Bank et Quiz, sans
-INSERT/UPDATE direct dans les tables pédagogiques Moodle.
+La Phase 6 RC4 a été validée de bout en bout sur Moodle 5.0.2 pour le cours ILIAS
+`ref_id=282`, y compris l'idempotence et la conservation d'un attempt utilisateur.
+Les développements suivants peuvent donc poursuivre sur les objets post-questions
+(Phase 6.5) sans rouvrir la logique Question Bank/Quiz validée.
 
 ## Kprim ILIAS
 
@@ -423,3 +426,47 @@ utilisé comme clé persistante du mapping.
 Cette règle empêche qu'un second questionnement distinct mette à jour
 silencieusement le mapping d'une première question lorsque ILIAS réutilise un
 `external_id`.
+
+## Validation RC4 complète sur Moodle 5.0.2
+
+La validation finale du cours ILIAS `ref_id=282` a confirmé l'état suivant après
+réparation des trois collisions de mapping :
+
+- 14 mappings Question Bank ;
+- 2 mappings Quiz ;
+- 571 mappings de questions, tous avec un `targetid` Moodle unique ;
+- 602 mappings ILIAS→Moodle au total pour le cours ;
+- 665 lignes physiques dans `question`, `question_bank_entries` et
+  `question_versions`, les lignes supplémentaires provenant des sous-questions
+  internes des transformations Cloze/multianswer ;
+- test 331 : 425 slots, `sumgrades=531.5` ;
+- test 357 : 1 slot, `sumgrades=1`.
+
+Le replay final `--phase=6 --apply` a produit exactement 16 opérations `UPDATED`
+(14 qbanks + 2 quiz), avec les mêmes CMID qu'avant le replay et
+`question_content_imported=false` pour tous les objets. Aucun contenu de question n'a
+donc été réimporté ou dupliqué.
+
+Un utilisateur de validation dédié a ensuite ouvert un attempt réel sur le test 357.
+Sa signature avant replay était :
+
+`2:9:2:inprogress:1:1791045708:1,0`
+
+où les champs représentent
+`attempt_id:user_id:uniqueid:state:attempt_number:timestart:layout`.
+
+Après un nouveau `--phase=6 --apply`, la signature est restée strictement identique.
+Les compteurs de mappings et de tables Question Bank sont eux aussi restés identiques ;
+le diff état avant/après est vide.
+
+Enfin, le dry-run post-replay retourne toujours :
+
+- `phase6_package.ready = true` ;
+- `phase6_package.apply_ready = true` ;
+- 16 opérations `UPDATE` ;
+- aucun blocage.
+
+Ce scénario valide l'idempotence de la Phase 6 sur des données Moodle déjà utilisées :
+un replay ne recrée ni qbank, ni quiz, ni question, ni slot et ne détruit pas les
+attempts utilisateur existants.
+
