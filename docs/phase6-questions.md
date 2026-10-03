@@ -397,3 +397,29 @@ contenu inventé.
 Les métriques Phase 6 exposent séparément les pools de contenu vérifiés,
 les pools bloqués, les préflights XML de qbank bloqués et le nombre de
 transformations score-préservantes utilisées par les Question Pools.
+
+## Identité persistante des questions : source_ident, pas external_id
+
+Le premier apply Phase 6 réussi du cours RC4 `ref_id=282` a importé 571
+questions de premier niveau mais seulement 568 mappings persistants.
+
+L'audit a montré trois collisions d'`external_id` :
+
+- deux questions distinctes du test 331 partagent
+  `5e84945c16dce7.38254637` ;
+- deux autres questions distinctes du test 331 partagent
+  `5e849b9ab22c85.42344928` ;
+- deux questions distinctes du pool 285 partagent à nouveau
+  `5e84945c16dce7.38254637`.
+
+En revanche, la clé `<container_ref>:<source_ident>` est unique pour les 571
+questions du package.
+
+La Phase 6 utilise donc désormais systématiquement `source_ident` pour
+`mapping_ref`. L'`external_id` reste conservé comme métadonnée et peut
+continuer à participer à l'`idnumber`/fingerprint Moodle, mais il n'est plus
+utilisé comme clé persistante du mapping.
+
+Cette règle empêche qu'un second questionnement distinct mette à jour
+silencieusement le mapping d'une première question lorsque ILIAS réutilise un
+`external_id`.
