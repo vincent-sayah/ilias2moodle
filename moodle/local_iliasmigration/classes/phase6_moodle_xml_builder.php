@@ -248,7 +248,14 @@ final class phase6_moodle_xml_builder {
                 continue;
             }
             $body .= $fragments[$index] ?? '';
-            $body .= $this->cloze_shortanswer($gap, !empty($question['case_sensitive']));
+            if (($gap['input_type'] ?? 'text') === 'numeric') {
+                $body .= $this->cloze_numerical($gap);
+            } else {
+                $body .= $this->cloze_shortanswer(
+                    $gap,
+                    !empty($question['case_sensitive'])
+                );
+            }
         }
         $body .= implode('', array_slice($fragments, count($gaps)));
 
@@ -481,6 +488,58 @@ final class phase6_moodle_xml_builder {
             }
         }
         return '{' . $this->number($weight) . ':' . $type . ':' . implode('~', $parts) . '}';
+    }
+
+    /** One exact numerical embedded-answer field. */
+    private function cloze_numerical(array $gap): string {
+        $weight = (float) ($gap['max_score'] ?? 0.0);
+        $accepted = is_array($gap['accepted_answers'] ?? null)
+            ? $gap['accepted_answers']
+            : [];
+        if ($weight <= 0.0 || !$accepted) {
+            throw new \coding_exception(
+                'Numeric Cloze gap has no accepted answer or positive score.'
+            );
+        }
+
+        $parts = [];
+        foreach ($accepted as $answer) {
+            if (!is_array($answer)) {
+                continue;
+            }
+            if (($answer['comparison'] ?? '') !== 'varequal') {
+                throw new \coding_exception(
+                    'Numeric Cloze currently requires exact ILIAS varequal scoring.'
+                );
+            }
+
+            $raw = trim((string) ($answer['text'] ?? ''));
+            if ($raw === '' || !is_numeric($raw)) {
+                throw new \coding_exception(
+                    'Numeric Cloze accepted answer must be numeric.'
+                );
+            }
+
+            $score = (float) ($answer['points'] ?? 0.0);
+            $fraction = 100.0 * $score / $weight;
+            $value = $this->number((float) $raw);
+            $prefix = abs($fraction - 100.0) < 0.000001
+                ? '='
+                : '%' . $this->number($fraction) . '%';
+            $parts[] = $prefix . $value . ':0';
+        }
+
+        if (!$parts) {
+            throw new \coding_exception(
+                'Numeric Cloze transform produced no accepted answer.'
+            );
+        }
+
+        return '{'
+            . $this->number($weight)
+            . ':NUMERICAL:'
+            . implode('~', $parts)
+            . '}';
     }
 
     /** One weighted dropdown for Matching. */
