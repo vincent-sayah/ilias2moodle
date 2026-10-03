@@ -109,7 +109,11 @@ final class phase6_moodle_xml_builder {
         return [
             'source_ident' => $ident,
             'external_id' => $external,
-            'mapping_ref' => $testref . ':' . ($external !== '' ? $external : $ident),
+            // source_ident is the container-local ILIAS question identity.
+            // external_id is not safe as a mapping key: real ILIAS exports can
+            // reuse it for distinct questions. Keep external_id as metadata and
+            // use source_ident for persistent one-to-one mappings.
+            'mapping_ref' => $testref . ':' . $ident,
             'title' => $title,
             'neutral_type' => $type,
             'effective_qtype' => $effectiveqtype,
