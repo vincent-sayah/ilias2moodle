@@ -267,9 +267,10 @@ final class phase65_blog_renderer {
         $mime = strtolower((string) ($selected['mime_type'] ?? ''));
 
         if (!str_starts_with($mime, 'image/')
-                && $mime !== 'video/mp4') {
+                && $mime !== 'video/mp4'
+                && $mime !== 'audio/mpeg') {
             throw new \coding_exception(
-                'Only image and MP4 video media are validated for Blog apply.'
+                'Only image, MP4 video, and MP3 audio media are validated for Blog apply.'
             );
         }
 
@@ -299,6 +300,32 @@ final class phase65_blog_renderer {
                 . $source
                 . $fallback
                 . '</video>';
+
+            if ($caption !== '') {
+                $html .= '<figcaption>'
+                    . $this->escape($caption)
+                    . '</figcaption>';
+            }
+
+            return $html . "</figure>\n";
+        }
+
+        if ($mime === 'audio/mpeg') {
+            $source = '<source src="'
+                . $this->escape($url)
+                . '" type="audio/mpeg">';
+
+            $fallback = '<a class="mediafallbacklink" href="'
+                . $this->escape($url)
+                . '">'
+                . $this->escape($title)
+                . '</a>';
+
+            $html = '<figure><audio controls="controls" '
+                . 'preload="metadata">'
+                . $source
+                . $fallback
+                . '</audio>';
 
             if ($caption !== '') {
                 $html .= '<figcaption>'
