@@ -27,6 +27,7 @@ final class phase6_scoring_policy_validator {
         $addedreviews = 0;
         $multichoicereviews = 0;
         $nonstandardfractionreviews = 0;
+        $matchingmediatransforms = 0;
         $transformedquestions = 0;
         $preflightblocked = 0;
 
@@ -59,6 +60,28 @@ final class phase6_scoring_policy_validator {
                 }
                 $type = (string) ($question['type'] ?? '');
                 $ident = (string) ($question['source_ident'] ?? '');
+
+                if ($type === 'matching' && $this->matching_has_media($question)) {
+                    $this->annotate_preview(
+                        $operation,
+                        $ident,
+                        'IMAGE_MATCHING_TO_CLOZE',
+                        'multianswer',
+                        'ILIAS_MATCHING_EMBEDDED_MEDIA'
+                    );
+                    $operationtransforms++;
+                    $matchingmediatransforms++;
+                    $transformedquestions++;
+                    $plan['warnings'][] = [
+                        'code' => 'MATCHING_MEDIA_INTERACTION_CHANGE',
+                        'source_ref_id' => $testref,
+                        'question_source_ident' => $ident,
+                        'question_title' => (string) ($question['title'] ?? ''),
+                        'apply_policy' => 'IMAGE_MATCHING_TO_CLOZE',
+                        'message' => 'ILIAS Matching contains embedded images. Moodle native Matching cannot reliably render images in answer choices, so apply uses one Cloze question that embeds the original images and preserves each pair score.',
+                    ];
+                    continue;
+                }
 
                 if ($type === 'matching' && $this->matching_has_unequal_pair_weights($question)) {
                     $this->annotate_preview(
@@ -228,6 +251,11 @@ final class phase6_scoring_policy_validator {
                             $xmlquestion,
                             (string) ($descriptor['source_ident'] ?? '')
                         );
+                    } else if ($qtype === 'match') {
+                        $this->assert_native_matching_complete(
+                            $xmlquestion,
+                            (string) ($descriptor['source_ident'] ?? '')
+                        );
                     }
 
                     if (($descriptor['transform'] ?? 'NATIVE') !== 'NATIVE') {
@@ -274,6 +302,8 @@ final class phase6_scoring_policy_validator {
             $plan['phase6_package']['multiple_choice_unselected_scoring_review_count'] = $multichoicereviews;
             $plan['phase6_package']['multiple_choice_nonstandard_fraction_review_count'] =
                 $nonstandardfractionreviews;
+            $plan['phase6_package']['matching_media_transform_count'] =
+                $matchingmediatransforms;
             $plan['phase6_package']['score_preserving_transform_count'] = $transformedquestions;
             $plan['phase6_package']['moodle_xml_preflight_blocked_tests'] = $preflightblocked;
             $plan['phase6_package']['moodle_xml_preflight_ready'] = $preflightblocked === 0;
@@ -297,7 +327,7 @@ final class phase6_scoring_policy_validator {
             $plan['warnings'][] = [
                 'code' => 'PHASE6_SCORE_PRESERVING_TRANSFORMS_ENABLED',
                 'transformed_question_count' => $transformedquestions,
-                'message' => 'Phase 6 apply is enabled. Unequal-weight Matching, Multiple Choice with unselected-option credit, and Multiple Choice with non-standard Moodle fractions use score-preserving Cloze transforms; Kprim uses an exact response-combination single-choice transform, and Ordering uses native ABSOLUTE_POSITION grading.',
+                'message' => 'Phase 6 apply is enabled. Matching with embedded media, unequal-weight Matching, Multiple Choice with unselected-option credit, and Multiple Choice with non-standard Moodle fractions use score-preserving Cloze transforms; Kprim uses an exact response-combination single-choice transform, and Ordering uses native ABSOLUTE_POSITION grading.',
             ];
             if ($multichoicereviews > 0) {
                 $plan['warnings'][] = [
@@ -309,6 +339,29 @@ final class phase6_scoring_policy_validator {
         }
 
         return $plan;
+    }
+
+    /**
+     * Reject native Moodle Matching XML with an empty stem or answer. This
+     * mirrors the qtype_match save guard before the real import writes data.
+     */
+    private function assert_native_matching_complete(
+        \SimpleXMLElement $question,
+        string $sourceident
+    ): void {
+        foreach ($question->subquestion as $index => $subquestion) {
+            $stem = trim((string) ($subquestion->text ?? ''));
+            $answer = trim((string) ($subquestion->answer->text ?? ''));
+            if ($stem === '' || $answer === '') {
+                throw new \coding_exception(
+                    'Generated native Moodle Matching contains an empty stem or answer for '
+                    . $sourceident
+                    . ' at pair '
+                    . ((int) $index + 1)
+                    . '.'
+                );
+            }
+        }
     }
 
     /**
@@ -491,6 +544,20 @@ final class phase6_scoring_policy_validator {
             ];
         }
         return $affected;
+    }
+
+    private function matching_has_media(array $question): bool {
+        foreach (($question['labels'] ?? []) as $label) {
+            if (!is_array($label)) {
+                continue;
+            }
+            foreach (($label['media'] ?? []) as $media) {
+                if (is_array($media) && ($media['kind'] ?? '') === 'image') {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private function matching_has_unequal_pair_weights(array $question): bool {
