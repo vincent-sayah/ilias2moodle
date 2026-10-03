@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+import base64
 from itertools import product
 from pathlib import Path
 from typing import Any
@@ -140,6 +141,35 @@ def _first_setvar_score(condition: ET.Element) -> float:
     return _float(_text(setvar)) if setvar is not None else 0.0
 
 
+def _embedded_label_media(label: ET.Element) -> list[dict[str, Any]]:
+    media: list[dict[str, Any]] = []
+    for index, image in enumerate(_descendants(label, "matimage"), start=1):
+        raw = "".join(_text(image).split())
+        filename = Path(
+            image.attrib.get("label", "") or f"image-{index}.bin"
+        ).name
+        valid = False
+        if image.attrib.get("embedded", "").lower() == "base64" and raw:
+            try:
+                base64.b64decode(raw, validate=True)
+                valid = True
+            except (ValueError, base64.binascii.Error):
+                valid = False
+
+        media.append(
+            {
+                "kind": "image",
+                "filename": filename,
+                "mime_type": image.attrib.get("imagtype", ""),
+                "encoding": image.attrib.get("embedded", ""),
+                "data": raw,
+                "valid_base64": valid,
+                "attributes": dict(image.attrib),
+            }
+        )
+    return media
+
+
 def _answer_labels(response: ET.Element) -> list[dict[str, Any]]:
     answers: list[dict[str, Any]] = []
     for index, label in enumerate(_descendants(response, "response_label")):
@@ -148,12 +178,15 @@ def _answer_labels(response: ET.Element) -> list[dict[str, Any]]:
             for mattext in _descendants(label, "mattext")
             if _text(mattext)
         ]
+        media = _embedded_label_media(label)
         answers.append(
             {
                 "ident": label.attrib.get("ident", ""),
                 "index": index,
                 "text": mattexts[0] if mattexts else "",
                 "texts": mattexts,
+                "media": media,
+                "has_media": bool(media),
                 "attributes": dict(label.attrib),
             }
         )
@@ -462,12 +495,16 @@ def _matching_question(item: ET.Element) -> dict[str, Any]:
         else:
             source_ident, target_ident = first_ident, second_ident
 
+        source_label = labels_by_ident.get(source_ident, {})
+        target_label = labels_by_ident.get(target_ident, {})
         pairs.append(
             {
                 "source_ident": source_ident,
                 "target_ident": target_ident,
-                "source_text": labels_by_ident.get(source_ident, {}).get("text", ""),
-                "target_text": labels_by_ident.get(target_ident, {}).get("text", ""),
+                "source_text": source_label.get("text", ""),
+                "target_text": target_label.get("text", ""),
+                "source_media": source_label.get("media", []),
+                "target_media": target_label.get("media", []),
                 "points": _first_setvar_score(condition),
             }
         )
@@ -476,6 +513,7 @@ def _matching_question(item: ET.Element) -> dict[str, Any]:
         "response_ident": response.attrib.get("ident", "") if response is not None else "",
         "labels": labels,
         "pairs": pairs,
+        "has_media": any(bool(label.get("media")) for label in labels),
         "max_score": sum(float(pair["points"]) for pair in pairs),
     }
 
