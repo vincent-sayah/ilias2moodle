@@ -243,17 +243,31 @@ final class phase6_moodle_xml_builder {
 
         $body = $questiontext;
         $gaps = is_array($question['gaps'] ?? null) ? $question['gaps'] : [];
+
+        $weights = [];
+        foreach ($gaps as $gap) {
+            if (is_array($gap)) {
+                $weights[] = (float) ($gap['max_score'] ?? 0.0);
+            }
+        }
+        $norms = $this->cloze_integer_norms($weights);
+
+        $renderedgap = 0;
         foreach ($gaps as $index => $gap) {
             if (!is_array($gap)) {
                 continue;
             }
             $body .= $fragments[$index] ?? '';
+            $norm = (int) ($norms[$renderedgap] ?? 0);
+            $renderedgap++;
+
             if (($gap['input_type'] ?? 'text') === 'numeric') {
-                $body .= $this->cloze_numerical($gap);
+                $body .= $this->cloze_numerical($gap, $norm);
             } else {
                 $body .= $this->cloze_shortanswer(
                     $gap,
-                    !empty($question['case_sensitive'])
+                    !empty($question['case_sensitive']),
+                    $norm
                 );
             }
         }
@@ -325,8 +339,17 @@ final class phase6_moodle_xml_builder {
             throw new \coding_exception('Weighted Matching transform requires pairs and at least two target choices.');
         }
 
+        $weights = [];
+        foreach ($pairs as $pair) {
+            if (is_array($pair)) {
+                $weights[] = (float) ($pair['points'] ?? 0.0);
+            }
+        }
+        $norms = $this->cloze_integer_norms($weights);
+
         $body = (string) ($question['question_text'] ?? '');
         $body .= '<table class="ilias2moodle-weighted-matching">';
+        $renderedpair = 0;
         foreach ($pairs as $pair) {
             if (!is_array($pair)) {
                 continue;
@@ -337,8 +360,11 @@ final class phase6_moodle_xml_builder {
             if ($weight <= 0.0 || $source === '' || $correct === '') {
                 throw new \coding_exception('Weighted Matching pair is incomplete.');
             }
+            $norm = (int) ($norms[$renderedpair] ?? 0);
+            $renderedpair++;
             $body .= '<tr><td>' . s($source) . '</td><td>'
-                . $this->cloze_choice($weight, $correct, $targets) . '</td></tr>';
+                . $this->cloze_choice($weight, $correct, $targets, $norm)
+                . '</td></tr>';
         }
         $body .= '</table>';
 
@@ -348,9 +374,7 @@ final class phase6_moodle_xml_builder {
 
     /** ILIAS MCMR with credit for unselected options -> explicit binary Cloze decisions. */
     private function render_binary_multichoice_cloze(array $question, array $descriptor): string {
-        $body = (string) ($question['question_text'] ?? '');
-        $body .= '<ol class="ilias2moodle-binary-multichoice">';
-        $rendered = 0;
+        $decisions = [];
         foreach (($question['answers'] ?? []) as $answer) {
             if (!is_array($answer)) {
                 continue;
@@ -361,22 +385,42 @@ final class phase6_moodle_xml_builder {
             if ($weight <= 0.0) {
                 continue;
             }
-            $rendered++;
-            $body .= '<li>' . s((string) ($answer['text'] ?? '')) . ' : '
-                . $this->cloze_binary_decision($weight, $selected, $unselected)
+            $decisions[] = [
+                'text' => (string) ($answer['text'] ?? ''),
+                'selected' => $selected,
+                'unselected' => $unselected,
+                'weight' => $weight,
+            ];
+        }
+
+        if (!$decisions) {
+            throw new \coding_exception('Binary Multiple Choice transform produced no scored decisions.');
+        }
+
+        $norms = $this->cloze_integer_norms(array_column($decisions, 'weight'));
+
+        $body = (string) ($question['question_text'] ?? '');
+        $body .= '<ol class="ilias2moodle-binary-multichoice">';
+        foreach ($decisions as $index => $decision) {
+            $body .= '<li>' . s((string) $decision['text']) . ' : '
+                . $this->cloze_binary_decision(
+                    (float) $decision['weight'],
+                    (float) $decision['selected'],
+                    (float) $decision['unselected'],
+                    (int) ($norms[$index] ?? 0)
+                )
                 . '</li>';
         }
         $body .= '</ol>';
         $body .= '<p><em>Migration ILIAS : chaque proposition doit être explicitement marquée '
             . '« sélectionner » ou « ne pas sélectionner » afin de conserver le barème source.</em></p>';
-        if ($rendered === 0) {
-            throw new \coding_exception('Binary Multiple Choice transform produced no scored decisions.');
-        }
 
         $xml = $this->header('cloze', $descriptor, $body, false);
         return $xml . "  </question>\n";
     }
 
+    /**
+     * ILIAS Kprim -> one Moodle single-choice question enumerating all binary
 
     /**
      * ILIAS Kprim -> one Moodle single-choice question enumerating all binary
@@ -466,11 +510,19 @@ final class phase6_moodle_xml_builder {
     }
 
     /** One embedded short-answer field. */
-    private function cloze_shortanswer(array $gap, bool $casesensitive): string {
+    private function cloze_shortanswer(
+        array $gap,
+        bool $casesensitive,
+        int $norm
+    ): string {
         $weight = (float) ($gap['max_score'] ?? 0.0);
-        $accepted = is_array($gap['accepted_answers'] ?? null) ? $gap['accepted_answers'] : [];
-        if ($weight <= 0.0 || !$accepted) {
-            throw new \coding_exception('Cloze gap has no accepted answer or positive score.');
+        $accepted = is_array($gap['accepted_answers'] ?? null)
+            ? $gap['accepted_answers']
+            : [];
+        if ($weight <= 0.0 || !$accepted || $norm <= 0) {
+            throw new \coding_exception(
+                'Cloze gap has no accepted answer, positive score or integer norm.'
+            );
         }
         $type = $casesensitive ? 'SHORTANSWER_C' : 'SHORTANSWER';
         $parts = [];
@@ -479,7 +531,7 @@ final class phase6_moodle_xml_builder {
                 continue;
             }
             $score = (float) ($answer['points'] ?? 0.0);
-            $fraction = $weight > 0.0 ? 100.0 * $score / $weight : 0.0;
+            $fraction = 100.0 * $score / $weight;
             $text = $this->cloze_escape((string) ($answer['text'] ?? ''));
             if (abs($fraction - 100.0) < 0.000001) {
                 $parts[] = '=' . $text;
@@ -487,18 +539,18 @@ final class phase6_moodle_xml_builder {
                 $parts[] = '%' . $this->number($fraction) . '%' . $text;
             }
         }
-        return '{' . $this->number($weight) . ':' . $type . ':' . implode('~', $parts) . '}';
+        return '{' . $norm . ':' . $type . ':' . implode('~', $parts) . '}';
     }
 
     /** One exact numerical embedded-answer field. */
-    private function cloze_numerical(array $gap): string {
+    private function cloze_numerical(array $gap, int $norm): string {
         $weight = (float) ($gap['max_score'] ?? 0.0);
         $accepted = is_array($gap['accepted_answers'] ?? null)
             ? $gap['accepted_answers']
             : [];
-        if ($weight <= 0.0 || !$accepted) {
+        if ($weight <= 0.0 || !$accepted || $norm <= 0) {
             throw new \coding_exception(
-                'Numeric Cloze gap has no accepted answer or positive score.'
+                'Numeric Cloze gap has no accepted answer, positive score or integer norm.'
             );
         }
 
@@ -536,24 +588,41 @@ final class phase6_moodle_xml_builder {
         }
 
         return '{'
-            . $this->number($weight)
+            . $norm
             . ':NUMERICAL:'
             . implode('~', $parts)
             . '}';
     }
 
     /** One weighted dropdown for Matching. */
-    private function cloze_choice(float $weight, string $correct, array $options): string {
+    private function cloze_choice(
+        float $weight,
+        string $correct,
+        array $options,
+        int $norm
+    ): string {
+        if ($weight <= 0.0 || $norm <= 0) {
+            throw new \coding_exception('Matching Cloze norm/weight must be positive.');
+        }
         $parts = [];
         foreach ($options as $option) {
             $escaped = $this->cloze_escape((string) $option);
             $parts[] = ((string) $option === $correct ? '=' : '') . $escaped;
         }
-        return '{' . $this->number($weight) . ':MULTICHOICE:' . implode('~', $parts) . '}';
+        return '{' . $norm . ':MULTICHOICE:' . implode('~', $parts) . '}';
     }
 
     /** One explicit selected/unselected decision with exact ILIAS fractions. */
-    private function cloze_binary_decision(float $weight, float $selected, float $unselected): string {
+    private function cloze_binary_decision(
+        float $weight,
+        float $selected,
+        float $unselected,
+        int $norm
+    ): string {
+        if ($weight <= 0.0 || $norm <= 0) {
+            throw new \coding_exception('Binary Cloze norm/weight must be positive.');
+        }
+
         $states = [
             ['label' => 'Ne pas sélectionner', 'score' => $unselected],
             ['label' => 'Sélectionner', 'score' => $selected],
@@ -570,7 +639,85 @@ final class phase6_moodle_xml_builder {
                 $parts[] = '%' . $this->number($fraction) . '%' . $label;
             }
         }
-        return '{' . $this->number($weight) . ':MULTICHOICE:' . implode('~', $parts) . '}';
+        return '{' . $norm . ':MULTICHOICE:' . implode('~', $parts) . '}';
+    }
+
+    /**
+     * Convert positive source weights to the smallest equivalent integer
+     * Moodle Cloze norms. Moodle core only accepts digits before the first
+     * colon of an embedded answer.
+     *
+     * @param float[] $weights
+     * @return int[]
+     */
+    private function cloze_integer_norms(array $weights): array {
+        if (!$weights) {
+            return [];
+        }
+
+        $precision = 0;
+        foreach ($weights as $weight) {
+            $weight = (float) $weight;
+            if ($weight <= 0.0) {
+                throw new \coding_exception('Cloze source weights must be positive.');
+            }
+
+            $rendered = $this->number($weight);
+            $point = strpos($rendered, '.');
+            if ($point !== false) {
+                $precision = max(
+                    $precision,
+                    strlen(rtrim(substr($rendered, $point + 1), '0'))
+                );
+            }
+        }
+
+        if ($precision > 4) {
+            throw new \coding_exception(
+                'Cloze source weights require more than four decimal places; exact integer normalization is refused.'
+            );
+        }
+
+        $scale = 10 ** $precision;
+        $integers = [];
+        foreach ($weights as $weight) {
+            $scaled = (float) $weight * $scale;
+            $rounded = (int) round($scaled);
+            if (abs($scaled - $rounded) > 0.0000001 || $rounded <= 0) {
+                throw new \coding_exception(
+                    'Cloze source weights cannot be represented exactly as bounded integer norms.'
+                );
+            }
+            $integers[] = $rounded;
+        }
+
+        $gcd = array_shift($integers);
+        foreach ($integers as $value) {
+            $gcd = $this->integer_gcd($gcd, $value);
+        }
+
+        $normalized = [];
+        foreach ($weights as $weight) {
+            $normalized[] = (int) (round((float) $weight * $scale) / $gcd);
+        }
+
+        if (array_sum($normalized) > 10000) {
+            throw new \coding_exception(
+                'Normalized Moodle Cloze weights are unexpectedly large; exact conversion is refused.'
+            );
+        }
+
+        return $normalized;
+    }
+
+    /** Greatest common divisor for positive integers. */
+    private function integer_gcd(int $a, int $b): int {
+        $a = abs($a);
+        $b = abs($b);
+        while ($b !== 0) {
+            [$a, $b] = [$b, $a % $b];
+        }
+        return max(1, $a);
     }
 
     /** True when Matching pair weights are not all identical. */
