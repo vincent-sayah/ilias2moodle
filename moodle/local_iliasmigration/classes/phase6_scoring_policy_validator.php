@@ -49,6 +49,8 @@ final class phase6_scoring_policy_validator {
 
             $testref = (string) ($operation['source_ref_id'] ?? '');
             $operationreviews = 0;
+            $operationunselectedreviews = 0;
+            $operationnonstandardreviews = 0;
             $operationtransforms = 0;
 
             foreach ($questions['questions'] as $question) {
@@ -112,6 +114,7 @@ final class phase6_scoring_policy_validator {
                     $operationreviews++;
                     $addedreviews++;
                     $multichoicereviews++;
+                    $operationunselectedreviews++;
                     $operationtransforms++;
                     $transformedquestions++;
 
@@ -157,6 +160,7 @@ final class phase6_scoring_policy_validator {
                 $operationreviews++;
                 $addedreviews++;
                 $nonstandardfractionreviews++;
+                $operationnonstandardreviews++;
                 $operationtransforms++;
                 $transformedquestions++;
 
@@ -180,11 +184,14 @@ final class phase6_scoring_policy_validator {
             }
 
             if ($operationreviews > 0) {
-                $operation['phase6_validation']['multiple_choice_unselected_scoring_review_count'] = $operationreviews;
                 $operation['phase6_validation']['scoring_review_count'] =
                     (int) ($operation['phase6_validation']['scoring_review_count'] ?? 0)
                     + $operationreviews;
             }
+            $operation['phase6_validation']['multiple_choice_unselected_scoring_review_count'] =
+                $operationunselectedreviews;
+            $operation['phase6_validation']['multiple_choice_nonstandard_fraction_review_count'] =
+                $operationnonstandardreviews;
             $operation['phase6_validation']['score_preserving_transform_count'] = $operationtransforms;
             $operation['phase6_validation']['scoring_policy_ready'] = true;
 
