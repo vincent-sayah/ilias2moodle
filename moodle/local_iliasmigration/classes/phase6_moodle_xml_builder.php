@@ -66,7 +66,10 @@ final class phase6_moodle_xml_builder {
             default => throw new \coding_exception('Unsupported Phase 6 neutral question type: ' . $type),
         };
 
-        if ($type === 'matching' && $this->matching_has_unequal_weights($question)) {
+        if ($type === 'matching' && $this->matching_has_media($question)) {
+            $effectiveqtype = 'multianswer';
+            $transform = 'IMAGE_MATCHING_TO_CLOZE';
+        } else if ($type === 'matching' && $this->matching_has_unequal_weights($question)) {
             $effectiveqtype = 'multianswer';
             $transform = 'WEIGHTED_MATCHING_TO_CLOZE';
         }
@@ -120,6 +123,9 @@ final class phase6_moodle_xml_builder {
     /** Render one question according to its neutral type and scoring policy. */
     private function render_question(array $question, array $descriptor): string {
         $type = (string) $question['type'];
+        if ($descriptor['transform'] === 'IMAGE_MATCHING_TO_CLOZE') {
+            return $this->render_image_matching_cloze($question, $descriptor);
+        }
         if ($descriptor['transform'] === 'WEIGHTED_MATCHING_TO_CLOZE') {
             return $this->render_weighted_matching_cloze($question, $descriptor);
         }
@@ -147,11 +153,34 @@ final class phase6_moodle_xml_builder {
     }
 
     /** Common question XML header. */
-    private function header(string $qtype, array $descriptor, string $questiontext, bool $defaultgrade = true): string {
+    private function header(
+        string $qtype,
+        array $descriptor,
+        string $questiontext,
+        bool $defaultgrade = true,
+        array $questionfiles = []
+    ): string {
         $xml = "  <question type=\"" . $this->xml($qtype) . "\">\n";
         $xml .= "    <name><text>" . $this->xml((string) $descriptor['title']) . "</text></name>\n";
         $xml .= "    <questiontext format=\"html\"><text><![CDATA["
-            . $this->cdata($questiontext) . "]]></text></questiontext>\n";
+            . $this->cdata($questiontext) . "]]></text>\n";
+        foreach ($questionfiles as $file) {
+            if (!is_array($file)) {
+                continue;
+            }
+            $name = trim((string) ($file['name'] ?? ''));
+            $data = preg_replace('/\\s+/', '', (string) ($file['data'] ?? ''));
+            if ($name === '' || $data === '' || base64_decode($data, true) === false) {
+                throw new \coding_exception(
+                    'Phase 6 embedded question file is invalid.'
+                );
+            }
+            $xml .= '      <file name="' . $this->xml($name)
+                . '" path="/" encoding="base64">'
+                . $data
+                . "</file>\n";
+        }
+        $xml .= "    </questiontext>\n";
         $xml .= "    <generalfeedback format=\"html\"><text></text></generalfeedback>\n";
         if ($defaultgrade) {
             $xml .= "    <defaultgrade>" . $this->number((float) $descriptor['max_score']) . "</defaultgrade>\n";
@@ -335,6 +364,155 @@ final class phase6_moodle_xml_builder {
             $xml .= '      <answer><text>' . $this->xml((string) ($pair['target_text'] ?? '')) . "</text></answer>\n";
             $xml .= "    </subquestion>\n";
         }
+        return $xml . "  </question>\n";
+    }
+
+    /**
+     * ILIAS Matching containing embedded images -> Moodle Cloze.
+     *
+     * Image sources are displayed directly beside a textual dropdown.
+     * When targets are images, the images are rendered in an A/B/C legend and
+     * the dropdown uses those stable tokens because HTML <option> elements
+     * cannot reliably display embedded images.
+     */
+    private function render_image_matching_cloze(
+        array $question,
+        array $descriptor
+    ): string {
+        $pairs = array_values(array_filter(
+            (array) ($question['pairs'] ?? []),
+            'is_array'
+        ));
+        $labels = [];
+        foreach (($question['labels'] ?? []) as $label) {
+            if (!is_array($label)) {
+                continue;
+            }
+            $ident = (string) ($label['ident'] ?? '');
+            if ($ident !== '') {
+                $labels[$ident] = $label;
+            }
+        }
+
+        if (!$pairs || !$labels) {
+            throw new \coding_exception(
+                'Image Matching transform requires pairs and response labels.'
+            );
+        }
+
+        $weights = array_map(
+            static fn(array $pair): float => (float) ($pair['points'] ?? 0.0),
+            $pairs
+        );
+        $norms = $this->cloze_integer_norms($weights);
+
+        $files = [];
+        $targetidents = [];
+        $targethasmedia = false;
+        foreach ($pairs as $pair) {
+            $targetident = (string) ($pair['target_ident'] ?? '');
+            if ($targetident === '' || !isset($labels[$targetident])) {
+                throw new \coding_exception(
+                    'Image Matching target identity is missing from response labels.'
+                );
+            }
+            if (!in_array($targetident, $targetidents, true)) {
+                $targetidents[] = $targetident;
+            }
+            if ($this->label_has_media($labels[$targetident])) {
+                $targethasmedia = true;
+            }
+        }
+
+        $options = [];
+        $correctbytarget = [];
+        $legend = '';
+
+        if ($targethasmedia) {
+            $legend .= '<ol class="ilias2moodle-image-matching-legend" type="A">';
+            foreach ($targetidents as $index => $targetident) {
+                $token = $this->alpha_token($index);
+                $target = $labels[$targetident];
+                $display = $this->matching_label_display(
+                    $target,
+                    (string) $descriptor['source_ident'],
+                    $files
+                );
+                if ($display === '') {
+                    throw new \coding_exception(
+                        'Image Matching target has neither text nor renderable media.'
+                    );
+                }
+                $options[] = $token;
+                $correctbytarget[$targetident] = $token;
+                $legend .= '<li><strong>' . s($token) . '</strong> — '
+                    . $display . '</li>';
+            }
+            $legend .= '</ol>';
+        } else {
+            foreach ($targetidents as $targetident) {
+                $target = $labels[$targetident];
+                $text = trim((string) ($target['text'] ?? ''));
+                if ($text === '') {
+                    throw new \coding_exception(
+                        'Image Matching textual target is empty.'
+                    );
+                }
+                if (!in_array($text, $options, true)) {
+                    $options[] = $text;
+                }
+                $correctbytarget[$targetident] = $text;
+            }
+        }
+
+        if (count($options) < 2) {
+            throw new \coding_exception(
+                'Image Matching transform requires at least two target choices.'
+            );
+        }
+
+        $body = (string) ($question['question_text'] ?? '');
+        $body .= $legend;
+        $body .= '<table class="ilias2moodle-image-matching">';
+
+        foreach ($pairs as $index => $pair) {
+            $sourceident = (string) ($pair['source_ident'] ?? '');
+            $targetident = (string) ($pair['target_ident'] ?? '');
+            if ($sourceident === '' || !isset($labels[$sourceident])) {
+                throw new \coding_exception(
+                    'Image Matching source identity is missing from response labels.'
+                );
+            }
+
+            $source = $this->matching_label_display(
+                $labels[$sourceident],
+                (string) $descriptor['source_ident'],
+                $files
+            );
+            $correct = (string) ($correctbytarget[$targetident] ?? '');
+            $weight = (float) ($pair['points'] ?? 0.0);
+            $norm = (int) ($norms[$index] ?? 0);
+
+            if ($source === '' || $correct === '' || $weight <= 0.0) {
+                throw new \coding_exception(
+                    'Image Matching pair is incomplete after media normalization.'
+                );
+            }
+
+            $body .= '<tr><td>' . $source . '</td><td>'
+                . $this->cloze_choice($weight, $correct, $options, $norm)
+                . '</td></tr>';
+        }
+
+        $body .= '</table>';
+
+        $xml = $this->header(
+            'cloze',
+            $descriptor,
+            $body,
+            false,
+            array_values($files)
+        );
         return $xml . "  </question>\n";
     }
 
@@ -798,6 +976,100 @@ final class phase6_moodle_xml_builder {
             [$a, $b] = [$b, $a % $b];
         }
         return max(1, $a);
+    }
+
+    /** True when a Matching question contains media in any response label. */
+    private function matching_has_media(array $question): bool {
+        foreach (($question['labels'] ?? []) as $label) {
+            if (is_array($label) && $this->label_has_media($label)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function label_has_media(array $label): bool {
+        foreach (($label['media'] ?? []) as $media) {
+            if (is_array($media) && ($media['kind'] ?? '') === 'image') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Render one response label and register embedded files for qformat_xml.
+     *
+     * @param array<string,array{name:string,data:string}> $files
+     */
+    private function matching_label_display(
+        array $label,
+        string $questionident,
+        array &$files
+    ): string {
+        $parts = [];
+        $text = trim((string) ($label['text'] ?? ''));
+        if ($text !== '') {
+            $parts[] = s($text);
+        }
+
+        $labelident = (string) ($label['ident'] ?? 'label');
+        foreach (($label['media'] ?? []) as $index => $media) {
+            if (!is_array($media) || ($media['kind'] ?? '') !== 'image') {
+                continue;
+            }
+            if (($media['encoding'] ?? '') !== 'base64' || empty($media['valid_base64'])) {
+                throw new \coding_exception(
+                    'ILIAS Matching image is not a validated embedded base64 asset.'
+                );
+            }
+
+            $data = preg_replace('/\\s+/', '', (string) ($media['data'] ?? ''));
+            if ($data === '' || base64_decode($data, true) === false) {
+                throw new \coding_exception(
+                    'ILIAS Matching image base64 payload is invalid.'
+                );
+            }
+
+            $original = basename((string) ($media['filename'] ?? 'image.bin'));
+            $safeoriginal = preg_replace('/[^A-Za-z0-9._-]+/', '_', $original)
+                ?: 'image.bin';
+            $prefix = preg_replace(
+                '/[^A-Za-z0-9_-]+/',
+                '_',
+                $questionident . '-' . $labelident . '-' . ($index + 1)
+            ) ?: 'image';
+            $name = substr($prefix . '-' . $safeoriginal, 0, 180);
+
+            if (isset($files[$name]) && $files[$name]['data'] !== $data) {
+                throw new \coding_exception(
+                    'ILIAS Matching generated two different assets with the same Moodle filename.'
+                );
+            }
+            $files[$name] = [
+                'name' => $name,
+                'data' => $data,
+            ];
+
+            $alt = $text !== '' ? $text : ('ILIAS image ' . $labelident);
+            $parts[] = '<img src="@@PLUGINFILE@@/' . s($name)
+                . '" alt="' . s($alt)
+                . '" style="max-width:180px;height:auto" />';
+        }
+
+        return implode(' ', $parts);
+    }
+
+    /** A, B, ..., Z, AA, AB ... stable labels for image target legends. */
+    private function alpha_token(int $index): string {
+        $value = $index + 1;
+        $token = '';
+        while ($value > 0) {
+            $value--;
+            $token = chr(65 + ($value % 26)) . $token;
+            $value = intdiv($value, 26);
+        }
+        return $token;
     }
 
     /** True when Matching pair weights are not all identical. */
