@@ -368,3 +368,32 @@ et le `max_score` ILIAS sont conservés.
 Le préflight rejette également tout Matching natif restant qui contient un
 stem ou une réponse vide, afin que le cas `nomatchinganswer` soit détecté au
 dry-run avant toute écriture.
+
+## Préflight des contenus de banques de questions
+
+Avant cette correction RC4, le préflight Moodle XML de la Phase 6 ne parcourait
+que les opérations `test`. Les Question Pools étaient validés comme
+conteneurs, mais les questions réellement exportées des pools n'étaient pas
+soumises au même builder ni aux mêmes parseurs Moodle que les questions de
+quiz.
+
+Ce comportement était insuffisant : `phase6_executor` importe bien le contenu
+des Question Pools via `phase6_moodle_xml_builder` puis le qformat XML Moodle.
+Un pool pouvait donc être déclaré prêt au dry-run et échouer seulement pendant
+`--apply`.
+
+La Phase 6 valide désormais les pools à deux niveaux :
+
+- validation structurelle de leur `questions.json` : identité ILIAS du pool,
+  schéma, compteurs, identifiants uniques, types pris en charge et
+  `max_score > 0` ;
+- préflight Moodle XML complet des pools contenant du contenu exporté, avec les
+  mêmes contrôles que les tests : parser Cloze natif, fractions multichoice
+  strictes, Matching natif complet et transformations score-préservantes.
+
+Les pools `CONTAINER_ONLY` restent non bloquants et ne reçoivent aucun
+contenu inventé.
+
+Les métriques Phase 6 exposent séparément les pools de contenu vérifiés,
+les pools bloqués, les préflights XML de qbank bloqués et le nombre de
+transformations score-préservantes utilisées par les Question Pools.
