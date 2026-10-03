@@ -552,14 +552,15 @@ final class phase65_blog_package_validator {
                 $supportedmime = str_starts_with(
                     $mime,
                     'image/'
-                ) || $mime === 'video/mp4';
+                ) || $mime === 'video/mp4'
+                    || $mime === 'audio/mpeg';
 
                 if ($locationtype !== 'LocalFile'
                         || !$supportedmime) {
                     $this->block(
                         $operation,
                         'BLOG_MEDIA_TYPE_NOT_VALIDATED',
-                        'Blog Phase 6.5.7 validates local image media and local MP4 video media only.'
+                        'Blog Phase 6.5.7 validates local image media, local MP4 video media, and local MP3 audio media only.'
                     );
                     return 0;
                 }
