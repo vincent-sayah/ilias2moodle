@@ -268,3 +268,34 @@ Pour les trous numériques dont ILIAS exprime la correction avec
 poids de la sous-question. Les autres comparateurs numériques restent
 volontairement refusés tant qu'une politique de tolérance n'a pas été
 validée sur un export réel.
+
+## Poids Cloze Moodle : normalisation entière et préflight core
+
+Le premier apply RC4 sur le cours `ref_id=282` a révélé une contrainte du
+parseur Moodle `qtype_multianswer` : le poids placé avant le premier `:`
+dans une réponse intégrée doit être constitué de chiffres entiers.
+
+Exemple refusé par Moodle :
+
+```text
+{0.5:NUMERICAL:=18:0}
+```
+
+Le générateur RC4 normalise désormais tous les poids positifs d'une même
+question Cloze vers le plus petit rapport entier équivalent. Ainsi quatre
+trous ILIAS à `0,5` point deviennent quatre normes Moodle `1`. Le slot
+Quiz conserve la note maximale ILIAS de 2 points, donc chaque trou reste
+pondéré à 0,5 point dans le Quiz.
+
+La normalisation est appliquée aux trois chemins Cloze du projet :
+
+- Cloze ILIAS natif ;
+- Matching pondéré transformé en Cloze ;
+- QCM sélection/non-sélection transformé en Cloze.
+
+Pour éviter un nouveau faux positif de dry-run, le préflight Phase 6 fait
+désormais passer chaque question `multianswer` générée dans
+`qtype_multianswer_extract_question()` puis
+`qtype_multianswer_validate_question()`, sans écriture en base. Une syntaxe
+Cloze que Moodle refuserait à l'import bloque donc désormais le dry-run avant
+tout `--apply`.
