@@ -26,6 +26,7 @@ final class phase6_scoring_policy_validator {
     public function validate(array $plan): array {
         $addedreviews = 0;
         $multichoicereviews = 0;
+        $nonstandardfractionreviews = 0;
         $transformedquestions = 0;
         $preflightblocked = 0;
 
@@ -107,33 +108,74 @@ final class phase6_scoring_policy_validator {
                     continue;
                 }
                 $affectedanswers = $this->answers_with_unselected_score($question);
-                if (!$affectedanswers) {
+                if ($affectedanswers) {
+                    $operationreviews++;
+                    $addedreviews++;
+                    $multichoicereviews++;
+                    $operationtransforms++;
+                    $transformedquestions++;
+
+                    $plan['warnings'][] = [
+                        'code' => 'MULTICHOICE_UNSELECTED_SCORING_REVIEW',
+                        'source_ref_id' => $testref,
+                        'question_source_ident' => $ident,
+                        'question_title' => (string) ($question['title'] ?? ''),
+                        'affected_answer_count' => count($affectedanswers),
+                        'affected_answers' => $affectedanswers,
+                        'apply_policy' => 'MULTICHOICE_BINARY_DECISIONS_TO_CLOZE',
+                        'message' => 'ILIAS awards points when some options are left unselected. Apply preserves the score by converting this one ILIAS question into one Moodle Cloze question containing one explicit selected/not-selected decision per scored option.',
+                    ];
+
+                    $this->annotate_preview(
+                        $operation,
+                        $ident,
+                        'MULTICHOICE_BINARY_DECISIONS_TO_CLOZE',
+                        'multianswer',
+                        'ILIAS_UNSELECTED_OPTION_POINTS'
+                    );
+                    continue;
+                }
+
+                $nonstandardfractions =
+                    $this->nonstandard_selected_fraction_details($question);
+                if (!$nonstandardfractions) {
+                    continue;
+                }
+
+                if (!$this->can_preserve_multiple_choice_as_multiresponse($question)) {
+                    $plan['warnings'][] = [
+                        'code' => 'MULTICHOICE_NONSTANDARD_FRACTIONS_UNSAFE',
+                        'source_ref_id' => $testref,
+                        'question_source_ident' => $ident,
+                        'question_title' => (string) ($question['title'] ?? ''),
+                        'fractions' => $nonstandardfractions,
+                        'message' => 'ILIAS uses answer fractions rejected by Moodle XML import, and their positive score total cannot be preserved exactly by the Cloze MULTIRESPONSE transform.',
+                    ];
                     continue;
                 }
 
                 $operationreviews++;
                 $addedreviews++;
-                $multichoicereviews++;
+                $nonstandardfractionreviews++;
                 $operationtransforms++;
                 $transformedquestions++;
 
                 $plan['warnings'][] = [
-                    'code' => 'MULTICHOICE_UNSELECTED_SCORING_REVIEW',
+                    'code' => 'MULTICHOICE_NONSTANDARD_FRACTIONS_TRANSFORM',
                     'source_ref_id' => $testref,
                     'question_source_ident' => $ident,
                     'question_title' => (string) ($question['title'] ?? ''),
-                    'affected_answer_count' => count($affectedanswers),
-                    'affected_answers' => $affectedanswers,
-                    'apply_policy' => 'MULTICHOICE_BINARY_DECISIONS_TO_CLOZE',
-                    'message' => 'ILIAS awards points when some options are left unselected. Apply preserves the score by converting this one ILIAS question into one Moodle Cloze question containing one explicit selected/not-selected decision per scored option.',
+                    'fractions' => $nonstandardfractions,
+                    'apply_policy' => 'MULTICHOICE_NONSTANDARD_FRACTIONS_TO_CLOZE',
+                    'message' => 'ILIAS uses exact Multiple Choice fractions that Moodle XML rejects in native multichoice. Apply preserves them by converting the question to one Cloze MULTIRESPONSE interaction.',
                 ];
 
                 $this->annotate_preview(
                     $operation,
                     $ident,
-                    'MULTICHOICE_BINARY_DECISIONS_TO_CLOZE',
+                    'MULTICHOICE_NONSTANDARD_FRACTIONS_TO_CLOZE',
                     'multianswer',
-                    'ILIAS_UNSELECTED_OPTION_POINTS'
+                    'ILIAS_NONSTANDARD_MOODLE_FRACTIONS'
                 );
             }
 
@@ -162,15 +204,21 @@ final class phase6_scoring_policy_validator {
                     $qtype = (string) ($descriptor['effective_qtype'] ?? '');
                     $qtypes[$qtype] = ($qtypes[$qtype] ?? 0) + 1;
 
+                    $xmlquestion = $parsed->question[$index] ?? null;
+                    if ($xmlquestion === null) {
+                        throw new \coding_exception(
+                            'Generated Moodle question is missing from the XML preflight document.'
+                        );
+                    }
+
                     if ($qtype === 'multianswer') {
-                        $xmlquestion = $parsed->question[$index] ?? null;
-                        if ($xmlquestion === null) {
-                            throw new \coding_exception(
-                                'Generated Moodle Cloze question is missing from the XML preflight document.'
-                            );
-                        }
                         $this->assert_core_multianswer_accepts(
                             (string) $xmlquestion->questiontext->text,
+                            (string) ($descriptor['source_ident'] ?? '')
+                        );
+                    } else if ($qtype === 'multichoice') {
+                        $this->assert_core_multichoice_fractions_accept(
+                            $xmlquestion,
                             (string) ($descriptor['source_ident'] ?? '')
                         );
                     }
@@ -217,6 +265,8 @@ final class phase6_scoring_policy_validator {
                     + $addedreviews;
             }
             $plan['phase6_package']['multiple_choice_unselected_scoring_review_count'] = $multichoicereviews;
+            $plan['phase6_package']['multiple_choice_nonstandard_fraction_review_count'] =
+                $nonstandardfractionreviews;
             $plan['phase6_package']['score_preserving_transform_count'] = $transformedquestions;
             $plan['phase6_package']['moodle_xml_preflight_blocked_tests'] = $preflightblocked;
             $plan['phase6_package']['moodle_xml_preflight_ready'] = $preflightblocked === 0;
@@ -240,7 +290,7 @@ final class phase6_scoring_policy_validator {
             $plan['warnings'][] = [
                 'code' => 'PHASE6_SCORE_PRESERVING_TRANSFORMS_ENABLED',
                 'transformed_question_count' => $transformedquestions,
-                'message' => 'Phase 6 apply is enabled. Unequal-weight Matching and Multiple Choice with unselected-option credit use score-preserving transforms, Kprim uses an exact response-combination single-choice transform, and Ordering uses native ABSOLUTE_POSITION grading.',
+                'message' => 'Phase 6 apply is enabled. Unequal-weight Matching, Multiple Choice with unselected-option credit, and Multiple Choice with non-standard Moodle fractions use score-preserving Cloze transforms; Kprim uses an exact response-combination single-choice transform, and Ordering uses native ABSOLUTE_POSITION grading.',
             ];
             if ($multichoicereviews > 0) {
                 $plan['warnings'][] = [
@@ -252,6 +302,36 @@ final class phase6_scoring_policy_validator {
         }
 
         return $plan;
+    }
+
+    /**
+     * Check generated native multichoice answer fractions with the same strict
+     * Moodle grade-option matcher used by qformat_xml during import.
+     */
+    private function assert_core_multichoice_fractions_accept(
+        \SimpleXMLElement $question,
+        string $sourceident
+    ): void {
+        global $CFG;
+
+        if (!function_exists('match_grade_options')) {
+            require_once($CFG->libdir . '/questionlib.php');
+        }
+
+        $options = \question_bank::fraction_options_full();
+        foreach ($question->answer as $answer) {
+            $percentage = (float) ($answer['fraction'] ?? 0.0);
+            $fraction = $percentage / 100.0;
+            if (match_grade_options($options, $fraction, 'error') === false) {
+                throw new \coding_exception(
+                    'Generated Moodle multichoice uses a fraction rejected by '
+                    . 'Moodle XML import for '
+                    . $sourceident
+                    . ': '
+                    . $this->format_fraction($fraction)
+                );
+            }
+        }
     }
 
     /**
@@ -315,6 +395,75 @@ final class phase6_scoring_policy_validator {
             libxml_clear_errors();
             libxml_use_internal_errors($previous);
         }
+    }
+
+    /** @return array<int,array{ident:string,fraction:float,score:float}> */
+    private function nonstandard_selected_fraction_details(array $question): array {
+        $maxscore = (float) ($question['max_score'] ?? 0.0);
+        if ($maxscore <= 0.0) {
+            return [];
+        }
+
+        $affected = [];
+        foreach (($question['answers'] ?? []) as $answer) {
+            if (!is_array($answer)) {
+                continue;
+            }
+            $score = (float) ($answer['score_if_selected'] ?? 0.0);
+            $fraction = $score / $maxscore;
+            if ($this->is_moodle_standard_fraction($fraction)) {
+                continue;
+            }
+            $affected[] = [
+                'ident' => (string) ($answer['ident'] ?? ''),
+                'fraction' => $fraction,
+                'score' => $score,
+            ];
+        }
+        return $affected;
+    }
+
+    private function can_preserve_multiple_choice_as_multiresponse(array $question): bool {
+        $maxscore = (float) ($question['max_score'] ?? 0.0);
+        if ($maxscore <= 0.0) {
+            return false;
+        }
+
+        $positive = 0.0;
+        $count = 0;
+        foreach (($question['answers'] ?? []) as $answer) {
+            if (!is_array($answer)) {
+                continue;
+            }
+            $count++;
+            if (abs((float) ($answer['score_if_not_selected'] ?? 0.0)) > 0.000000001) {
+                return false;
+            }
+            $score = (float) ($answer['score_if_selected'] ?? 0.0);
+            if ($score > 0.0) {
+                $positive += $score;
+            }
+        }
+
+        return $count >= 2 && abs($positive - $maxscore) <= 0.000001;
+    }
+
+    private function is_moodle_standard_fraction(float $fraction): bool {
+        global $CFG;
+
+        if (!function_exists('match_grade_options')) {
+            require_once($CFG->libdir . '/questionlib.php');
+        }
+
+        return match_grade_options(
+            \question_bank::fraction_options_full(),
+            $fraction,
+            'error'
+        ) !== false;
+    }
+
+    private function format_fraction(float $fraction): string {
+        return rtrim(rtrim(number_format($fraction, 10, '.', ''), '0'), '.');
     }
 
     private function answers_with_unselected_score(array $question): array {
