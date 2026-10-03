@@ -28,12 +28,21 @@ final class phase6_moodle_xml_builder {
 
         $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<quiz>\n";
         $descriptors = [];
+        $mappingrefs = [];
 
         foreach ($items as $question) {
             if (!is_array($question)) {
                 throw new \coding_exception('Invalid neutral question during Moodle XML generation.');
             }
             $descriptor = $this->descriptor($question, $testref);
+            $mappingref = (string) $descriptor['mapping_ref'];
+            if (isset($mappingrefs[$mappingref])) {
+                throw new \coding_exception(
+                    'Duplicate Phase 6 persistent question mapping identity: ' . $mappingref
+                );
+            }
+            $mappingrefs[$mappingref] = true;
+
             $xml .= $this->render_question($question, $descriptor);
             $descriptors[] = $descriptor;
         }
@@ -106,6 +115,13 @@ final class phase6_moodle_xml_builder {
         $stable = preg_replace('/[^A-Za-z0-9_-]+/', '_', $stable) ?: 'question';
         $idnumber = substr('i2m-' . $testref . '-' . $stable . '-' . $fingerprint, 0, 100);
 
+        $mappingref = $testref . ':' . $ident;
+        if (strlen($mappingref) > 64) {
+            throw new \coding_exception(
+                'Phase 6 persistent question mapping identity exceeds the plugin schema limit.'
+            );
+        }
+
         return [
             'source_ident' => $ident,
             'external_id' => $external,
@@ -113,7 +129,7 @@ final class phase6_moodle_xml_builder {
             // external_id is not safe as a mapping key: real ILIAS exports can
             // reuse it for distinct questions. Keep external_id as metadata and
             // use source_ident for persistent one-to-one mappings.
-            'mapping_ref' => $testref . ':' . $ident,
+            'mapping_ref' => $mappingref,
             'title' => $title,
             'neutral_type' => $type,
             'effective_qtype' => $effectiveqtype,
