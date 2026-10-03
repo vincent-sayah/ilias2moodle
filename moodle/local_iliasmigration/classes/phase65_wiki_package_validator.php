@@ -52,6 +52,7 @@ final class phase65_wiki_package_validator {
         $pagecount = 0;
         $assetcount = 0;
         $wikipagelinks = 0;
+        $unresolvedwikipagelinks = 0;
         $repositorylinks = 0;
         $pagecreates = 0;
         $pageupdates = 0;
@@ -116,6 +117,7 @@ final class phase65_wiki_package_validator {
             $pagecount += (int) ($summary['pages'] ?? 0);
             $assetcount += (int) ($summary['assets'] ?? 0);
             $wikipagelinks += (int) ($summary['wiki_page_links'] ?? 0);
+            $unresolvedwikipagelinks += (int) ($summary['unresolved_wiki_page_links'] ?? 0);
             $repositorylinks += (int) ($summary['repository_links'] ?? 0);
             $pagecreates += (int) ($summary['page_creates'] ?? 0);
             $pageupdates += (int) ($summary['page_updates'] ?? 0);
@@ -152,6 +154,7 @@ final class phase65_wiki_package_validator {
             'page_count' => $pagecount,
             'asset_count' => $assetcount,
             'wiki_page_link_count' => $wikipagelinks,
+            'unresolved_wiki_page_link_count' => $unresolvedwikipagelinks,
             'repository_link_count' => $repositorylinks,
             'page_create_count' => $pagecreates,
             'page_update_count' => $pageupdates,
@@ -298,7 +301,7 @@ final class phase65_wiki_package_validator {
             ? $structure['internal_links']
             : [];
         $wikipagelinks = 0;
-        $repositorylinks = 0;
+        $unresolvedwikipagelinks = 0;
         foreach ($links as $link) {
             if (!is_array($link)) {
                 continue;
@@ -307,12 +310,7 @@ final class phase65_wiki_package_validator {
                 $wikipagelinks++;
                 $targetid = (string) ($link['source_id'] ?? '');
                 if ($targetid === '' || !isset($pageids[$targetid])) {
-                    $this->block(
-                        $operation,
-                        'WIKI_INTERNAL_PAGE_LINK_MISSING',
-                        'An internal Wiki page link targets a page absent from the export.'
-                    );
-                    return $this->empty_summary();
+                    $unresolvedwikipagelinks++;
                 }
             } else {
                 $repositorylinks++;
@@ -383,6 +381,8 @@ final class phase65_wiki_package_validator {
             'page_count' => count($pages),
             'asset_count' => count($assetpaths),
             'wiki_page_link_count' => $wikipagelinks,
+            'unresolved_wiki_page_link_count' => $unresolvedwikipagelinks,
+            'unresolved_wiki_page_link_policy' => 'PRESERVE_AS_TEXT_PAGE_NOT_EXPORTED',
             'repository_link_count' => $repositorylinks,
             'start_page_source_id' => $startid,
             'start_page_title' => $starttitle,
@@ -399,6 +399,7 @@ final class phase65_wiki_package_validator {
             'pages' => count($pages),
             'assets' => count($assetpaths),
             'wiki_page_links' => $wikipagelinks,
+            'unresolved_wiki_page_links' => $unresolvedwikipagelinks,
             'repository_links' => $repositorylinks,
             'page_creates' => (int) ($pageplan['create_count'] ?? 0),
             'page_updates' => (int) ($pageplan['update_count'] ?? 0),
