@@ -330,3 +330,41 @@ exemple `%34%`, `%33%`, `%33%`. Le slot du Quiz conserve le
 Le préflight vérifie également chaque `multichoice` restant avec
 `match_grade_options(..., 'error')`, afin qu'une future fraction native
 incompatible soit bloquée au dry-run au lieu d'échouer pendant l'import réel.
+
+## Matching ILIAS contenant des images
+
+Le troisième apply RC4 du cours `ref_id=282` a révélé un cas que le modèle
+neutre ne conservait pas encore : certains `assMatchingQuestion` utilisent
+des `response_label` contenant des `matimage embedded="base64"` au lieu
+d'un `mattext`.
+
+Dans le cours de validation :
+
+- `il_0_qst_1169` et `il_0_qst_1170` utilisent des images côté source ;
+- `il_0_qst_1574` utilise cinq logos côté cible.
+
+L'ancien parseur ne lisait que `mattext`, ce qui produisait des
+`source_text=""` ou `target_text=""`. Moodle pouvait alors créer des stems
+vides ou refuser l'import avec `qtype_match::nomatchinganswer`.
+
+Le modèle neutre conserve désormais, pour chaque `response_label`, les
+médias embarqués base64 (nom, type, encodage et payload validé). Les paires
+Matching exposent également leurs médias source/cible.
+
+La Phase 6 applique `IMAGE_MATCHING_TO_CLOZE` dès qu'un Matching contient
+un média :
+
+- image source + cible texte : l'image est affichée directement à côté d'un
+  menu Cloze textuel ;
+- cible image : les images sont affichées dans une légende A/B/C... et les
+  menus utilisent ces jetons, car les choix du qtype Moodle Matching natif
+  sont rendus avec `format_string()` et ne peuvent pas afficher de façon
+  fiable des images dans un `<option>`.
+
+Les images sont importées avec le mécanisme Moodle XML natif
+`@@PLUGINFILE@@` + `<file encoding="base64">`. Le score de chaque paire
+et le `max_score` ILIAS sont conservés.
+
+Le préflight rejette également tout Matching natif restant qui contient un
+stem ou une réponse vide, afin que le cas `nomatchinganswer` soit détecté au
+dry-run avant toute écriture.
