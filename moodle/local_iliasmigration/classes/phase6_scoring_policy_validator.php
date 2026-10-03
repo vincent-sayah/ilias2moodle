@@ -81,6 +81,28 @@ final class phase6_scoring_policy_validator {
                     continue;
                 }
 
+                if ($type === 'kprim') {
+                    $this->annotate_preview(
+                        $operation,
+                        $ident,
+                        'KPRIM_COMBINATIONS_TO_MULTICHOICE',
+                        'multichoice',
+                        'ILIAS_KPRIM_COMBINATION_SCORING'
+                    );
+                    $operationtransforms++;
+                    $transformedquestions++;
+                    $plan['warnings'][] = [
+                        'code' => 'KPRIM_INTERACTION_CHANGE',
+                        'source_ref_id' => $testref,
+                        'question_source_ident' => $ident,
+                        'question_title' => (string) ($question['title'] ?? ''),
+                        'combination_count' => count((array) ($question['combinations'] ?? [])),
+                        'apply_policy' => 'KPRIM_COMBINATIONS_TO_MULTICHOICE',
+                        'message' => 'ILIAS Kprim binary decisions are converted to one single-choice Moodle question containing every response combination. This preserves the exact QTI score table while changing the interaction.',
+                    ];
+                    continue;
+                }
+
                 if ($type !== 'multiple_choice') {
                     continue;
                 }
@@ -204,7 +226,7 @@ final class phase6_scoring_policy_validator {
             $plan['warnings'][] = [
                 'code' => 'PHASE6_SCORE_PRESERVING_TRANSFORMS_ENABLED',
                 'transformed_question_count' => $transformedquestions,
-                'message' => 'Phase 6 apply is enabled. Unequal-weight Matching and Multiple Choice with unselected-option credit are converted to one weighted Moodle Cloze question per ILIAS question; Ordering uses native ABSOLUTE_POSITION grading.',
+                'message' => 'Phase 6 apply is enabled. Unequal-weight Matching and Multiple Choice with unselected-option credit use score-preserving transforms, Kprim uses an exact response-combination single-choice transform, and Ordering uses native ABSOLUTE_POSITION grading.',
             ];
             if ($multichoicereviews > 0) {
                 $plan['warnings'][] = [

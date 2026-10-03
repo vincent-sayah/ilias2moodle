@@ -21,6 +21,7 @@ final class phase6_package_validator {
         'short_answer' => 'shortanswer',
         'cloze' => 'multianswer',
         'ordering' => 'ordering',
+        'kprim' => 'multichoice',
     ];
 
     /**

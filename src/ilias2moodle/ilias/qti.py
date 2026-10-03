@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from itertools import product
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
@@ -15,6 +16,7 @@ QUESTION_TYPE_MAP = {
     "assTextSubset": "short_answer",
     "assClozeTest": "cloze",
     "assOrderingQuestion": "ordering",
+    "assKprimChoice": "kprim",
 }
 
 
@@ -229,6 +231,179 @@ def _choice_question(item: ET.Element, multiple: bool) -> dict[str, Any]:
         ),
         "response_ident": response.attrib.get("ident", ""),
         "max_score": max_score,
+    }
+
+
+def _boolean_condition_matches(
+    element: ET.Element,
+    state: dict[str, bool],
+) -> bool | None:
+    """Evaluate the boolean QTI subset used by ILIAS Kprim scoring."""
+    name = _local_name(element.tag)
+
+    if name == "conditionvar":
+        children = list(element)
+        if not children:
+            return None
+        results = [
+            _boolean_condition_matches(child, state)
+            for child in children
+        ]
+        if any(result is None for result in results):
+            return None
+        return all(bool(result) for result in results)
+
+    if name == "and":
+        children = list(element)
+        results = [
+            _boolean_condition_matches(child, state)
+            for child in children
+        ]
+        if not children or any(result is None for result in results):
+            return None
+        return all(bool(result) for result in results)
+
+    if name == "or":
+        children = list(element)
+        results = [
+            _boolean_condition_matches(child, state)
+            for child in children
+        ]
+        if not children or any(result is None for result in results):
+            return None
+        return any(bool(result) for result in results)
+
+    if name == "not":
+        children = list(element)
+        if len(children) != 1:
+            return None
+        result = _boolean_condition_matches(children[0], state)
+        return None if result is None else not result
+
+    if name == "varequal":
+        ident = element.attrib.get("respident", "")
+        if ident not in state:
+            return None
+        raw = _text(element).strip().lower()
+        if raw in {"1", "true"}:
+            expected = True
+        elif raw in {"0", "false"}:
+            expected = False
+        else:
+            return None
+        return state[ident] is expected
+
+    return None
+
+
+def _kprim_score_for_state(
+    item: ET.Element,
+    state: dict[str, bool],
+) -> float | None:
+    """Evaluate SCORE mutations for one Kprim response combination."""
+    score = 0.0
+
+    for condition in _descendants(item, "respcondition"):
+        setvars = [
+            element
+            for element in _descendants(condition, "setvar")
+            if element.attrib.get("varname", "SCORE") in {"", "SCORE"}
+        ]
+        if not setvars:
+            continue
+
+        conditionvar = _first(condition, "conditionvar")
+        if conditionvar is None:
+            return None
+        matches = _boolean_condition_matches(conditionvar, state)
+        if matches is None:
+            return None
+        if not matches:
+            continue
+
+        for setvar in setvars:
+            value = _float(_text(setvar))
+            action = setvar.attrib.get("action", "Set").strip().lower()
+            if action == "add":
+                score += value
+            elif action == "set":
+                score = value
+            else:
+                return None
+
+    return score
+
+
+def _kprim_question(item: ET.Element) -> dict[str, Any]:
+    """Normalize ILIAS Kprim as an exact table of binary combinations."""
+    response = _first(item, "response_lid")
+    answers = _answer_labels(response) if response is not None else []
+    render = _first(response, "render_choice") if response is not None else None
+
+    idents = [str(answer.get("ident", "")) for answer in answers]
+    if (
+        not answers
+        or any(not ident for ident in idents)
+        or len(set(idents)) != len(idents)
+        or len(answers) > 8
+    ):
+        return {
+            "answers": answers,
+            "combinations": [],
+            "shuffle": False,
+            "response_ident": (
+                response.attrib.get("ident", "")
+                if response is not None
+                else ""
+            ),
+            "max_score": 0.0,
+            "kprim_scoring_supported": False,
+        }
+
+    combinations: list[dict[str, Any]] = []
+    for values in product((False, True), repeat=len(answers)):
+        state = {
+            ident: value
+            for ident, value in zip(idents, values, strict=True)
+        }
+        score = _kprim_score_for_state(item, state)
+        if score is None:
+            return {
+                "answers": answers,
+                "combinations": [],
+                "shuffle": False,
+                "response_ident": response.attrib.get("ident", ""),
+                "max_score": 0.0,
+                "kprim_scoring_supported": False,
+            }
+        combinations.append(
+            {
+                "states": [
+                    {
+                        "ident": ident,
+                        "selected": bool(value),
+                    }
+                    for ident, value in zip(idents, values, strict=True)
+                ],
+                "score": float(score),
+            }
+        )
+
+    max_score = max(
+        (float(combination["score"]) for combination in combinations),
+        default=0.0,
+    )
+    return {
+        "answers": answers,
+        "combinations": combinations,
+        "combination_count": len(combinations),
+        "shuffle": (
+            render is not None
+            and render.attrib.get("shuffle", "").lower() == "yes"
+        ),
+        "response_ident": response.attrib.get("ident", ""),
+        "max_score": max_score,
+        "kprim_scoring_supported": max_score > 0.0,
     }
 
 
@@ -456,6 +631,10 @@ def _normalize_question(item: ET.Element, position: int) -> dict[str, Any]:
         specific = _cloze_question(item)
     elif normalized_type == "ordering":
         specific = _ordering_question(item)
+    elif normalized_type == "kprim":
+        specific = _kprim_question(item)
+        if not specific.get("kprim_scoring_supported", False):
+            normalized_type = "unsupported"
     else:
         specific = {"max_score": 0.0}
 

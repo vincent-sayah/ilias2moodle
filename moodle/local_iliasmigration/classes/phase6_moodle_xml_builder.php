@@ -62,6 +62,7 @@ final class phase6_moodle_xml_builder {
             'cloze' => 'multianswer',
             'ordering' => 'ordering',
             'matching' => 'match',
+            'kprim' => 'multichoice',
             default => throw new \coding_exception('Unsupported Phase 6 neutral question type: ' . $type),
         };
 
@@ -72,6 +73,10 @@ final class phase6_moodle_xml_builder {
         if ($type === 'multiple_choice' && $this->has_unselected_scoring($question)) {
             $effectiveqtype = 'multianswer';
             $transform = 'MULTICHOICE_BINARY_DECISIONS_TO_CLOZE';
+        }
+        if ($type === 'kprim') {
+            $effectiveqtype = 'multichoice';
+            $transform = 'KPRIM_COMBINATIONS_TO_MULTICHOICE';
         }
 
         $fingerprintpayload = json_encode(
@@ -108,6 +113,9 @@ final class phase6_moodle_xml_builder {
         }
         if ($descriptor['transform'] === 'MULTICHOICE_BINARY_DECISIONS_TO_CLOZE') {
             return $this->render_binary_multichoice_cloze($question, $descriptor);
+        }
+        if ($descriptor['transform'] === 'KPRIM_COMBINATIONS_TO_MULTICHOICE') {
+            return $this->render_kprim_combinations_multichoice($question, $descriptor);
         }
 
         return match ($type) {
@@ -359,6 +367,94 @@ final class phase6_moodle_xml_builder {
         }
 
         $xml = $this->header('cloze', $descriptor, $body, false);
+        return $xml . "  </question>\n";
+    }
+
+
+    /**
+     * ILIAS Kprim -> one Moodle single-choice question enumerating all binary
+     * response combinations. This preserves the complete QTI score table,
+     * including all-or-nothing or partial-credit Kprim policies.
+     */
+    private function render_kprim_combinations_multichoice(
+        array $question,
+        array $descriptor
+    ): string {
+        $answers = array_values(array_filter(
+            (array) ($question['answers'] ?? []),
+            'is_array'
+        ));
+        $combinations = array_values(array_filter(
+            (array) ($question['combinations'] ?? []),
+            'is_array'
+        ));
+        $maxscore = (float) ($descriptor['max_score'] ?? 0.0);
+
+        if (!$answers || !$combinations || $maxscore <= 0.0) {
+            throw new \coding_exception(
+                'Kprim transform requires answer statements, response combinations and a positive score.'
+            );
+        }
+
+        $body = (string) ($question['question_text'] ?? '');
+        $body .= '<ol class="ilias2moodle-kprim-statements">';
+        foreach ($answers as $answer) {
+            $text = trim((string) ($answer['text'] ?? ''));
+            if ($text === '') {
+                throw new \coding_exception(
+                    'Kprim transform found an empty statement.'
+                );
+            }
+            $body .= '<li>' . s($text) . '</li>';
+        }
+        $body .= '</ol>';
+        $body .= '<p><em>Migration ILIAS Kprim : chaque réponse code les états des propositions '
+            . 'dans leur ordre d’affichage (1/0).</em></p>';
+
+        $xml = $this->header(
+            'multichoice',
+            $descriptor,
+            $body
+        );
+        $xml .= "    <single>true</single>\n";
+        $xml .= "    <shuffleanswers>false</shuffleanswers>\n";
+        $xml .= "    <answernumbering>none</answernumbering>\n";
+        $xml .= "    <showstandardinstruction>0</showstandardinstruction>\n";
+
+        foreach ($combinations as $combination) {
+            $states = array_values(array_filter(
+                (array) ($combination['states'] ?? []),
+                'is_array'
+            ));
+            if (count($states) !== count($answers)) {
+                throw new \coding_exception(
+                    'Kprim response combination does not match the statement count.'
+                );
+            }
+
+            $labels = [];
+            foreach ($states as $index => $state) {
+                $labels[] = ($index + 1) . '='
+                    . (!empty($state['selected']) ? '1' : '0');
+            }
+
+            $score = (float) ($combination['score'] ?? 0.0);
+            $fraction = 100.0 * $score / $maxscore;
+            if ($fraction > 100.000001 || $fraction < -100.000001) {
+                throw new \coding_exception(
+                    'Kprim response combination fraction is outside Moodle multichoice limits.'
+                );
+            }
+
+            $xml .= '    <answer fraction="' . $this->number($fraction)
+                . '" format="html">' . "\n";
+            $xml .= '      <text><![CDATA['
+                . $this->cdata(implode(' ; ', $labels))
+                . "]]></text>\n";
+            $xml .= "      <feedback format=\"html\"><text></text></feedback>\n";
+            $xml .= "    </answer>\n";
+        }
+
         return $xml . "  </question>\n";
     }
 

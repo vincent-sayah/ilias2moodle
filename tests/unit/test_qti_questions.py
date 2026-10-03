@@ -207,3 +207,90 @@ def test_parse_phase6_representative_question_types() -> None:
     assert quiz["question_order"][1]["source_ident"] == "q_single"
     assert quiz["unresolved_question_refs"] == []
     assert quiz["title"] == "test"
+
+
+KPRIM_QTI = """<?xml version="1.0"?>
+<questestinterop>
+  <assessment ident="test_kprim" title="kprim">
+    <section>
+      <item ident="il_0_qst_1194" title="Formation Générale (53)">
+        <itemmetadata><qtimetadata>
+          <qtimetadatafield><fieldlabel>QUESTIONTYPE</fieldlabel><fieldentry>assKprimChoice</fieldentry></qtimetadatafield>
+          <qtimetadatafield><fieldlabel>externalId</fieldlabel><fieldentry>6214d3a5600970.08414694</fieldentry></qtimetadatafield>
+          <qtimetadatafield><fieldlabel>option_label_setting</fieldlabel><fieldentry>adequate_or_not</fieldentry></qtimetadatafield>
+        </qtimetadata></itemmetadata>
+        <presentation>
+          <material><mattext texttype="text/xhtml">&lt;p&gt;Quels sont les éléments constitutifs du marquage d'un document ?&lt;/p&gt;</mattext></material>
+          <response_lid ident="MCMR" rcardinality="Multiple"><render_choice shuffle="No">
+            <response_label ident="0"><material><mattext>Le timbre</mattext></material></response_label>
+            <response_label ident="1"><material><mattext>La pagination</mattext></material></response_label>
+            <response_label ident="2"><material><mattext>La classification</mattext></material></response_label>
+            <response_label ident="3"><material><mattext>L'identification</mattext></material></response_label>
+          </render_choice></response_lid>
+        </presentation>
+        <resprocessing>
+          <outcomes><decvar varname="SCORE" vartype="Decimal" defaultval="0" minvalue="0" maxvalue="1"/></outcomes>
+          <respcondition continue="Yes"><conditionvar><varequal respident="0">1</varequal></conditionvar><displayfeedback feedbacktype="Response" linkrefid="response_0"/></respcondition>
+          <respcondition continue="Yes"><conditionvar><varequal respident="1">1</varequal></conditionvar><displayfeedback feedbacktype="Response" linkrefid="response_1"/></respcondition>
+          <respcondition continue="Yes"><conditionvar><varequal respident="2">0</varequal></conditionvar><displayfeedback feedbacktype="Response" linkrefid="response_2"/></respcondition>
+          <respcondition continue="Yes"><conditionvar><varequal respident="3">1</varequal></conditionvar><displayfeedback feedbacktype="Response" linkrefid="response_3"/></respcondition>
+          <respcondition continue="Yes"><conditionvar><and>
+            <varequal respident="0">1</varequal>
+            <varequal respident="1">1</varequal>
+            <varequal respident="2">0</varequal>
+            <varequal respident="3">1</varequal>
+          </and></conditionvar><setvar action="Add">1</setvar></respcondition>
+          <respcondition continue="Yes"><conditionvar><or>
+            <not><varequal respident="0">1</varequal></not>
+            <not><varequal respident="1">1</varequal></not>
+            <not><varequal respident="2">0</varequal></not>
+            <not><varequal respident="3">1</varequal></not>
+          </or></conditionvar><setvar action="Add">0</setvar></respcondition>
+        </resprocessing>
+      </item>
+    </section>
+  </assessment>
+</questestinterop>
+"""
+
+
+def test_parse_real_ilias_kprim_all_or_nothing_scoring() -> None:
+    questions, quiz = parse_test_qti(
+        KPRIM_QTI,
+        source_ref_id="331",
+        source_obj_id="947",
+        title="Test global",
+    )
+
+    assert questions["question_count"] == 1
+    assert questions["unsupported_count"] == 0
+    assert questions["type_counts"] == {"kprim": 1}
+
+    question = questions["questions"][0]
+    assert question["source_ident"] == "il_0_qst_1194"
+    assert question["external_id"] == "6214d3a5600970.08414694"
+    assert question["ilias_type"] == "assKprimChoice"
+    assert question["type"] == "kprim"
+    assert question["max_score"] == 1
+    assert question["combination_count"] == 16
+    assert [answer["text"] for answer in question["answers"]] == [
+        "Le timbre",
+        "La pagination",
+        "La classification",
+        "L'identification",
+    ]
+
+    scoring = [
+        combination
+        for combination in question["combinations"]
+        if combination["score"] > 0
+    ]
+    assert len(scoring) == 1
+    assert scoring[0]["score"] == 1
+    assert [
+        state["selected"]
+        for state in scoring[0]["states"]
+    ] == [True, True, False, True]
+
+    assert quiz["ordered_question_count"] == 1
+    assert quiz["total_max_score"] == 1

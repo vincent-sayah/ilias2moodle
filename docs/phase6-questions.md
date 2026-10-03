@@ -215,3 +215,31 @@ question, activité Quiz ou slot de question Moodle.
 La prochaine étape est de revalider le dry-run avec les quatre revues de scoring, puis
 d'implémenter le chemin d'apply via les API/outils core Question Bank et Quiz, sans
 INSERT/UPDATE direct dans les tables pédagogiques Moodle.
+
+## Kprim ILIAS
+
+Le POC RC4 sur le cours ILIAS `ref_id=282` a rencontré un type supplémentaire :
+`assKprimChoice`.
+
+Le cas réel `il_0_qst_1194` contient quatre propositions et un barème QTI
+tout-ou-rien : la combinaison `1,1,0,1` vaut 1 point et toute autre
+combinaison vaut 0.
+
+À partir du correctif RC4, le parseur :
+
+- normalise `assKprimChoice` en type neutre `kprim` ;
+- évalue les conditions QTI booléennes `and/or/not/varequal` pour toutes les
+  combinaisons binaires ;
+- conserve ainsi la table de score complète plutôt qu'une approximation.
+
+L'apply Moodle transforme ensuite une question Kprim en une seule question
+`multichoice` à réponse unique contenant toutes les combinaisons possibles.
+Pour quatre propositions, cela produit 16 réponses. Chaque réponse reçoit
+exactement la fraction correspondant au score QTI source.
+
+Cette représentation modifie l'interaction visuelle, mais conserve :
+
+- un seul slot Moodle pour une question ILIAS ;
+- la note maximale ;
+- le score de chaque combinaison, y compris le tout-ou-rien ;
+- l'identité source et l'idempotence des mappings.
