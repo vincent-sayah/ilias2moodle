@@ -98,7 +98,8 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS 
 - [ ] intégrer les extensions Phase 7 utilisant des inventaires auxiliaires ;
 - [ ] refactoriser/raccorder la réconciliation d'ordre V2 à la console ;
 - [ ] granularité d'ignorance par `source_ref_id` à l'intérieur d'une même famille ;
-- [ ] validation end-to-end de la beta1 sur VM Moodle 5.0.2 avant promotion RC.
+- [x] validation end-to-end nominale de la beta1 sur VM Moodle 5.0.2 : run #2 `COMPLETED`, cours Moodle `id=4 / ILIAS-282`, 621 mappings ;
+- [ ] validation du scénario `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` avant promotion RC.
 
 ## Validation de consolidation
 
