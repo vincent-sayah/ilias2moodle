@@ -76,3 +76,82 @@ mapping ILIAS ID ↔ Moodle ID
     ↓
 rapport final
 ```
+
+## Console opérateur et orchestration persistante
+
+À partir de `0.21.0-beta1`, le plugin Moodle ajoute une couche d'orchestration au-dessus des executors existants.
+
+```text
+migration.json
+     │
+     ▼
+Console opérateur Moodle
+     │
+     ├── local_iliasmigration_run
+     │
+     ├── local_iliasmigration_step
+     │
+     └── local_iliasmigration_log
+     │
+     ▼
+Pipeline ordonné
+     │
+     ├── Structure
+     ├── Ressources
+     ├── SCORM
+     ├── Book
+     ├── Questions / Quiz
+     ├── Content Page
+     ├── Glossaire
+     ├── Wiki
+     ├── Exercice
+     ├── Forum
+     ├── MediaCast
+     ├── Blog
+     ├── Media Pool
+     └── Item Groups
+     │
+     ▼
+Executors existants
+     │
+     ▼
+Mappings + objets Moodle
+     │
+     ▼
+Rapport HTML / JSON
+```
+
+### Principe de reprise
+
+Le pipeline n'est pas exécuté dans une unique requête web. Une requête traite une seule famille, persiste son résultat puis redirige vers l'étape suivante.
+
+Cette stratégie rend le run :
+
+- reprenable ;
+- observable ;
+- moins sensible aux timeouts HTTP ;
+- capable de s'arrêter proprement sur une erreur.
+
+Un échec passe le run à `WAITING_DECISION`. L'opérateur peut ensuite :
+
+```text
+FAILED
+  ├── retry  -> PENDING -> exécution
+  └── ignore -> SKIPPED -> étape suivante
+```
+
+### Isolation des erreurs
+
+La beta1 isole les erreurs à la granularité d'une **famille d'objet**. Chaque executor conserve sa transaction et ses garde-fous.
+
+La granularité par `source_ref_id` est une évolution ultérieure afin de ne pas casser les invariants transactionnels déjà validés des executors existants.
+
+### Journal et audit
+
+Le journal opérateur ne remplace pas `local_iliasmigration_map`.
+
+- `local_iliasmigration_map` répond à « quel objet ILIAS correspond à quel objet Moodle ? » ;
+- `local_iliasmigration_run/step/log` répond à « que s'est-il passé pendant cette migration opérateur ? ».
+
+Les deux ensembles sont complémentaires.
+
