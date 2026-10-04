@@ -196,15 +196,18 @@ final class operator_run_manager {
             return $run;
         }
 
-        $step = $DB->get_record_sql(
-            "SELECT *
-               FROM {local_iliasmigration_step}
-              WHERE runid = ?
-                AND status = ?
-           ORDER BY position ASC",
-            [$runid, self::STEP_PENDING],
-            IGNORE_MULTIPLE
+        $steps = $DB->get_records(
+            'local_iliasmigration_step',
+            [
+                'runid' => $runid,
+                'status' => self::STEP_PENDING,
+            ],
+            'position ASC',
+            '*',
+            0,
+            1
         );
+        $step = $steps ? reset($steps) : false;
 
         if (!$step) {
             $this->finalize_run($runid, $userid);
@@ -560,15 +563,18 @@ final class operator_run_manager {
     private function refresh_current_step(int $runid): void {
         global $DB;
 
-        $next = $DB->get_record_sql(
-            "SELECT *
-               FROM {local_iliasmigration_step}
-              WHERE runid = ?
-                AND status = ?
-           ORDER BY position ASC",
-            [$runid, self::STEP_PENDING],
-            IGNORE_MULTIPLE
+        $steps = $DB->get_records(
+            'local_iliasmigration_step',
+            [
+                'runid' => $runid,
+                'status' => self::STEP_PENDING,
+            ],
+            'position ASC',
+            '*',
+            0,
+            1
         );
+        $next = $steps ? reset($steps) : false;
 
         $DB->set_field(
             'local_iliasmigration_run',
