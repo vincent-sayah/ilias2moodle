@@ -2,104 +2,79 @@
 
 ## POC de référence — état au 4 octobre 2026
 
-Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS `ref_id=128 / obj_id=504` vers la cible fraîche Moodle `course id=2 / ILIAS-128`.
+Les phases 1 à 7 du POC ILIAS 10 → Moodle sont validées. La Phase 7.3 est clôturée en rapport historique uniquement.
 
-## Phase 1 — Inventaire et analyse `[TERMINÉE]`
+## Couverture fonctionnelle
 
-- [x] analyse d'un export ILIAS 10 réel ;
-- [x] reconstruction de l'arborescence et des métadonnées ;
-- [x] génération du modèle neutre `migration.json` ;
-- [x] rapports et diagnostics exploitables ;
-- [x] préparation reproductible des packages de migration.
+- [x] Phase 1 — inventaire/analyse ;
+- [x] Phase 2 — cours, sections, sous-sections, catégories, mappings ;
+- [x] Phase 3 — ressources simples ;
+- [x] Phase 4 — SCORM ;
+- [x] Phase 5 — Learning Module → Book ;
+- [x] Phase 6 — Question Pool + Quiz ;
+- [x] Phase 6.5 — Content Page ;
+- [x] Phase 6.5 — Glossaire ;
+- [x] Phase 6.5 — Wiki ;
+- [x] Phase 6.5 — Exercice ;
+- [x] Phase 6.5 — Forum ;
+- [x] Phase 6.5 — Mediacast ;
+- [x] Phase 6.5 — Blog ;
+- [x] Phase 6.5 — Media Pool ;
+- [x] Phase 6.5 — Item Groups + ordre V2 ;
+- [x] Phase 7.1 — utilisateurs, inscriptions, rôles ;
+- [x] Phase 7.3 / #41 — POC avancé progression ; politique historique uniquement ;
+- [x] Phase 7.4 — contributions Forum ;
+- [x] Phase 7.5 — auteurs Blog ;
+- [x] Phase 7.6 — auteurs/dates Wiki.
 
-## Phase 2 — Structure `[TERMINÉE]`
+## Première version exploitable — opérateur V1
 
-- [x] plugin Moodle installable ;
-- [x] catégories et chemin de catégories ;
-- [x] cours ;
-- [x] sections et sous-sections ;
-- [x] politique des dossiers profonds ;
-- [x] ordre global ;
-- [x] mappings persistants ;
-- [x] dry-run et apply idempotents.
+Branche : `operator-v1`.
 
-## Phase 3 — Ressources simples `[TERMINÉE]`
+Cible : `0.21.0-rc1`.
 
-- [x] fichiers et médias ;
-- [x] URL ;
-- [x] HTML simple ;
-- [x] liens internes ILIAS -> Moodle ;
-- [x] placements déterministes ;
-- [x] idempotence.
+- [x] modèle persistant job / étapes / logs ;
+- [x] capability opérateur ;
+- [x] upload sécurisé d'un package préparé ;
+- [x] chemin serveur vers `migration.json` ;
+- [x] pipeline généré selon les objets présents ;
+- [x] tâche ad hoc Moodle ;
+- [x] lock par job ;
+- [x] pause sur erreur non critique ;
+- [x] `Ignorer et continuer` ;
+- [x] retry à partir d'une étape ;
+- [x] politique auto-continue ;
+- [x] rapport final JSON ;
+- [x] documentation opérateur ;
+- [ ] CI de la branche ;
+- [ ] qualification réelle sur Moodle 5.0.2 ;
+- [ ] test d'échec volontaire d'une famille + reprise ;
+- [ ] validation du second passage/idempotence de la console ;
+- [ ] promotion sur `main` puis tag V1.
 
-## Phase 4 — SCORM `[TERMINÉE]`
+## Backlog fonctionnel
 
-- [x] extraction des packages ;
-- [x] import Moodle ;
-- [x] mapping des paramètres compatibles ;
-- [x] deux SCORM du POC migrés.
+- [ ] #22 — objet ILIAS Groupe complet : modèle conteneur + membres + restrictions + contenus.
 
-## Phase 5 — Learning Modules `[TERMINÉE]`
+## V1.1 / améliorations opérateur
 
-- [x] parsing du module ILIAS ;
-- [x] chapitres/pages/médias ;
-- [x] conversion vers Moodle Book ;
-- [x] validation réelle du POC.
+- [ ] préparation d'un export ILIAS brut directement depuis l'interface ou via worker de préparation ;
+- [ ] automatiser Phase 7.1 dans le pipeline ;
+- [ ] automatiser les enrichissements Phase 7.4/7.6 lorsque leurs sidecars sont disponibles ;
+- [ ] isolation transactionnelle **objet par objet** à l'intérieur d'une famille ;
+- [ ] transformer la réconciliation d'ordre V2 en service réutilisable par l'orchestrateur ;
+- [ ] bouton d'annulation contrôlée ;
+- [ ] politique de rétention/purge des packages et rapports ;
+- [ ] vue de progression dynamique/polling ;
+- [ ] export HTML/PDF du compte rendu en complément du JSON.
 
-## Phase 6 — Tests et banques de questions `[TERMINÉE]`
+## Règle de promotion
 
-- [x] inventaire des types de questions ;
-- [x] parsing QTI ;
-- [x] représentation neutre ;
-- [x] génération Moodle XML ;
-- [x] Question Bank ;
-- [x] Quiz ;
-- [x] 11 questions / 46 points ;
-- [x] apply idempotent et validation visuelle.
+Une candidate opérateur ne devient version exploitable publiée qu'après :
 
-## Phase 6.5 — Objets pédagogiques étendus `[TERMINÉE]`
-
-- [x] Content Page ;
-- [x] Glossaire ;
-- [x] Wiki ;
-- [x] Exercice ;
-- [x] Forum ;
-- [x] Mediacast ;
-- [x] Blog ;
-- [x] Media Pool.
-
-## Phase 7 — Utilisateurs, contributions et progression `[TERMINÉE POUR LE POC]`
-
-- [x] Phase 7.1 — 6 utilisateurs, inscriptions et rôles ;
-- [x] mappings utilisateurs GLOBAL, dont `ILIAS 6/root -> Moodle 2/admin` ;
-- [x] Phase 7.3 — progression/résultats : 0 `MIGRATE`, 2 `HISTORY_ONLY`, 21 `NO_DATA` ;
-- [x] Phase 7.3 — mappings robustes `sourcecourse 504/128` et Exercise 1 -> 4 ;
-- [x] Phase 7.3 — POC avancé cours `827/282` : 12 identités, 2 Tests, 1 SCORM 2004 et 1 Exercise ;
-- [x] Phase 7.3 — politique finale : **rapport historique uniquement**, aucune écriture de notes, tentatives ou completion dans les objets Moodle natifs ;
-- [x] Phase 7.4 — Forum : 3 auteurs, 2 discussions, 7 posts, 3 pièces jointes ;
-- [x] Phase 7.5 — Blog : 2 auteurs/propriétaires déjà conformes, no-op ;
-- [x] Phase 7.6 — deux Wikis : auteur courant et dates réconciliés ;
-- [x] seconds passages idempotents / sans écriture.
-
-## Validation de consolidation
-
-- [x] cible fraîche Moodle 5.0.2 / course id 2 ;
-- [x] PHP 8.3.35 ;
-- [x] syntaxe des resolvers Phase 7 ;
-- [x] tests PHP Phase 7.3 et 7.4 ;
-- [x] suite PHP : 14 / 14 réussis ;
-- [x] suite Python de référence : 57 tests réussis ;
-- [x] Phase 7.3 dry-run sans écriture ;
-- [x] Forum/Blog/Wiki en état final idempotent ;
-- [x] RC3 : 89 fichiers PHP lintés sans erreur ;
-- [x] RC3 : copie installée strictement identique à la candidate ;
-- [x] RC3 : aucun CRLF dans le plugin installé ;
-- [x] RC3 : premier upgrade Moodle réussi ;
-- [x] RC3 : second upgrade sans mise à jour nécessaire.
-
-## Backlog non bloquant
-
-- [ ] #22 — objet ILIAS Groupe complet : `DEFERRED` tant qu'un mapping conteneur + contenus + membres + restrictions n'est pas validé ;
-- [x] #41 — POC avancé de progression multi-utilisateurs validé sur le cours `827/282` ; clôturé en rapport historique uniquement.
-
-Le seul backlog fonctionnel restant dans cette section est l'objet ILIAS Groupe (#22). Le POC avancé de progression (#41) est clôturé.
+1. CI verte ;
+2. upgrade Moodle réel ;
+3. migration complète d'un package de référence ;
+4. test pause/ignore/retry ;
+5. contrôle du rapport ;
+6. second passage sans doublon.
