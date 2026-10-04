@@ -47,4 +47,4 @@ $string['step_blogs'] = 'Blogs';
 $string['step_mediapools'] = 'Media Pools';
 $string['step_itemgroups'] = 'Item Groups';
 $string['local/iliasmigration:operate'] = 'Lancer et piloter les migrations ILIAS2Moodle';
-$string['local/iliasmigration:viewreports'] = 'Consulter les comptes rendus ILIAS2Moodle';
+$string['local/iliasmigration:viewreports'] = 'Consulter les comptes rendus ILIAS2Moodle';\n$string['result'] = 'Résultat';\n
