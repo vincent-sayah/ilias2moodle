@@ -245,9 +245,35 @@ final class structure_executor {
         }
 
         if ((int) $sectioninfo->section !== $position) {
-            $sectionactions->move_at($sectioninfo, $position);
+            $moved = false;
+
+            // sectionactions::move_at() is only available in newer Moodle
+            // branches. Moodle 4.5/5.0 still use the stable move_section_to()
+            // course API. Keep the plugin compatible with its declared
+            // minimum and with the validated Moodle 5.0.2 target.
+            if (method_exists($sectionactions, 'move_at')) {
+                $moved = (bool) $sectionactions->move_at(
+                    $sectioninfo,
+                    $position
+                );
+            } else {
+                $moved = (bool) move_section_to(
+                    $course,
+                    (int) $sectioninfo->section,
+                    $position,
+                    true
+                );
+            }
+
+            if (!$moved) {
+                throw new \coding_exception(
+                    'Unable to move the Moodle section to the requested position.'
+                );
+            }
+
             rebuild_course_cache($course->id, true);
-            $sectioninfo = get_fast_modinfo($course->id)->get_section_info_by_id($sectionid);
+            $sectioninfo = get_fast_modinfo($course->id)
+                ->get_section_info_by_id($sectionid);
         }
 
         if (!$sectioninfo) {
