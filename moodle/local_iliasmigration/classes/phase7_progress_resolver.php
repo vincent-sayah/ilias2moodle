@@ -20,13 +20,49 @@ final class phase7_progress_resolver {
         string $exercisejson,
         int $courseid
     ): array {
+        return $this->resolve_many(
+            $progressjson,
+            [$testjson],
+            [$scorm719json, $scorm720json],
+            [$exercisejson],
+            $courseid
+        );
+    }
+
+    public function resolve_many(
+        string $progressjson,
+        array $testjsons,
+        array $scormjsons,
+        array $exercisejsons,
+        int $courseid
+    ): array {
         global $DB;
 
         $progress = $this->read_json($progressjson, 'progress');
-        $test = $this->read_json($testjson, 'test');
-        $scorm719 = $this->read_json($scorm719json, 'scorm');
-        $scorm720 = $this->read_json($scorm720json, 'scorm');
-        $exercise = $this->read_json($exercisejson, 'exercise');
+
+        $tests = [];
+        foreach ($testjsons as $path) {
+            $path = trim((string) $path);
+            if ($path !== '') {
+                $tests[] = $this->read_json($path, 'test');
+            }
+        }
+
+        $scorms = [];
+        foreach ($scormjsons as $path) {
+            $path = trim((string) $path);
+            if ($path !== '') {
+                $scorms[] = $this->read_json($path, 'scorm');
+            }
+        }
+
+        $exercises = [];
+        foreach ($exercisejsons as $path) {
+            $path = trim((string) $path);
+            if ($path !== '') {
+                $exercises[] = $this->read_json($path, 'exercise');
+            }
+        }
 
         $course = $DB->get_record(
             'course',
@@ -212,12 +248,19 @@ final class phase7_progress_resolver {
             }
         }
 
-        $detailed = [
-            $this->classify_test($test),
-            $this->classify_scorm($scorm719),
-            $this->classify_scorm($scorm720),
-            $this->classify_exercise($exercise),
-        ];
+        $detailed = [];
+
+        foreach ($tests as $test) {
+            $detailed[] = $this->classify_test($test);
+        }
+
+        foreach ($scorms as $scorm) {
+            $detailed[] = $this->classify_scorm($scorm);
+        }
+
+        foreach ($exercises as $exercise) {
+            $detailed[] = $this->classify_exercise($exercise);
+        }
 
         foreach ($detailed as $item) {
             $ref = (string) ($item['source_ref_id'] ?? '');

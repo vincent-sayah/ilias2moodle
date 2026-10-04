@@ -9,6 +9,9 @@ require_once(__DIR__ . '/../classes/phase7_progress_resolver.php');
 [$options, $unrecognized] = cli_get_params(
     [
         'progress' => '',
+        'tests' => '',
+        'scorms' => '',
+        'exercises' => '',
         'test' => '',
         'scorm719' => '',
         'scorm720' => '',
@@ -24,13 +27,15 @@ if ($unrecognized) {
 }
 
 $help = "ILIAS2Moodle Phase 7.3 progress/results dry-run\n\n"
+    . "Generic usage:\n"
     . "php local/iliasmigration/cli/phase7_progress_dry_run.php "
     . "--progress=/path/progress.json "
-    . "--test=/path/test.json "
-    . "--scorm719=/path/scorm719.json "
-    . "--scorm720=/path/scorm720.json "
-    . "--exercise=/path/exercise.json "
+    . "[--tests=/path/test1.json,/path/test2.json] "
+    . "[--scorms=/path/scorm1.json,/path/scorm2.json] "
+    . "[--exercises=/path/exercise1.json,/path/exercise2.json] "
     . "--course=ID\n\n"
+    . "Legacy options remain supported: "
+    . "--test, --scorm719, --scorm720, --exercise.\n\n"
     . "Read-only classification. No Moodle completion, grades, attempts "
     . "or mapping records are written.\n";
 
@@ -39,18 +44,59 @@ if ($options['help']) {
     exit(0);
 }
 
-$paths = [
-    'progress' => trim((string) $options['progress']),
-    'test' => trim((string) $options['test']),
-    'scorm719' => trim((string) $options['scorm719']),
-    'scorm720' => trim((string) $options['scorm720']),
-    'exercise' => trim((string) $options['exercise']),
-];
+$progress = trim((string) $options['progress']);
 
-foreach ($paths as $name => $path) {
-    if ($path === '') {
-        cli_error('Missing --' . $name . '.');
+$splitpaths = static function(string $value): array {
+    $value = trim($value);
+
+    if ($value === '') {
+        return [];
     }
+
+    $paths = preg_split('/\s*,\s*/', $value);
+
+    return array_values(
+        array_unique(
+            array_filter(
+                array_map(
+                    static fn($path): string => trim((string) $path),
+                    $paths ?: []
+                ),
+                static fn($path): bool => $path !== ''
+            )
+        )
+    );
+};
+
+$tests = $splitpaths((string) $options['tests']);
+$scorms = $splitpaths((string) $options['scorms']);
+$exercises = $splitpaths((string) $options['exercises']);
+
+if (!$tests) {
+    $legacy = trim((string) $options['test']);
+    if ($legacy !== '') {
+        $tests[] = $legacy;
+    }
+}
+
+if (!$scorms) {
+    foreach (['scorm719', 'scorm720'] as $name) {
+        $legacy = trim((string) $options[$name]);
+        if ($legacy !== '') {
+            $scorms[] = $legacy;
+        }
+    }
+}
+
+if (!$exercises) {
+    $legacy = trim((string) $options['exercise']);
+    if ($legacy !== '') {
+        $exercises[] = $legacy;
+    }
+}
+
+if ($progress === '') {
+    cli_error('Missing --progress.');
 }
 
 $courseid = (int) $options['course'];
@@ -61,12 +107,11 @@ if ($courseid <= 0) {
 try {
     $result = (
         new \local_iliasmigration\phase7_progress_resolver()
-    )->resolve(
-        $paths['progress'],
-        $paths['test'],
-        $paths['scorm719'],
-        $paths['scorm720'],
-        $paths['exercise'],
+    )->resolve_many(
+        $progress,
+        $tests,
+        $scorms,
+        $exercises,
         $courseid
     );
 
