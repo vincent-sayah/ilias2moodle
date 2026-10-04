@@ -156,7 +156,10 @@ final class operator_job_runner {
                 'timefinished' => time(),
                 'summaryjson' => $this->encode($repo->build_report($jobid)),
             ]);
-            throw $exception;
+            // Do not rethrow here: Moodle may retry failed adhoc tasks automatically.
+            // Operator jobs are explicitly resumable; retries must remain an
+            // operator decision recorded in the persistent audit trail.
+            return;
         } finally {
             $lock->release();
         }

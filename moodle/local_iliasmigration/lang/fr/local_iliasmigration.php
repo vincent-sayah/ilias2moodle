@@ -29,3 +29,5 @@ $string['operatoruploadfailed'] = 'L’envoi du package a échoué.';
 $string['operatorsourcechoice'] = 'Choisissez exactement une source : un ZIP du package ou un chemin serveur vers migration.json.';
 $string['taskrunoperatorjob'] = 'Exécuter un job opérateur ILIAS2Moodle';
 $string['local/iliasmigration:manage'] = 'Gérer les jobs de migration ILIAS2Moodle';
+
+$string['operatorrefresh'] = 'Actualiser l’état';

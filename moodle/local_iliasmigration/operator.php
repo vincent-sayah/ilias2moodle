@@ -149,13 +149,24 @@ if ($jobid > 0) {
                 'stepid' => (int) $step->id,
                 'sesskey' => sesskey(),
             ];
-            $retryurl = new moodle_url('/local/iliasmigration/operator_action.php', $base + ['action' => 'retry']);
-            $actions .= html_writer::link($retryurl, get_string('operatorretry', 'local_iliasmigration'));
+            $retryurl = new moodle_url(
+                '/local/iliasmigration/operator_action.php',
+                $base + ['action' => 'retry']
+            );
+            $actions .= $OUTPUT->single_button(
+                $retryurl,
+                get_string('operatorretry', 'local_iliasmigration'),
+                'post'
+            );
             if (!empty($step->skippable)) {
-                $ignoreurl = new moodle_url('/local/iliasmigration/operator_action.php', $base + ['action' => 'ignore']);
-                $actions .= ' | ' . html_writer::link(
+                $ignoreurl = new moodle_url(
+                    '/local/iliasmigration/operator_action.php',
+                    $base + ['action' => 'ignore']
+                );
+                $actions .= $OUTPUT->single_button(
                     $ignoreurl,
-                    get_string('operatorignorecontinue', 'local_iliasmigration')
+                    get_string('operatorignorecontinue', 'local_iliasmigration'),
+                    'post'
                 );
             }
         }
@@ -189,6 +200,11 @@ if ($jobid > 0) {
 
     echo html_writer::div(
         html_writer::link(
+            new moodle_url('/local/iliasmigration/operator.php', ['jobid' => $jobid]),
+            get_string('operatorrefresh', 'local_iliasmigration')
+        )
+        . ' | '
+        . html_writer::link(
             new moodle_url('/local/iliasmigration/operator.php'),
             get_string('operatorback', 'local_iliasmigration')
         )

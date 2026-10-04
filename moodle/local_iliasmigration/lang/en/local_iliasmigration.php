@@ -29,3 +29,5 @@ $string['operatoruploadfailed'] = 'The package upload failed.';
 $string['operatorsourcechoice'] = 'Choose exactly one source: upload a package ZIP or provide a server migration.json path.';
 $string['taskrunoperatorjob'] = 'Run an ILIAS2Moodle operator migration job';
 $string['local/iliasmigration:manage'] = 'Manage ILIAS2Moodle migration jobs';
+
+$string['operatorrefresh'] = 'Refresh status';
