@@ -218,11 +218,15 @@ final class operator_pipeline {
     /**
      * Compact report safe for persistent storage.
      */
-    public function summarize_result(array $result): array {
+    public function summarize_result(string $stepkey, array $result): array {
         $actions = [];
         $kinds = [];
+        $operations = $this->operations_for_step(
+            $stepkey,
+            (array) ($result['operations'] ?? [])
+        );
 
-        foreach ((array) ($result['operations'] ?? []) as $operation) {
+        foreach ($operations as $operation) {
             if (!is_array($operation)) {
                 continue;
             }
@@ -251,13 +255,54 @@ final class operator_pipeline {
             'course_target_id' => $result['course']['target_id']
                 ?? $result['target_course']['id']
                 ?? null,
-            'operation_count' => count((array) ($result['operations'] ?? [])),
+            'operation_count' => count($operations),
             'actions' => $actions,
             'kinds' => $kinds,
             'warning_count' => count($warningcodes),
             'warning_codes' => array_values(array_unique($warningcodes)),
             'reason' => $result['reason'] ?? null,
         ];
+    }
+
+    /**
+     * Keep only the plan operations that belong to one operator step.
+     *
+     * Executors often return the complete plan even though they only execute
+     * one family. Filtering here keeps the operator report truthful.
+     *
+     * @param array<int, mixed> $operations
+     * @return array<int, array>
+     */
+    private function operations_for_step(
+        string $stepkey,
+        array $operations
+    ): array {
+        $definitions = self::step_definitions();
+
+        if (!isset($definitions[$stepkey])) {
+            throw new \coding_exception(
+                'Unknown operator pipeline step: ' . $stepkey
+            );
+        }
+
+        $allowedkinds = $stepkey === 'structure'
+            ? ['course', 'section', 'subsection']
+            : $definitions[$stepkey]['types'];
+
+        return array_values(array_filter(
+            $operations,
+            static function($operation) use ($allowedkinds): bool {
+                if (!is_array($operation)) {
+                    return false;
+                }
+
+                return in_array(
+                    (string) ($operation['kind'] ?? ''),
+                    $allowedkinds,
+                    true
+                );
+            }
+        ));
     }
 
     public function extract_category_id(array $result): int {
