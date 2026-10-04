@@ -405,6 +405,8 @@ Un sujet reste volontairement hors du périmètre fonctionnel :
 
 Le ticket #41 de progression avancée est désormais clôturé : le POC enrichi a confirmé que les résultats Test peuvent être conservés fidèlement comme historique, tandis que le SCORM ILIAS ne fournit pas l'historique détaillé nécessaire pour reconstruire sans approximation toutes les tentatives Moodle.
 
+La Phase 8 est en beta. Le run opérateur nominal #2 a été validé de bout en bout sur Moodle 5.0.2 avec une cible vierge : cours ILIAS `827/282` vers Moodle `id=4 / ILIAS-282`, statut final `COMPLETED`, 621 mappings, toutes les familles présentes migrées au premier essai et les familles absentes correctement `SKIPPED_NOT_APPLICABLE`. Le scénario `Ignorer et continuer` reste à qualifier avant promotion RC.
+
 La release candidate courante est `0.20.0-rc3`. Elle reprend la correction d'installation neuve MySQL/MariaDB introduite en `0.20.0-rc2` et ajoute la consolidation Phase 7 validée sur PHP 8.3.35 avec 14/14 tests PHP réussis. La RC3 a ensuite été installée et qualifiée sur une Moodle 5.0.2 fraîche : 89 fichiers PHP sans erreur de syntaxe, copie candidate strictement identique après déploiement, aucun CRLF installé, premier upgrade réussi et second upgrade sans mise à jour nécessaire. Le tag `v0.20.0-rc1` reste conservé pour la traçabilité.
 
 
