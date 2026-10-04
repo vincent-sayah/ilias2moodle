@@ -7,7 +7,7 @@ def test_phase6_numeric_cloze_is_rendered_as_exact_numerical():
     ).read_text(encoding="utf-8")
 
     assert "($gap['input_type'] ?? 'text') === 'numeric'" in source
-    assert "cloze_numerical($gap)" in source
+    assert "$this->cloze_numerical($gap, $norm)" in source
     assert ":NUMERICAL:" in source
     assert "':0'" in source
     assert (

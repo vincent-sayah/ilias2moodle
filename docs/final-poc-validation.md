@@ -229,12 +229,13 @@ La tentative initiale de Moodle Group a été supprimée et ne fait pas partie d
 
 Le périmètre POC couvert par les phases 1 à 7 est reproductible et idempotent sur la cible fraîche Moodle 5.0.2.
 
-Les éléments volontairement hors périmètre restent :
+L'élément fonctionnel volontairement hors périmètre reste :
 
-- #22 — migration complète de l'objet ILIAS Groupe ;
-- #41 — POC enrichi de progression avec états réellement migrables.
+- #22 — migration complète de l'objet ILIAS Groupe.
 
-La release candidate courante est `0.20.0-rc3`. Ce build formalise la consolidation Phase 7 validée sur la cible fraîche ; aucun changement de schéma n'est associé à cette promotion.
+Le ticket #41 a depuis été validé et clôturé par le POC avancé du 4 octobre 2026 décrit ci-dessous.
+
+La release candidate qualifiée par ce document reste `0.20.0-rc3`. La branche opérateur `0.21.0-rc1` constitue une candidate ultérieure et possède sa propre procédure de qualification dans `docs/operator-console.md`.
 
 ## Validation complémentaire Phase 7.3 — 4 octobre 2026
 
@@ -253,3 +254,14 @@ Le Test `ref=357` contient deux résultats finaux fiables (1/1 passed et 0/1 fai
 Le SCORM `ref=347` fournit l'état final agrégé du SCO et un compteur global de tentatives, mais pas le détail de chaque tentative. Moodle 5 matérialisant chaque tentative séparément, aucune tentative SCORM native n'est créée afin d'éviter d'inventer des données.
 
 La Phase 7.3 est donc clôturée en **rapport historique uniquement**. Aucun `quiz_attempt`, `scorm_attempt`, gradebook ou état de completion Moodle n'est écrit par cette phase. Le ticket #41 n'est plus un backlog ouvert.
+
+
+## Candidate console opérateur — 0.21.0-rc1
+
+Une nouvelle candidate d'exploitation est développée après la qualification RC3.
+
+Elle ajoute une console Moodle permettant de créer un job de migration, de l'exécuter via les tâches ad hoc Moodle, de journaliser chaque étape, de mettre en pause ou de continuer après une erreur non critique, puis de produire un rapport final.
+
+Cette candidate **n'est pas couverte par la qualification RC3 ci-dessus**. Elle doit être validée séparément sur Moodle 5.0.2 avant promotion.
+
+Voir `docs/operator-console.md`.

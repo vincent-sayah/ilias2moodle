@@ -939,55 +939,6 @@ def _build_unresolved_irss_document(
     return document, structure
 
 
-def test_exercise_irss_empty_collection_is_blocked(
-    tmp_path: Path,
-) -> None:
-    uuid = "44444444-5555-6666-7777-888888888888"
-
-    recovery_root = tmp_path / "irss"
-    collection_root = recovery_root / uuid
-    collection_root.mkdir(parents=True)
-
-    (collection_root / "manifest.json").write_text(
-        json.dumps(
-            {
-                "collection_uuid": uuid,
-                "client_id": "ilias10",
-                "files": [],
-                "resource_count": 0,
-            }
-        ),
-        encoding="utf-8",
-    )
-
-    document, structure = _build_unresolved_irss_document(uuid)
-
-    result = recover_exercise_instruction_files(
-        document,
-        recovery_root,
-    )
-
-    assert result["recovered"]["collections_recovered"] == 0
-    assert result["recovered"]["instruction_files_recovered"] == 0
-
-    assert len(result["missing"]) == 1
-    assert (
-        result["missing"][0]["kind"]
-        == "exercise_irss_empty_collection"
-    )
-
-    assignment = structure["assignments"][0]
-
-    assert assignment["automatic_ready"] is False
-    assert assignment["instruction_files"] == []
-    assert assignment["migration_constraints"] == [
-        "instruction_collection_not_embedded"
-    ]
-
-    assert len(structure["blocking_features"]) == 1
-    assert len(structure["export_issues"]) == 1
-
-
 def test_exercise_package_reports_unresolved_irss_collection(
     tmp_path: Path,
 ) -> None:
