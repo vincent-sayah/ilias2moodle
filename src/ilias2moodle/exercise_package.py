@@ -136,20 +136,9 @@ def recover_exercise_instruction_files(
             except (TypeError, ValueError):
                 resource_count = -1
 
-            # An empty IRSS collection cannot prove that the instruction
-            # dependency was successfully recovered. Keep the assignment
-            # blocked rather than silently treating missing instructional
-            # material as a valid zero-file collection.
-            if resource_count == 0 and len(manifest_files) == 0:
-                missing.append(
-                    {
-                        "source_id": item.source_id,
-                        "assignment_id": assignment_id,
-                        "kind": "exercise_irss_empty_collection",
-                        "source_path": str(manifest_path),
-                    }
-                )
-                continue
+            # A valid IRSS collection may legitimately contain no resources.
+            # In that case the collection is resolved with zero instruction
+            # files; only malformed or inconsistent manifests remain blocking.
 
             if (
                 resource_count < 0
