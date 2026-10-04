@@ -1,6 +1,6 @@
 # Roadmap
 
-## POC de référence — état au 27 septembre 2026
+## POC de référence — état au 4 octobre 2026
 
 Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS `ref_id=128 / obj_id=504` vers la cible fraîche Moodle `course id=2 / ILIAS-128`.
 
@@ -74,6 +74,8 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS 
 - [x] mappings utilisateurs GLOBAL, dont `ILIAS 6/root -> Moodle 2/admin` ;
 - [x] Phase 7.3 — progression/résultats : 0 `MIGRATE`, 2 `HISTORY_ONLY`, 21 `NO_DATA` ;
 - [x] Phase 7.3 — mappings robustes `sourcecourse 504/128` et Exercise 1 -> 4 ;
+- [x] Phase 7.3 — POC avancé cours `827/282` : 12 identités, 2 Tests, 1 SCORM 2004 et 1 Exercise ;
+- [x] Phase 7.3 — politique finale : **rapport historique uniquement**, aucune écriture de notes, tentatives ou completion dans les objets Moodle natifs ;
 - [x] Phase 7.4 — Forum : 3 auteurs, 2 discussions, 7 posts, 3 pièces jointes ;
 - [x] Phase 7.5 — Blog : 2 auteurs/propriétaires déjà conformes, no-op ;
 - [x] Phase 7.6 — deux Wikis : auteur courant et dates réconciliés ;
@@ -98,6 +100,6 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS 
 ## Backlog non bloquant
 
 - [ ] #22 — objet ILIAS Groupe complet : `DEFERRED` tant qu'un mapping conteneur + contenus + membres + restrictions n'est pas validé ;
-- [ ] #41 — POC avancé de progression avec données réellement migrables et états multiples.
+- [x] #41 — POC avancé de progression multi-utilisateurs validé sur le cours `827/282` ; clôturé en rapport historique uniquement.
 
-Ces sujets restent ouverts volontairement et ne remettent pas en cause la validation du périmètre actuel.
+Le seul backlog fonctionnel restant dans cette section est l'objet ILIAS Groupe (#22). Le POC avancé de progression (#41) est clôturé.

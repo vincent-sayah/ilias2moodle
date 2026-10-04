@@ -367,6 +367,8 @@ final class phase7_progress_resolver {
                 'test_final_result_without_reconstructible_attempt' => 'HISTORY_ONLY',
                 'scorm_final_state_without_attempt_history' => 'PARTIAL',
                 'detailed_result_without_source_data' => 'NO_DATA',
+                'historical_reporting_only' => true,
+                'native_moodle_writes' => false,
                 'automatic_apply' => false,
             ],
             'identity_audit' => $identityaudit,
@@ -376,7 +378,7 @@ final class phase7_progress_resolver {
             'classifications' => $classifications,
             'ready_for_apply' => false,
             'apply_implemented' => false,
-            'apply_reason' => 'PHASE73_APPLY_NOT_IMPLEMENTED',
+            'apply_reason' => 'PHASE73_HISTORICAL_REPORT_ONLY',
         ];
     }
 

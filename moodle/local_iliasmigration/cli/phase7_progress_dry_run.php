@@ -36,7 +36,7 @@ $help = "ILIAS2Moodle Phase 7.3 progress/results dry-run\n\n"
     . "--course=ID\n\n"
     . "Legacy options remain supported: "
     . "--test, --scorm719, --scorm720, --exercise.\n\n"
-    . "Read-only classification. No Moodle completion, grades, attempts "
+    . "Historical report only. No Moodle completion, grades, attempts "
     . "or mapping records are written.\n";
 
 if ($options['help']) {

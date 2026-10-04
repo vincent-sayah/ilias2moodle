@@ -235,3 +235,21 @@ Les éléments volontairement hors périmètre restent :
 - #41 — POC enrichi de progression avec états réellement migrables.
 
 La release candidate courante est `0.20.0-rc3`. Ce build formalise la consolidation Phase 7 validée sur la cible fraîche ; aucun changement de schéma n'est associé à cette promotion.
+
+## Validation complémentaire Phase 7.3 — 4 octobre 2026
+
+Le backlog #41 a été rejoué sur un POC enrichi distinct du POC de référence :
+
+- source ILIAS : cours `obj_id=827 / ref_id=282`, `Cours test RC 0.20` ;
+- cible Moodle : cours `id=3 / ILIAS-282` ;
+- 12 identités source résolues, 12 cibles présentes et inscrites, 0 anomalie d'identité ;
+- inventaires détaillés : 2 Tests, 1 SCORM 2004 et 1 Exercise ;
+- dry-run final : `MIGRATE=0`, `PARTIAL=6`, `HISTORY_ONLY=1`, `UNSUPPORTED=5`, `NO_DATA=32` ;
+- `writes_performed=false`, `ready_for_apply=false`, `apply_implemented=false` ;
+- politique finale : `PHASE73_HISTORICAL_REPORT_ONLY`.
+
+Le Test `ref=357` contient deux résultats finaux fiables (1/1 passed et 0/1 failed, seuil ILIAS 50 %) mais les tentatives Quiz Moodle ne sont pas reconstructibles fidèlement. Il reste donc `HISTORY_ONLY`.
+
+Le SCORM `ref=347` fournit l'état final agrégé du SCO et un compteur global de tentatives, mais pas le détail de chaque tentative. Moodle 5 matérialisant chaque tentative séparément, aucune tentative SCORM native n'est créée afin d'éviter d'inventer des données.
+
+La Phase 7.3 est donc clôturée en **rapport historique uniquement**. Aucun `quiz_attempt`, `scorm_attempt`, gradebook ou état de completion Moodle n'est écrit par cette phase. Le ticket #41 n'est plus un backlog ouvert.

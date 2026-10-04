@@ -131,7 +131,7 @@ Voir [`docs/migration-format.md`](docs/migration-format.md).
 | Media Pool / galerie média | `mod_data` | Validé Phase 6.5 — images + MP4 + COPage + dossiers |
 | Groupe | Non migré automatiquement ; conteneur + membres + restrictions + contenus à définir | Différé (#22) |
 | Utilisateurs / inscriptions | Comptes / inscriptions / rôles | Phase 7 |
-| Progression / historique | Completion / historique | Phase 7 |
+| Progression / résultats | Rapport historique contrôlé, sans écriture native Moodle | Phase 7.3 — validé |
 
 La matrice détaillée est maintenue dans [`docs/mapping.md`](docs/mapping.md).
 
@@ -298,7 +298,7 @@ Résultats validés :
 - mots de passe initiaux générés aléatoirement et non journalisés ;
 - second apply idempotent : aucun compte ni enrolment supplémentaire créé.
 
-Les auteurs/contributions Forum, Blog et Wiki ont été validés. La Phase 7.3 résout désormais les mappings de la cible fraîche, y compris l’Exercise 1 -> 4, tout en conservant les cas sans équivalent sûr en `HISTORY_ONLY` ou `NO_DATA`. Deux extensions restent hors périmètre de la RC : l’objet Groupe complet (#22) et le POC avancé de progression multi-utilisateurs (#41).
+Les auteurs/contributions Forum, Blog et Wiki ont été validés. La Phase 7.3 résout les mappings de la cible fraîche, y compris l’Exercise 1 -> 4. Le POC avancé #41 a ensuite été validé sur le cours ILIAS `827/282` vers Moodle `course id=3` avec 12 identités résolues, deux Tests, un SCORM 2004 et un Exercise. La politique finale de Phase 7.3 est **rapport historique uniquement** : aucune tentative Quiz/SCORM, note ou completion native Moodle n’est reconstruite lorsque les données ILIAS ne permettent pas une reproduction fidèle. Voir [`docs/phase7-progress-results.md`](docs/phase7-progress-results.md). L’objet Groupe complet (#22) reste le seul écart fonctionnel explicitement différé.
 
 ## Idempotence
 
@@ -345,7 +345,7 @@ Phase 6    [x] Tests et banques de questions
 Phase 6.5  [x] Extension des objets pédagogiques
 Phase 7    [x] Utilisateurs, inscriptions et progression du POC
   Phase 7.1 [x] Utilisateurs, inscriptions et rôles
-  Phase 7.3 [x] Progression/résultats du POC analysés et classifiés
+  Phase 7.3 [x] Progression/résultats validés en rapport historique uniquement
   Phase 7.4 [x] Forum : auteurs, posts et pièces jointes
   Phase 7.5 [x] Blog : auteurs
   Phase 7.6 [x] Wiki : auteur courant et dates
@@ -357,9 +357,10 @@ Phase 7    [x] Utilisateurs, inscriptions et progression du POC
 
 La **Phase 6.5 est terminée** : Content Page, Glossaire, Wiki, Exercice, Forum, Mediacast, Blog et Media Pool sont validés sur le POC réel. La **Phase 7 du POC courant est clôturée** : utilisateurs, inscriptions, rôles, progression/résultats disponibles, auteurs et contributions Forum/Blog/Wiki ont été analysés ou migrés avec contrôle d'idempotence.
 
-Deux sujets restent volontairement hors du périmètre de la release candidate du POC :
-- l'objet ILIAS Groupe complet (#22), classé DEFERRED / HISTORY_ONLY tant qu'un mapping conteneur + contenus + restrictions n'est pas validé ;
-- les tests avancés de progression multi-utilisateurs (#41), qui nécessitent un POC enrichi.
+Un sujet reste volontairement hors du périmètre fonctionnel :
+- l'objet ILIAS Groupe complet (#22), classé DEFERRED / HISTORY_ONLY tant qu'un mapping conteneur + contenus + restrictions n'est pas validé.
+
+Le ticket #41 de progression avancée est désormais clôturé : le POC enrichi a confirmé que les résultats Test peuvent être conservés fidèlement comme historique, tandis que le SCORM ILIAS ne fournit pas l'historique détaillé nécessaire pour reconstruire sans approximation toutes les tentatives Moodle.
 
 La release candidate courante est `0.20.0-rc3`. Elle reprend la correction d'installation neuve MySQL/MariaDB introduite en `0.20.0-rc2` et ajoute la consolidation Phase 7 validée sur PHP 8.3.35 avec 14/14 tests PHP réussis. La RC3 a ensuite été installée et qualifiée sur une Moodle 5.0.2 fraîche : 89 fichiers PHP sans erreur de syntaxe, copie candidate strictement identique après déploiement, aucun CRLF installé, premier upgrade réussi et second upgrade sans mise à jour nécessaire. Le tag `v0.20.0-rc1` reste conservé pour la traçabilité.
 
