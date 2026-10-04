@@ -80,3 +80,6 @@ jobs:
 
       - name: Operator pipeline definition regression
         run: php tests/php/test_operator_pipeline_definition.php
+
+      - name: Structure section move compatibility
+        run: php tests/php/test_structure_section_move_compat.php
