@@ -83,3 +83,6 @@ jobs:
 
       - name: Structure section move compatibility
         run: php tests/php/test_structure_section_move_compat.php
+
+      - name: Operator duplicate course guard
+        run: php tests/php/test_operator_duplicate_course_guard.php
