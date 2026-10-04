@@ -34,6 +34,14 @@ URL directe :
 /local/iliasmigration/index.php
 ```
 
+## Protection contre les doubles migrations
+
+La console refuse de créer un nouveau run complet lorsqu'un mapping `course` valide existe déjà pour le même cours ILIAS et pointe vers un cours Moodle existant.
+
+Cette protection correspond au scénario d'exploitation normal : un cours source est migré une fois.
+
+Elle ne bloque pas les actions **Réessayer** dans un run déjà créé. L'idempotence des executors reste donc utilisée pour reprendre une étape en erreur sans créer de doublons.
+
 ## Création d'une migration
 
 L'opérateur renseigne :
