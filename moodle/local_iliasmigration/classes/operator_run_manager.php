@@ -58,6 +58,10 @@ final class operator_run_manager {
         }
 
         $inspection = $this->pipeline->inspect_source($resolved);
+        $this->assert_source_not_already_migrated(
+            $inspection['document']
+        );
+
         $types = $inspection['types'];
         $now = time();
 
@@ -544,6 +548,69 @@ final class operator_run_manager {
                 $logs
             )),
         ];
+    }
+
+
+    /**
+     * Refuse a new operator run when this ILIAS course already has a live
+     * Moodle course mapping.
+     *
+     * Retries inside an existing run stay supported; this only prevents an
+     * operator from starting a second complete migration of the same source.
+     */
+    private function assert_source_not_already_migrated(
+        array $document
+    ): void {
+        global $DB;
+
+        $sourcecourse = trim(
+            (string) ($document['course']['source_id'] ?? '')
+        );
+        $sourceinstance = rtrim(
+            trim((string) ($document['source']['instance'] ?? '')),
+            '/'
+        );
+
+        if ($sourcecourse === '') {
+            return;
+        }
+
+        $conditions = [
+            'sourcelms' => 'ILIAS',
+            'sourceinstance' => $sourceinstance,
+            'sourcecourse' => $sourcecourse,
+            'targettype' => 'course',
+        ];
+
+        $mapping = $DB->get_record(
+            'local_iliasmigration_map',
+            $conditions
+        );
+
+        if (!$mapping && $sourceinstance !== '') {
+            $conditions['sourceinstance'] = '';
+            $mapping = $DB->get_record(
+                'local_iliasmigration_map',
+                $conditions
+            );
+        }
+
+        if (!$mapping || (int) $mapping->targetid <= 0) {
+            return;
+        }
+
+        $targetid = (int) $mapping->targetid;
+
+        if (!$DB->record_exists('course', ['id' => $targetid])) {
+            return;
+        }
+
+        throw new \moodle_exception(
+            'coursealreadymigrated',
+            'local_iliasmigration',
+            '',
+            $targetid
+        );
     }
 
     private function get_step(
