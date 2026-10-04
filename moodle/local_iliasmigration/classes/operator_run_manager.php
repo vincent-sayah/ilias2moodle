@@ -251,7 +251,10 @@ final class operator_run_manager {
                 (string) ($run->categorypath ?? '')
             );
 
-            $summary = $this->pipeline->summarize_result($result);
+            $summary = $this->pipeline->summarize_result(
+                (string) $step->stepkey,
+                $result
+            );
 
             if ($step->stepkey === 'structure'
                     && (int) ($run->categoryid ?? 0) <= 0) {
