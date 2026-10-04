@@ -86,3 +86,6 @@ jobs:
 
       - name: Operator duplicate course guard
         run: php tests/php/test_operator_duplicate_course_guard.php
+
+      - name: Operator step summary regression
+        run: php tests/php/test_operator_step_summary.php
