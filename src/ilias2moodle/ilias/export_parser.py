@@ -67,6 +67,7 @@ class IliasExportParser:
         self.root_manifest_name = self._find_root_manifest()
         self.root_manifest = self._parse_xml(self.root_manifest_name)
         self.export_sets = self._index_export_sets()
+        self.object_ref_index: dict[str, str] = {}
 
     def close(self) -> None:
         self.archive.close()
@@ -198,6 +199,18 @@ class IliasExportParser:
         if course_element is None:
             raise ValueError("Élément racine du cours introuvable dans Container")
 
+        # Item Groups reference repository objects by ILIAS obj_id rather than
+        # ref_id. Build one authoritative obj_id -> ref_id index from the
+        # course Container before individual items are enriched.
+        self.object_ref_index = {}
+        for candidate in course_element.iter():
+            if _local_name(candidate.tag) != "Item":
+                continue
+            object_id = candidate.attrib.get("Id", "")
+            ref_id = candidate.attrib.get("RefId", "")
+            if object_id and ref_id:
+                self.object_ref_index[object_id] = ref_id
+
         course = CourseExport(
             source_id=course_element.attrib.get("RefId", main_object_id),
             title=course_element.attrib.get(
@@ -271,6 +284,92 @@ class IliasExportParser:
             self._enrich_test(item, base)
         elif ilias_type == "qpl":
             self._enrich_question_pool(item, base)
+        elif ilias_type == "itgr":
+            self._enrich_item_group(item, base)
+
+    def _enrich_item_group(self, item: MigrationItem, base: str) -> None:
+        """Preserve ILIAS Item Group presentation and membership metadata."""
+
+        component = self._component_export(base, "ItemGroup")
+        if component is None:
+            item.metadata.update(
+                {
+                    "item_group_export_available": False,
+                    "item_group_member_obj_ids": [],
+                    "item_group_member_ref_ids": [],
+                    "item_group_member_count": 0,
+                }
+            )
+            return
+
+        root = self._parse_xml(component)
+        itgr = _first_descendant(root, "Itgr")
+
+        if itgr is None:
+            item.metadata.update(
+                {
+                    "item_group_export_available": True,
+                    "item_group_schema_version": root.attrib.get(
+                        "SchemaVersion", ""
+                    ),
+                    "item_group_member_obj_ids": [],
+                    "item_group_member_ref_ids": [],
+                    "item_group_member_count": 0,
+                }
+            )
+            return
+
+        title = _text_descendant(itgr, "Title")
+        description = _text_descendant(itgr, "Description")
+
+        if title:
+            item.title = title
+        item.description = description
+
+        member_obj_ids: list[str] = []
+
+        for candidate in root.iter():
+            if _local_name(candidate.tag) != "ItgrItem":
+                continue
+
+            object_id = _text_descendant(candidate, "ItemId")
+            if object_id:
+                member_obj_ids.append(object_id)
+
+        # Preserve export order while rejecting accidental duplicates.
+        member_obj_ids = list(dict.fromkeys(member_obj_ids))
+
+        member_ref_ids = [
+            self.object_ref_index[object_id]
+            for object_id in member_obj_ids
+            if object_id in self.object_ref_index
+        ]
+
+        unresolved_obj_ids = [
+            object_id
+            for object_id in member_obj_ids
+            if object_id not in self.object_ref_index
+        ]
+
+        item.metadata.update(
+            {
+                "item_group_export_available": True,
+                "item_group_schema_version": root.attrib.get(
+                    "SchemaVersion", ""
+                ),
+                "item_group_export_base": base,
+                "item_group_hide_title": int(
+                    _text_descendant(itgr, "HideTitle", "0") or 0
+                ),
+                "item_group_behaviour": int(
+                    _text_descendant(itgr, "Behaviour", "0") or 0
+                ),
+                "item_group_member_obj_ids": member_obj_ids,
+                "item_group_member_ref_ids": member_ref_ids,
+                "item_group_unresolved_obj_ids": unresolved_obj_ids,
+                "item_group_member_count": len(member_obj_ids),
+            }
+        )
 
     def _enrich_file(self, item: MigrationItem, base: str) -> None:
         component = self._component_export(base, "File")

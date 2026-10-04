@@ -697,7 +697,24 @@ HTML;
             ? '/'
             : '/' . trim($dirname, '/') . '/';
 
-        $stored = get_file_storage()->create_file_from_pathname(
+        /*
+         * On this Moodle 5 environment, create_file_from_pathname() has been
+         * observed returning stale/wrong content for Media Pool source files.
+         * Reading the validated package file explicitly and writing the exact
+         * bytes through create_file_from_string() avoids pathname/file cache
+         * ambiguity and gives deterministic content hashes.
+         */
+        $sourcebytes = file_get_contents($sourcefile);
+        if ($sourcebytes === false) {
+            throw new \coding_exception(
+                'Unable to read the validated Media Pool source asset.'
+            );
+        }
+
+        $sourcesize = strlen($sourcebytes);
+        $sourcesha1 = sha1($sourcebytes);
+
+        $stored = get_file_storage()->create_file_from_string(
             [
                 'contextid' => $context->id,
                 'component' => 'mod_data',
@@ -706,13 +723,17 @@ HTML;
                 'filepath' => $filepath,
                 'filename' => $filename,
             ],
-            $sourcefile
+            $sourcebytes
         );
 
         if (!$stored
-                || (int) $stored->get_filesize() !== filesize($sourcefile)) {
+                || (int) $stored->get_filesize() !== $sourcesize
+                || !hash_equals(
+                    $sourcesha1,
+                    (string) $stored->get_contenthash()
+                )) {
             throw new \coding_exception(
-                'Moodle Files API did not persist the complete Media Pool asset.'
+                'Moodle Files API did not persist the exact Media Pool asset.'
             );
         }
 
