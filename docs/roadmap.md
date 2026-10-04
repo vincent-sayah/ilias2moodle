@@ -81,6 +81,25 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS 
 - [x] Phase 7.6 — deux Wikis : auteur courant et dates réconciliés ;
 - [x] seconds passages idempotents / sans écriture.
 
+## Phase 8 — Console opérateur et exploitation `[BETA1]`
+
+- [x] interface Moodle pour créer/lancer un run ;
+- [x] détection des familles présentes dans `migration.json` ;
+- [x] pipeline automatique Structure → Item Groups ;
+- [x] journal persistant des runs, étapes et événements ;
+- [x] état `WAITING_DECISION` sur erreur ;
+- [x] action `Réessayer` ;
+- [x] action `Ignorer et continuer` ;
+- [x] statut final `COMPLETED_WITH_SKIPS` ;
+- [x] rapport HTML ;
+- [x] export JSON du compte rendu ;
+- [x] capabilities Moodle dédiées ;
+- [x] guide opérateur ;
+- [ ] intégrer les extensions Phase 7 utilisant des inventaires auxiliaires ;
+- [ ] refactoriser/raccorder la réconciliation d'ordre V2 à la console ;
+- [ ] granularité d'ignorance par `source_ref_id` à l'intérieur d'une même famille ;
+- [ ] validation end-to-end de la beta1 sur VM Moodle 5.0.2 avant promotion RC.
+
 ## Validation de consolidation
 
 - [x] cible fraîche Moodle 5.0.2 / course id 2 ;
