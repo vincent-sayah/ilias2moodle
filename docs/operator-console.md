@@ -380,3 +380,82 @@ Elle est considérée exploitable pour validation opérateur lorsque :
 - `Réessayer` fonctionne ;
 - `Ignorer et continuer` permet aux familles suivantes de terminer ;
 - le rapport final reflète exactement les étapes ignorées et réussies.
+
+## Validation réelle — run #2
+
+Validation réalisée le 4 octobre 2026 sur Moodle 5.0.2 avec une cible vierge.
+
+Source :
+
+```text
+/opt/ilias2moodle/operator_packages/course827/migration.json
+SHA-256 = 4b31eaab054d791962bd56fbd65c796632a633d3210d3629fc06cc6c3f113083
+ILIAS ref_id = 282
+ILIAS obj_id = 827
+Cours test RC 0.20
+```
+
+Résultat opérateur :
+
+```text
+Run #2
+status = COMPLETED
+target category = 1
+target course = Moodle id 4 / ILIAS-282
+visible = 0
+```
+
+Étapes :
+
+```text
+Structure                         SUCCESS
+Ressources simples               SUCCESS
+SCORM                             SUCCESS
+Learning Modules -> Book         SUCCESS
+Banques de questions / Quiz      SUCCESS
+Content Pages                    SUCCESS
+Glossaires                       SKIPPED_NOT_APPLICABLE
+Wikis                             SUCCESS
+Exercices                         SUCCESS
+Forums                            SKIPPED_NOT_APPLICABLE
+MediaCasts                        SUCCESS
+Blogs                             SUCCESS
+Media Pools                       SUCCESS
+Item Groups                       SUCCESS
+```
+
+Chaque étape applicable a réussi à la première tentative.
+
+Contrôle post-migration :
+
+```text
+TOTAL_MAPPINGS = 621
+
+assign       = 2
+book         = 1
+course       = 1
+data         = 3
+data_record  = 7
+file         = 5
+html_module  = 1
+page         = 1
+qbank        = 14
+question     = 571
+quiz         = 2
+scorm        = 1
+section      = 5
+subsection   = 3
+url          = 1
+wiki         = 1
+wiki_page    = 2
+```
+
+Le cours Moodle est créé masqué, conformément à la politique de validation avant mise à disposition.
+
+Le scénario nominal end-to-end via l'interface est donc **validé**.
+
+Restent à valider ultérieurement avant promotion RC :
+
+- un scénario contrôlé `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` ;
+- le contrôle fonctionnel final du rapport après amélioration des compteurs par étape ;
+- les extensions Phase 7 et la réconciliation d'ordre V2 ne sont toujours pas automatisées par cette beta.
