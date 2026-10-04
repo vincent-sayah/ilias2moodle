@@ -49,3 +49,4 @@ $string['step_itemgroups'] = 'Item Groups';
 $string['local/iliasmigration:operate'] = 'Run and control ILIAS2Moodle migrations';
 $string['local/iliasmigration:viewreports'] = 'View ILIAS2Moodle migration reports';
 $string['result'] = 'Result';
+$string['coursealreadymigrated'] = 'This ILIAS course has already been migrated to Moodle course {$a}. The console refuses a second full migration of the same source course.';
