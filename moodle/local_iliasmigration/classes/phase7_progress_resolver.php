@@ -364,6 +364,8 @@ final class phase7_progress_resolver {
                 'not_attempted' => 'NO_DATA',
                 'manual_tutor_course_in_progress' => 'HISTORY_ONLY',
                 'completed_or_failed_without_validated_semantics' => 'PARTIAL_OR_UNSUPPORTED',
+                'test_final_result_without_reconstructible_attempt' => 'HISTORY_ONLY',
+                'scorm_final_state_without_attempt_history' => 'PARTIAL',
                 'detailed_result_without_source_data' => 'NO_DATA',
                 'automatic_apply' => false,
             ],
@@ -374,7 +376,7 @@ final class phase7_progress_resolver {
             'classifications' => $classifications,
             'ready_for_apply' => false,
             'apply_implemented' => false,
-            'apply_reason' => 'POC_HAS_NO_MIGRATABLE_PHASE73_DATA',
+            'apply_reason' => 'PHASE73_APPLY_NOT_IMPLEMENTED',
         ];
     }
 
@@ -560,8 +562,26 @@ final class phase7_progress_resolver {
 
     private function classify_test(array $source): array {
         $counts = (array) ($source['counts'] ?? []);
-        $hasdata = (int) ($counts['test_participants_with_active_id'] ?? 0) > 0
-            || (int) ($counts['scored_participants'] ?? 0) > 0;
+
+        $active = (int) (
+            $counts['test_participants_with_active_id'] ?? 0
+        );
+        $scored = (int) (
+            $counts['scored_participants'] ?? 0
+        );
+
+        if ($scored > 0) {
+            $classification = 'HISTORY_ONLY';
+            $reason =
+                'TEST_FINAL_RESULTS_AVAILABLE_WITHOUT_RECONSTRUCTIBLE_QUIZ_ATTEMPTS';
+        } else if ($active > 0) {
+            $classification = 'PARTIAL';
+            $reason =
+                'TEST_PARTICIPATION_PRESENT_WITHOUT_FINAL_SCORING';
+        } else {
+            $classification = 'NO_DATA';
+            $reason = 'NO_TEST_ATTEMPTS_OR_SCORES';
+        }
 
         return [
             'source_kind' => 'test_results',
@@ -569,10 +589,8 @@ final class phase7_progress_resolver {
             'source_ref_id' => (string) ($source['test']['ref_id'] ?? ''),
             'source_type' => 'tst',
             'source_title' => (string) ($source['test']['title'] ?? ''),
-            'classification' => $hasdata ? 'PARTIAL' : 'NO_DATA',
-            'reason' => $hasdata
-                ? 'TEST_RESULTS_PRESENT_REQUIRE_ATTEMPT_SEMANTICS_VALIDATION'
-                : 'NO_TEST_ATTEMPTS_OR_SCORES',
+            'classification' => $classification,
+            'reason' => $reason,
             'source_counts' => $counts,
         ];
     }
@@ -593,7 +611,7 @@ final class phase7_progress_resolver {
             'source_subtype' => (string) ($source['scorm']['subtype'] ?? ''),
             'classification' => $hasdata ? 'PARTIAL' : 'NO_DATA',
             'reason' => $hasdata
-                ? 'SCORM_TRACKING_PRESENT_REQUIRES_RUNTIME_SEMANTICS_VALIDATION'
+                ? 'SCORM_FINAL_RUNTIME_STATE_AVAILABLE_BUT_ATTEMPT_HISTORY_INCOMPLETE'
                 : 'NO_SCORM_TRACKING_ATTEMPTS_SCO_DATA_OR_SCORES',
             'source_counts' => $counts,
         ];

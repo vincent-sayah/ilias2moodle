@@ -228,3 +228,106 @@ foreach ($ambiguouschecks as $ok) {
 }
 
 echo "PHASE7_PROGRESS_MAPPING_RESOLVER_OK\n";
+
+$testclassifier = new ReflectionMethod(
+    \local_iliasmigration\phase7_progress_resolver::class,
+    'classify_test'
+);
+$testclassifier->setAccessible(true);
+
+$scormclassifier = new ReflectionMethod(
+    \local_iliasmigration\phase7_progress_resolver::class,
+    'classify_scorm'
+);
+$scormclassifier->setAccessible(true);
+
+$scoredtest = $testclassifier->invoke(
+    $resolver,
+    [
+        'test' => [
+            'object_id' => '1006',
+            'ref_id' => '357',
+            'title' => 'test validation du cours',
+        ],
+        'counts' => [
+            'test_participants_with_active_id' => 2,
+            'scored_participants' => 2,
+        ],
+    ]
+);
+
+$unscoredtest = $testclassifier->invoke(
+    $resolver,
+    [
+        'test' => [
+            'object_id' => '9999',
+            'ref_id' => '9999',
+            'title' => 'unfinished test',
+        ],
+        'counts' => [
+            'test_participants_with_active_id' => 1,
+            'scored_participants' => 0,
+        ],
+    ]
+);
+
+$emptytest = $testclassifier->invoke(
+    $resolver,
+    [
+        'test' => [
+            'object_id' => '947',
+            'ref_id' => '331',
+            'title' => 'Test global',
+        ],
+        'counts' => [
+            'test_participants_with_active_id' => 0,
+            'scored_participants' => 0,
+        ],
+    ]
+);
+
+$scormpartial = $scormclassifier->invoke(
+    $resolver,
+    [
+        'scorm' => [
+            'object_id' => '994',
+            'ref_id' => '347',
+            'title' => 'Gestion des incidents',
+            'subtype' => 'scorm2004',
+        ],
+        'counts' => [
+            'tracked_users_in_course' => 2,
+            'users_with_sco_data' => 2,
+            'total_attempts' => 3,
+            'sco_tracking_records' => 2,
+        ],
+    ]
+);
+
+$classificationchecks = [
+    ($scoredtest['classification'] ?? '') === 'HISTORY_ONLY',
+    ($scoredtest['reason'] ?? '') ===
+        'TEST_FINAL_RESULTS_AVAILABLE_WITHOUT_RECONSTRUCTIBLE_QUIZ_ATTEMPTS',
+
+    ($unscoredtest['classification'] ?? '') === 'PARTIAL',
+    ($unscoredtest['reason'] ?? '') ===
+        'TEST_PARTICIPATION_PRESENT_WITHOUT_FINAL_SCORING',
+
+    ($emptytest['classification'] ?? '') === 'NO_DATA',
+
+    ($scormpartial['classification'] ?? '') === 'PARTIAL',
+    ($scormpartial['reason'] ?? '') ===
+        'SCORM_FINAL_RUNTIME_STATE_AVAILABLE_BUT_ATTEMPT_HISTORY_INCOMPLETE',
+];
+
+foreach ($classificationchecks as $ok) {
+    if (!$ok) {
+        fwrite(
+            STDERR,
+            "Phase 7 progress classification regression failed.\n"
+        );
+        exit(1);
+    }
+}
+
+echo "PHASE7_PROGRESS_CLASSIFICATION_OK\n";
