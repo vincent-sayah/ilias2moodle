@@ -215,6 +215,20 @@ Une évolution ultérieure pourra découper les executors en unités `source_ref
 
 Cette limitation est volontairement explicite dans la beta1.
 
+## Intégrité du package pendant un run
+
+Lors de la création d'un run, la console enregistre le SHA-256 de `migration.json`.
+
+Avant chaque étape, la console recalcule ce hash. Si le fichier a été modifié, supprimé ou remplacé pendant la migration, l'étape est arrêtée avec :
+
+```text
+SOURCE_CHANGED_DURING_RUN
+```
+
+Le run ne doit pas continuer sur un document source mutable, car cela rendrait le journal et le rapport non reproductibles.
+
+Après restauration exacte du `migration.json` d'origine, l'opérateur peut utiliser **Réessayer** sur l'étape en erreur.
+
 ## Journalisation
 
 Trois tables complètent la table historique de mapping :
