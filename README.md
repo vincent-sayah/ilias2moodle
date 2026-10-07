@@ -129,11 +129,51 @@ Voir [`docs/migration-format.md`](docs/migration-format.md).
 | Mediacast | `mod_data` | Validé Phase 6.5 — MP4 local + URL externe |
 | Blog | `mod_data` | Validé Phase 6.5 — billets + images ; auteurs Moodle Phase 7 |
 | Media Pool / galerie média | `mod_data` | Validé Phase 6.5 — images + MP4 + COPage + dossiers |
+| Item Group | Section / `mod_subsection` + repositionnement des activités | Validé Phase 6.5.9 |
 | Groupe | Non migré automatiquement ; conteneur + membres + restrictions + contenus à définir | Différé (#22) |
 | Utilisateurs / inscriptions | Comptes / inscriptions / rôles | Phase 7 |
 | Progression / résultats | Rapport historique contrôlé, sans écriture native Moodle | Phase 7.3 — validé |
 
 La matrice détaillée est maintenue dans [`docs/mapping.md`](docs/mapping.md).
+
+
+### Objets migrables dans la première version exploitable
+
+La version `0.21.0-beta1` introduit une **console opérateur Moodle** qui automatise le package pédagogique principal. Les familles suivantes sont exécutables automatiquement depuis l'interface, dans cet ordre :
+
+1. structure : cours, sections, sous-sections ;
+2. ressources simples : fichiers, URL, modules HTML ;
+3. SCORM ;
+4. Learning Modules ILIAS vers Moodle Book ;
+5. banques de questions et Quiz ;
+6. Content Pages ;
+7. Glossaires ;
+8. Wikis ;
+9. Exercices ;
+10. Forums (conteneur) ;
+11. MediaCasts ;
+12. Blogs ;
+13. Media Pools ;
+14. Item Groups.
+
+Les étapes qui ne correspondent à aucun objet dans le package sont marquées `SKIPPED` automatiquement.
+
+Les fonctions Phase 7 restent disponibles dans le plugin mais ne sont **pas encore orchestrées automatiquement par la console beta1**, car elles utilisent des extractions auxiliaires spécifiques :
+
+- utilisateurs, inscriptions et rôles ;
+- contributions historiques Forum ;
+- auteurs Blog ;
+- auteurs et dates courantes Wiki ;
+- progression/résultats Phase 7.3, conservés en rapport historique uniquement.
+
+La réconciliation d'ordre V2 reste également un post-traitement CLI gardé dans cette beta. Elle sera intégrée à la console après refactorisation du script actuel en service réutilisable.
+
+La console refuse également de démarrer une seconde migration complète lorsqu'un mapping `course` valide existe déjà pour le même cours ILIAS. Les `Retry` à l'intérieur d'un run restent autorisés.
+
+En cas d'échec d'une famille d'objet, la migration s'arrête sur `WAITING_DECISION`. L'opérateur peut **réessayer** l'étape ou **l'ignorer explicitement et continuer**. Toutes les actions sont journalisées et un compte rendu final HTML/JSON est disponible.
+
+Guide opérateur : [`docs/operator-console.md`](docs/operator-console.md).
+
 
 ## Phase 2 — Structure : terminée
 
@@ -270,12 +310,14 @@ Le plugin Moodle est situé dans :
 moodle/local_iliasmigration
 ```
 
-Version courante :
+Version de développement de la console opérateur :
 
 ```text
-0.20.0-rc3
-2026092701
+0.21.0-beta1
+2026100402
 ```
+
+La dernière RC POC antérieure reste `0.20.0-rc3`.
 
 La Phase 6.5 dispose d’implémentations fonctionnelles validées sur le POC réel pour Content Page, Glossaire, Wiki, Exercice, Forum, Mediacast, Blog et Media Pool. Les dépendances d’identité différées ont ensuite été traitées en Phase 7 : auteurs et contributions Forum, auteurs Blog, ainsi que l’auteur courant et les dates des pages Wiki. Les données ne disposant pas d’un équivalent sûr restent explicitement classées `HISTORY_ONLY`, `NO_DATA` ou `DEFERRED`.
 
@@ -344,6 +386,7 @@ Phase 5    [x] Modules d’apprentissage ILIAS
 Phase 6    [x] Tests et banques de questions
 Phase 6.5  [x] Extension des objets pédagogiques
 Phase 7    [x] Utilisateurs, inscriptions et progression du POC
+Phase 8    [~] Console opérateur automatisée (beta1)
   Phase 7.1 [x] Utilisateurs, inscriptions et rôles
   Phase 7.3 [x] Progression/résultats validés en rapport historique uniquement
   Phase 7.4 [x] Forum : auteurs, posts et pièces jointes
@@ -361,6 +404,8 @@ Un sujet reste volontairement hors du périmètre fonctionnel :
 - l'objet ILIAS Groupe complet (#22), classé DEFERRED / HISTORY_ONLY tant qu'un mapping conteneur + contenus + restrictions n'est pas validé.
 
 Le ticket #41 de progression avancée est désormais clôturé : le POC enrichi a confirmé que les résultats Test peuvent être conservés fidèlement comme historique, tandis que le SCORM ILIAS ne fournit pas l'historique détaillé nécessaire pour reconstruire sans approximation toutes les tentatives Moodle.
+
+La Phase 8 est en beta. Le run opérateur nominal #2 a été validé de bout en bout sur Moodle 5.0.2 avec une cible vierge : cours ILIAS `827/282` vers Moodle `id=4 / ILIAS-282`, statut final `COMPLETED`, 621 mappings, toutes les familles présentes migrées au premier essai et les familles absentes correctement `SKIPPED_NOT_APPLICABLE`. Le scénario `Ignorer et continuer` reste à qualifier avant promotion RC.
 
 La release candidate courante est `0.20.0-rc3`. Elle reprend la correction d'installation neuve MySQL/MariaDB introduite en `0.20.0-rc2` et ajoute la consolidation Phase 7 validée sur PHP 8.3.35 avec 14/14 tests PHP réussis. La RC3 a ensuite été installée et qualifiée sur une Moodle 5.0.2 fraîche : 89 fichiers PHP sans erreur de syntaxe, copie candidate strictement identique après déploiement, aucun CRLF installé, premier upgrade réussi et second upgrade sans mise à jour nécessaire. Le tag `v0.20.0-rc1` reste conservé pour la traçabilité.
 

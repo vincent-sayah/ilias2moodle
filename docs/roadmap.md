@@ -81,6 +81,54 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS 
 - [x] Phase 7.6 — deux Wikis : auteur courant et dates réconciliés ;
 - [x] seconds passages idempotents / sans écriture.
 
+## Phase 8 — Console opérateur et exploitation `[BETA1]`
+
+- [x] interface Moodle pour créer/lancer un run ;
+- [x] détection des familles présentes dans `migration.json` ;
+- [x] pipeline automatique Structure → Item Groups ;
+- [x] journal persistant des runs, étapes et événements ;
+- [x] état `WAITING_DECISION` sur erreur ;
+- [x] action `Réessayer` ;
+- [x] action `Ignorer et continuer` ;
+- [x] statut final `COMPLETED_WITH_SKIPS` ;
+- [x] rapport HTML ;
+- [x] export JSON du compte rendu ;
+- [x] capabilities Moodle dédiées ;
+- [x] guide opérateur ;
+- [ ] intégrer les extensions Phase 7 utilisant des inventaires auxiliaires ;
+- [ ] refactoriser/raccorder la réconciliation d'ordre V2 à la console ;
+- [ ] granularité d'ignorance par `source_ref_id` à l'intérieur d'une même famille ;
+- [x] validation end-to-end nominale de la beta1 sur VM Moodle 5.0.2 : run #2 `COMPLETED`, cours Moodle `id=4 / ILIAS-282`, 621 mappings ;
+- [ ] validation du scénario `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` avant promotion RC.
+
+## Suite Phase 8 — ordre de traitement
+
+Avant d'étendre la console, terminer les issues déjà ouvertes dans cet ordre :
+
+1. **#68 — Console opérateur beta1**
+   - test volontaire d'échec Wiki ;
+   - validation `Ignorer et continuer` ;
+   - validation finale `COMPLETED_WITH_SKIPS`.
+
+2. **#69 — Mappings orphelins après suppression d'un cours Moodle**
+   - détection sûre des mappings orphelins ;
+   - reset explicite depuis la console ;
+   - aucune suppression automatique d'un mapping dont la cible existe encore ;
+   - remigration possible après suppression d'un cours cible.
+
+3. **#66 — Operator V1.1 : automatisation complète et isolation objet par objet**
+   - accepter/préparer un export ILIAS natif depuis l'interface ou un worker ;
+   - automatiser les récupérations complémentaires read-only ;
+   - intégrer Phase 7.1, Forum 7.4 et Wiki 7.6 ;
+   - conserver Phase 7.3 en rapport historique uniquement ;
+   - isolation et transactions objet par objet ;
+   - réconciliation d'ordre V2 comme service orchestré ;
+   - progression, annulation, rétention et rapports enrichis.
+
+L'objectif V1.1 est qu'un opérateur parte autant que possible de l'export ZIP ILIAS et non d'un `migration.json` préparé manuellement.
+
+L'issue **#22 — objet ILIAS Groupe complet** reste volontairement `DEFERRED` et ne bloque pas la qualification de la console opérateur.
+
 ## Validation de consolidation
 
 - [x] cible fraîche Moodle 5.0.2 / course id 2 ;

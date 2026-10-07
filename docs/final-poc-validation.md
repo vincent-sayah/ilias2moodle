@@ -229,10 +229,11 @@ La tentative initiale de Moodle Group a été supprimée et ne fait pas partie d
 
 Le périmètre POC couvert par les phases 1 à 7 est reproductible et idempotent sur la cible fraîche Moodle 5.0.2.
 
-Les éléments volontairement hors périmètre restent :
+L'élément fonctionnel volontairement hors périmètre reste :
 
-- #22 — migration complète de l'objet ILIAS Groupe ;
-- #41 — POC enrichi de progression avec états réellement migrables.
+- #22 — migration complète de l'objet ILIAS Groupe.
+
+Le POC enrichi de progression #41 a depuis été validé et clôturé ; voir la validation complémentaire ci-dessous.
 
 La release candidate courante est `0.20.0-rc3`. Ce build formalise la consolidation Phase 7 validée sur la cible fraîche ; aucun changement de schéma n'est associé à cette promotion.
 
@@ -253,3 +254,15 @@ Le Test `ref=357` contient deux résultats finaux fiables (1/1 passed et 0/1 fai
 Le SCORM `ref=347` fournit l'état final agrégé du SCO et un compteur global de tentatives, mais pas le détail de chaque tentative. Moodle 5 matérialisant chaque tentative séparément, aucune tentative SCORM native n'est créée afin d'éviter d'inventer des données.
 
 La Phase 7.3 est donc clôturée en **rapport historique uniquement**. Aucun `quiz_attempt`, `scorm_attempt`, gradebook ou état de completion Moodle n'est écrit par cette phase. Le ticket #41 n'est plus un backlog ouvert.
+
+## Suite d'exploitation — Phase 8
+
+La consolidation POC 0.20.0-rc3 reste la référence historique des phases 1 à 7.
+
+Le développement suivant est la console opérateur `0.21.0-beta1`, suivie séparément dans la Phase 8. Elle ajoute orchestration, journal persistant, reprise/ignore et rapport de migration sans modifier les conclusions de validation de ce document.
+
+Voir :
+
+- `docs/operator-console.md` ;
+- `docs/roadmap.md` ;
+- PR #67.

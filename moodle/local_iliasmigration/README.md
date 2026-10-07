@@ -31,9 +31,44 @@ Le plugin sait maintenant :
 - importer les assets de chapitre via la File API `mod_book/chapter` ;
 - rejouer un Book inchangé sans dupliquer ses chapitres ou fichiers ;
 - valider en dry-run les questions normalisées Phase 6 et produire une prévisualisation Question Bank + Quiz ;
-- vérifier les modules Moodle `qbank` / `quiz` et les qtypes core nécessaires avant toute écriture Phase 6.
+- créer ou mettre à jour les Question Banks et Quiz Phase 6 avec les mappings de notation validés ;
+- migrer Content Page, Glossaire, Wiki, Exercice, Forum, MediaCast, Blog, Media Pool et Item Groups ;
+- piloter le package principal depuis une console opérateur avec journal, reprise, ignore explicite et rapport final.
 
 Le cours reste masqué tant que les phases de migration suivantes n'ont pas été validées.
+
+## Console opérateur — 0.21.0-beta1
+
+La première version exploitable de la console est accessible depuis l'administration Moodle ou directement via :
+
+```text
+/local/iliasmigration/index.php
+```
+
+Elle automatise le pipeline principal de la structure jusqu'aux Item Groups. Chaque famille est persistée comme une étape indépendante.
+
+En cas d'erreur :
+
+```text
+STEP_FAILED
+   ↓
+WAITING_DECISION
+   ├── Réessayer
+   └── Ignorer et continuer
+```
+
+Les runs, étapes et événements sont journalisés dans :
+
+```text
+local_iliasmigration_run
+local_iliasmigration_step
+local_iliasmigration_log
+```
+
+Un rapport HTML et un export JSON sont disponibles à la fin du run. Un run contenant une erreur explicitement ignorée termine en `COMPLETED_WITH_SKIPS`.
+
+Guide complet : `docs/operator-console.md`.
+
 
 ## Table de mapping
 
@@ -256,7 +291,7 @@ Voir `docs/phase5-learning-modules.md`.
 
 ## Phase 6 — Questions et Quiz
 
-Depuis `0.11.0-alpha`, la Phase 6 possède un dry-run Moodle. L'apply reste volontairement désactivé.
+La Phase 6 possède un dry-run et un apply Moodle validés sur le POC réel. Les transformations de notation nécessaires ont été figées avant activation de l'apply.
 
 ```bash
 php local/iliasmigration/cli/import.php \
@@ -281,14 +316,13 @@ Le dry-run Phase 6 :
 
 Le POC v5 validé côté ILIAS contient 11 questions, 8 types, aucun QRef absent et un total de `46.0` points.
 
-Deux points restent à arbitrer avant l'écriture réelle :
+Les décisions de notation ont depuis été validées :
 
-- Matching : ILIAS utilise des poids de paires `4/2/5` ;
-- Ordering : Moodle propose plusieurs stratégies de notation et celle correspondant au scoring ILIAS par position doit être sélectionnée.
+- Matching pondéré ILIAS → Cloze pondéré ;
+- QCM avec crédit de non-sélection → décisions binaires Cloze ;
+- Ordering → qtype natif avec `ABSOLUTE_POSITION`.
 
-`--phase=6 --apply` est refusé tant que ces mappings et l'écriture via les API/outils core Question Bank + Quiz ne sont pas implémentés et validés.
-
-Voir `docs/phase6-questions.md`.
+L'apply est idempotent sur le POC validé. Voir `docs/phase6-questions.md` et la section de validation réelle ci-dessous.
 
 
 ## Phase 7.3 — progression et résultats
@@ -318,7 +352,7 @@ php local/iliasmigration/cli/phase7_progress_dry_run.php \
   --course=5
 ```
 
-Le résultat POC retourne `ready_for_apply=false`, `apply_implemented=false` et `writes_performed=false`. Cette absence d'apply est volontaire : aucune donnée n'est classée `MIGRATE`.
+Le POC avancé `obj_id=827/ref_id=282` a ensuite confirmé la politique finale : `PHASE73_HISTORICAL_REPORT_ONLY`. Les résultats Test finaux sont conservés comme historique lorsqu'une tentative Quiz fidèle n'est pas reconstructible ; le SCORM reste partiel lorsque seul l'état final agrégé est disponible. Aucun apply Phase 7.3 ne crée de note, tentative ou completion Moodle.
 
 
 ## Phase 7.4 — Forum : auteurs et contributions
@@ -428,11 +462,9 @@ Phases POC validées :
 - Phase 3 : ressources simples ;
 - Phase 4 : SCORM ;
 - Phase 5 : Learning Module natif → Moodle Book ;
-- Phase 6 : normalisation ILIAS et dry-run Moodle Question Bank + Quiz implémentés, validation Moodle réelle à exécuter.
+- Phase 6 : Question Bank + Quiz validés de bout en bout et idempotents.
 
 Restent notamment à réaliser :
-
-- Phase 6 : choix final des mappings de notation puis apply Question Bank + Quiz ;
 - remplacement sûr d'un Book dont le contenu source a changé ;
 - réécriture/validation des liens internes de Learning Module ;
 - politique globale d'ordre des objets racine et de flattening des profondeurs non représentables.

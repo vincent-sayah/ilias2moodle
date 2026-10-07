@@ -22,10 +22,39 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Mediacast | `mcst` | `mod_data` | 6.5 | validé — #19 ; MP4 local + URL externe |
 | Blog | `blog` | `mod_data` | 6.5 + 7 | validé — #20, #44 ; billets + images + auteurs |
 | Media Pool / galerie média | `mep` | `mod_data` | 6.5 | validé — #21 ; images + MP4 + COPage + dossiers |
+| Item Group | `itgr` | Section / `mod_subsection` + repositionnement | 6.5.9 | validé |
 | Groupe | `grp` | Non migré automatiquement pour l’instant ; nécessite conteneur + membres + restrictions + contenus | 7 | différé — #22 |
-| Learning Progress | — | Completion / historique | 7 | POC validé : 0 donnée migrable, 2 `HISTORY_ONLY`, 21 `NO_DATA` — #37 |
+| Learning Progress / résultats | — | Rapport historique uniquement | 7.3 | validé sur POC avancé : aucune écriture native Moodle |
 
 \* Les codes encore marqués d’un astérisque restent indicatifs tant qu’ils n’ont pas été confirmés sur leur POC réel.
+
+## Disponibilité dans la console opérateur beta1
+
+| Famille | Console beta1 | Remarque |
+|---|---|---|
+| Structure | automatique | cours, sections, sous-sections |
+| Fichier / URL / HTML | automatique | Phase 3 |
+| SCORM | automatique | Phase 4 |
+| Learning Module / Book | automatique | Phase 5 |
+| Question Pool / Test | automatique | Phase 6 |
+| Content Page | automatique | Phase 6.5 |
+| Glossaire | automatique | famille transactionnelle |
+| Wiki | automatique | famille transactionnelle |
+| Exercice | automatique | structure Assign ; données utilisateur non incluses |
+| Forum | automatique | conteneur ; contributions historiques en extension Phase 7 |
+| MediaCast | automatique | mod_data |
+| Blog | automatique | mod_data ; auteur historique Phase 7 séparé |
+| Media Pool | automatique | mod_data |
+| Item Group | automatique | après création des activités |
+| Utilisateurs / inscriptions / rôles | assisté hors console beta1 | inventaire auxiliaire Phase 7 |
+| Contributions Forum | assisté hors console beta1 | inventaire auxiliaire |
+| Auteur/date Wiki | assisté hors console beta1 | inventaire auxiliaire |
+| Progression / résultats | rapport historique | pas d'apply |
+| Groupe ILIAS | non supporté | #22 |
+
+Une famille absente du package est marquée `SKIPPED_NOT_APPLICABLE`.
+
+Une famille en échec met le run en `WAITING_DECISION`; elle peut être réessayée ou explicitement ignorée avant de poursuivre les familles suivantes.
 
 ## Règle pour les dossiers
 
@@ -93,7 +122,7 @@ Aucun Moodle Group ne doit être créé automatiquement comme substitut de l'obj
 
 ## Phase 7.3 — Learning Progress, résultats et tentatives
 
-Le POC réel `cours 504 / ref 128` a été inventorié en lecture seule côté ILIAS puis classifié dans Moodle à partir des mappings persistants de la cible fraîche `course id=2`.
+Deux POC ont été utilisés pour la Phase 7.3. Le POC initial `cours 504 / ref 128` a validé le pipeline read-only. Le POC avancé `obj_id=827 / ref_id=282 -> Moodle course id=3` a ensuite validé des états `completed`, `failed`, `in_progress`, des résultats Test et du tracking SCORM.
 
 Résultat du dry-run consolidé :
 
@@ -142,7 +171,7 @@ aucune tentative/résultat     -> NO_DATA
 completed/failed futur        -> conversion seulement après validation sémantique
 ```
 
-Aucun apply Phase 7.3 n'est exécuté sur ce POC, car il n'existe aucune donnée classée `MIGRATE`. Le dry-run reste volontairement sans écriture Moodle.
+La décision finale est `PHASE73_HISTORICAL_REPORT_ONLY` : aucun `quiz_attempt`, `scorm_attempt`, gradebook ou état de completion n'est créé. Les résultats Test finaux fiables restent `HISTORY_ONLY` lorsque les tentatives ne sont pas reconstructibles ; le SCORM reste `PARTIAL` lorsque seul l'état final agrégé est disponible. Voir `docs/phase7-progress-results.md`.
 
 ## Phase 7.4 — Forum : auteurs et contributions
 

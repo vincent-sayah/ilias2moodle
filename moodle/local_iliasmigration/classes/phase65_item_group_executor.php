@@ -275,6 +275,55 @@ final class phase65_item_group_executor {
                 || empty($package['apply_implemented'])
                 || empty($package['root_structure_ready'])
                 || !empty($package['blocked_item_groups'])) {
+            foreach ($plan['operations'] as $operation) {
+                if ((string) ($operation['kind'] ?? '') !== 'itgr'
+                        || (string) ($operation['action'] ?? '') !== 'BLOCKED') {
+                    continue;
+                }
+
+                $validation = is_array(
+                    $operation['item_group_validation'] ?? null
+                ) ? $operation['item_group_validation'] : [];
+
+                $code = trim((string) (
+                    $validation['code']
+                    ?? $operation['reason']
+                    ?? ''
+                ));
+
+                $message = trim((string) (
+                    $validation['message'] ?? ''
+                ));
+
+                $membervalidation = is_array(
+                    $operation['item_group_member_validation'] ?? null
+                ) ? $operation['item_group_member_validation'] : [];
+
+                $membererrors = [];
+                foreach ((array) ($membervalidation['errors'] ?? []) as $error) {
+                    if (!is_array($error)) {
+                        continue;
+                    }
+                    $membererrors[] = trim(
+                        (string) ($error['source_ref_id'] ?? '')
+                        . ':'
+                        . (string) ($error['code'] ?? '')
+                    );
+                }
+
+                $suffix = $membererrors
+                    ? ' Members: ' . implode(', ', $membererrors) . '.'
+                    : '';
+
+                if ($code !== '') {
+                    throw new \coding_exception(
+                        'Item Group package validation failed (' . $code . ')'
+                        . ($message !== '' ? ': ' . $message : '.')
+                        . $suffix
+                    );
+                }
+            }
+
             throw new \coding_exception(
                 'Item Group package is not ready for apply.'
             );

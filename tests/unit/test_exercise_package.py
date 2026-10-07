@@ -939,7 +939,7 @@ def _build_unresolved_irss_document(
     return document, structure
 
 
-def test_exercise_irss_empty_collection_is_blocked(
+def test_exercise_irss_empty_collection_is_recovered(
     tmp_path: Path,
 ) -> None:
     uuid = "44444444-5555-6666-7777-888888888888"
@@ -967,25 +967,19 @@ def test_exercise_irss_empty_collection_is_blocked(
         recovery_root,
     )
 
-    assert result["recovered"]["collections_recovered"] == 0
+    assert result["recovered"]["collections_recovered"] == 1
     assert result["recovered"]["instruction_files_recovered"] == 0
-
-    assert len(result["missing"]) == 1
-    assert (
-        result["missing"][0]["kind"]
-        == "exercise_irss_empty_collection"
-    )
+    assert result["missing"] == []
 
     assignment = structure["assignments"][0]
 
-    assert assignment["automatic_ready"] is False
+    assert assignment["automatic_ready"] is True
     assert assignment["instruction_files"] == []
-    assert assignment["migration_constraints"] == [
-        "instruction_collection_not_embedded"
-    ]
+    assert assignment["migration_constraints"] == []
+    assert assignment["recovery_status"] == "RECOVERED"
 
-    assert len(structure["blocking_features"]) == 1
-    assert len(structure["export_issues"]) == 1
+    assert structure["blocking_features"] == []
+    assert structure["export_issues"] == []
 
 
 def test_exercise_package_reports_unresolved_irss_collection(
