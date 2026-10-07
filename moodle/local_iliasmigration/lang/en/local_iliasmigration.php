@@ -63,3 +63,4 @@ $string['mappingtype'] = 'Mapping type';
 $string['mappingdetails'] = 'Mappings detected';
 $string['resetauditnotice'] = 'A JSON snapshot and SHA-256 of the removed mappings are retained in the reset audit table before deletion.';
 $string['resetandrelaunch'] = 'Reset mappings and restart migration';
+$string['courseorphanedmapping'] = 'This ILIAS course has orphaned migration mappings for deleted Moodle course {$a}. Use the operator reset action before starting a new migration.';
