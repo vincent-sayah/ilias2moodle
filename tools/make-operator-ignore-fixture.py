@@ -73,7 +73,13 @@ def create_fixture(
     title_suffix: str,
 ) -> dict[str, Any]:
     source_package = source_package.resolve()
+    output = output.resolve()
     migration_path = source_package / "migration.json"
+
+    if output == source_package or output.is_relative_to(source_package):
+        raise ValueError(
+            "output must be outside the source package directory"
+        )
 
     if not migration_path.is_file():
         raise FileNotFoundError(
@@ -95,10 +101,14 @@ def create_fixture(
         raise ValueError("migration.json course.source_id is empty")
 
     new_source_id = str(source_course_id).strip()
-    if not new_source_id or new_source_id == old_source_id:
+    if (
+        not new_source_id.isdigit()
+        or int(new_source_id) <= 0
+        or new_source_id == old_source_id
+    ):
         raise ValueError(
-            "synthetic source course id must be non-empty and different "
-            "from the original source_id"
+            "synthetic source course id must be a positive numeric id "
+            "different from the original source_id"
         )
 
     title = str(course.get("title", "")).strip()
