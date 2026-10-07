@@ -129,6 +129,26 @@ final class phase65_wiki_executor {
                 || empty($package['apply_ready'])
                 || !empty($package['blocked_wikis'])
                 || !empty($package['page_blocked_count'])) {
+            foreach ($plan['operations'] as $operation) {
+                if ((string) ($operation['kind'] ?? '') !== 'wiki'
+                        || (string) ($operation['action'] ?? '') !== 'BLOCKED') {
+                    continue;
+                }
+
+                $validation = is_array($operation['wiki_validation'] ?? null)
+                    ? $operation['wiki_validation']
+                    : [];
+                $code = trim((string) ($validation['code'] ?? $operation['reason'] ?? ''));
+                $message = trim((string) ($validation['message'] ?? ''));
+
+                if ($code !== '') {
+                    throw new \coding_exception(
+                        'Wiki package validation failed (' . $code . ')'
+                        . ($message !== '' ? ': ' . $message : '.')
+                    );
+                }
+            }
+
             throw new \coding_exception('Wiki package validation failed; apply is refused.');
         }
 
