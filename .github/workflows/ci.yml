@@ -98,3 +98,6 @@ jobs:
 
       - name: Item Group operator error detail
         run: php tests/php/test_item_group_operator_error_detail.php
+
+      - name: Operator stale mapping reset
+        run: php tests/php/test_operator_stale_mapping_reset.php
