@@ -139,7 +139,7 @@ La matrice détaillée est maintenue dans [`docs/mapping.md`](docs/mapping.md).
 
 ### Objets migrables dans la première version exploitable
 
-La version `0.21.0-beta1` introduit une **console opérateur Moodle** qui automatise le package pédagogique principal. Les familles suivantes sont exécutables automatiquement depuis l'interface, dans cet ordre :
+La version `0.21.0-beta2` introduit une **console opérateur Moodle** qui automatise le package pédagogique principal. Les familles suivantes sont exécutables automatiquement depuis l'interface, dans cet ordre :
 
 1. structure : cours, sections, sous-sections ;
 2. ressources simples : fichiers, URL, modules HTML ;
@@ -169,6 +169,8 @@ Les fonctions Phase 7 restent disponibles dans le plugin mais ne sont **pas enco
 La réconciliation d'ordre V2 reste également un post-traitement CLI gardé dans cette beta. Elle sera intégrée à la console après refactorisation du script actuel en service réutilisable.
 
 La console refuse également de démarrer une seconde migration complète lorsqu'un mapping `course` valide existe déjà pour le même cours ILIAS. Les `Retry` à l'intérieur d'un run restent autorisés.
+
+La beta2 ajoute un **reset contrôlé des mappings orphelins** lorsqu'un cours Moodle migré a été supprimé. La console vérifie que la cible n'existe plus, affiche le scope concerné, conserve un snapshot JSON + SHA-256 dans une table d'audit, supprime les mappings du cours source dans une transaction puis relance une nouvelle migration après confirmation explicite. Un cours cible encore présent interdit le reset.
 
 En cas d'échec d'une famille d'objet, la migration s'arrête sur `WAITING_DECISION`. L'opérateur peut **réessayer** l'étape ou **l'ignorer explicitement et continuer**. Toutes les actions sont journalisées et un compte rendu final HTML/JSON est disponible.
 
