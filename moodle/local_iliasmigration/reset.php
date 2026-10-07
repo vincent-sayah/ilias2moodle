@@ -135,7 +135,7 @@ if (!empty($inspection['mapping_types'])
     $typetable = new html_table();
     $typetable->head = [
         get_string('mappingtype', 'local_iliasmigration'),
-        get_string('count'),
+        get_string('mappingquantity', 'local_iliasmigration'),
     ];
 
     foreach ($inspection['mapping_types'] as $type => $count) {
