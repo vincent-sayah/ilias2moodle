@@ -50,3 +50,16 @@ $string['local/iliasmigration:operate'] = 'Run and control ILIAS2Moodle migratio
 $string['local/iliasmigration:viewreports'] = 'View ILIAS2Moodle migration reports';
 $string['result'] = 'Result';
 $string['coursealreadymigrated'] = 'This ILIAS course has already been migrated to Moodle course {$a}. The console refuses a second full migration of the same source course.';
+
+$string['resetorphanedmapping'] = 'Reset orphaned migration mappings';
+$string['resetnotallowed'] = 'This mapping scope cannot be reset safely.';
+$string['resetwarning'] = 'The mapped Moodle course no longer exists. Confirming this action will archive an audit snapshot, delete the orphaned mappings for this source course, and immediately start a new migration.';
+$string['resetcompleted'] = '{$a->count} orphaned mappings were reset. Audit record #{$a->auditid} was created.';
+$string['sourcecourse'] = 'ILIAS source course';
+$string['sourceinstance'] = 'ILIAS source instance';
+$string['deletedtargetcourse'] = 'Deleted Moodle course id';
+$string['mappingcount'] = 'Mappings to reset';
+$string['mappingtype'] = 'Mapping type';
+$string['mappingdetails'] = 'Mappings detected';
+$string['resetauditnotice'] = 'A JSON snapshot and SHA-256 of the removed mappings are retained in the reset audit table before deletion.';
+$string['resetandrelaunch'] = 'Reset mappings and restart migration';
