@@ -83,6 +83,11 @@ $pagechecks = [
     "reset_source(",
     "create_run(",
     "resetandrelaunch",
+    "'name' => \$name",
+    "'sourcepath' => \$sourcepath",
+    "'categoryid' => \$categoryid",
+    "'categorypath' => \$categorypath",
+    "Validate the relaunch target before deleting any mapping.",
 ];
 
 foreach ($pagechecks as $check) {
