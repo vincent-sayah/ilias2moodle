@@ -49,6 +49,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
     }
 
+    // Validate the relaunch target before deleting any mapping.
+    // The form posts these values explicitly so a reset never depends on
+    // query-string parameters surviving the confirmation POST.
+    if (($categoryid > 0) === ($categorypath !== '')) {
+        throw new \coding_exception(
+            'Choose exactly one target: an existing Moodle category or a category path.'
+        );
+    }
+
+    if ($categoryid > 0
+            && !$DB->record_exists(
+                'course_categories',
+                ['id' => $categoryid]
+            )) {
+        throw new \coding_exception(
+            'The selected Moodle category does not exist.'
+        );
+    }
+
     try {
         $result = $resetter->reset_source(
             $sourcepath,
@@ -161,20 +180,22 @@ echo html_writer::tag(
 echo html_writer::start_tag('form', [
     'method' => 'post',
     'action' => (new moodle_url(
-        '/local/iliasmigration/reset.php',
-        [
-            'sourcepath' => $sourcepath,
-            'categoryid' => $categoryid,
-            'categorypath' => $categorypath,
-        ]
+        '/local/iliasmigration/reset.php'
     ))->out(false),
 ]);
 
-echo html_writer::empty_tag('input', [
-    'type' => 'hidden',
-    'name' => 'sesskey',
-    'value' => sesskey(),
-]);
+foreach ([
+    'sourcepath' => $sourcepath,
+    'categoryid' => $categoryid,
+    'categorypath' => $categorypath,
+    'sesskey' => sesskey(),
+] as $name => $value) {
+    echo html_writer::empty_tag('input', [
+        'type' => 'hidden',
+        'name' => $name,
+        'value' => $value,
+    ]);
+}
 
 echo html_writer::tag(
     'button',
