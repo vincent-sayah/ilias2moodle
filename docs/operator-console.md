@@ -368,6 +368,53 @@ Elle n'est pas appelée implicitement par la console beta1 afin de ne pas affaib
 11. Exécuter la réconciliation d'ordre V2 lorsque le package utilise les scénarios concernés.
 12. Effectuer le contrôle fonctionnel/visuel final avant de rendre le cours visible.
 
+## Scénario de qualification — Ignorer un Wiki en erreur
+
+L'issue #68 est qualifiée avec un package de test jetable dérivé d'un package réel déjà validé. Le cours nominal migré ne doit pas être modifié.
+
+Créer le fixture :
+
+```bash
+python3.11 tools/make-operator-ignore-fixture.py \
+  --source-package=/opt/ilias2moodle/operator_packages/course827 \
+  --output=/opt/ilias2moodle/operator_packages/course827_ignore_wiki \
+  --source-course-id=9282
+```
+
+Le générateur :
+
+- copie intégralement le package source ;
+- remplace uniquement l'identité du cours par le `source_id=9282` ;
+- ajoute le suffixe `[TEST IGNORE WIKI]` au titre ;
+- conserve les objets pédagogiques et ressources ;
+- modifie uniquement le `schema_version` du premier `wikis/<ref>/structure.json` ;
+- produit `operator-fixture.json` avec la description du défaut injecté ;
+- ne modifie jamais le package source.
+
+Erreur attendue à l'étape Wikis :
+
+```text
+WIKI_SCHEMA_UNSUPPORTED
+```
+
+Séquence attendue :
+
+```text
+Structure .. Content Pages   SUCCESS
+Wikis                        FAILED
+Run                          WAITING_DECISION
+                              ↓
+                       Ignorer et continuer
+                              ↓
+Exercices et étapes suivantes continuent
+                              ↓
+Run                          COMPLETED_WITH_SKIPS
+```
+
+Le rapport final doit conserver l'étape Wiki avec `ignored=true` et l'événement `STEP_IGNORED`.
+
+Le fixture est exclusivement destiné à la qualification technique et doit être supprimé avec son cours Moodle cible et ses mappings après conservation des preuves de test.
+
 ## Critère d'exploitation de la beta1
 
 La beta1 vise à supprimer la majorité des commandes manuelles pour une migration standard tout en conservant les garde-fous techniques existants.
