@@ -52,6 +52,87 @@ def _walk_items(items: list[Any]):
             yield from _walk_items(children)
 
 
+
+def _detach_wiki_from_item_groups(
+    items: list[Any],
+    wiki_ref: str,
+) -> list[dict[str, Any]]:
+    detached: list[dict[str, Any]] = []
+
+    for item in _walk_items(items):
+        if str(item.get("type", "")).strip() != "itgr":
+            continue
+
+        metadata = item.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+
+        refs = metadata.get("item_group_member_ref_ids", [])
+        objids = metadata.get("item_group_member_obj_ids", [])
+
+        if not isinstance(refs, list) or not isinstance(objids, list):
+            continue
+
+        normalized_refs = [str(value) for value in refs]
+        if wiki_ref not in normalized_refs:
+            continue
+
+        if len(refs) != len(objids):
+            raise ValueError(
+                "Item Group member refs/obj ids are inconsistent before "
+                f"fixture isolation for ref_id {item.get('source_id')}"
+            )
+
+        kept_refs: list[Any] = []
+        kept_objids: list[Any] = []
+        removed: list[dict[str, str]] = []
+
+        for member_ref, member_obj_id in zip(
+            refs,
+            objids,
+            strict=True,
+        ):
+            if str(member_ref) == wiki_ref:
+                removed.append(
+                    {
+                        "source_ref_id": str(member_ref),
+                        "source_obj_id": str(member_obj_id),
+                    }
+                )
+                continue
+
+            kept_refs.append(member_ref)
+            kept_objids.append(member_obj_id)
+
+        if not kept_refs:
+            raise ValueError(
+                "Fixture isolation would leave Item Group "
+                f"{item.get('source_id')} with no members"
+            )
+
+        metadata["item_group_member_ref_ids"] = kept_refs
+        metadata["item_group_member_obj_ids"] = kept_objids
+        metadata["item_group_member_count"] = len(kept_refs)
+        metadata["operator_fixture"] = {
+            "purpose": "detach_ignored_wiki_from_item_group",
+            "wiki_ref_id": wiki_ref,
+            "removed_members": removed,
+        }
+
+        detached.append(
+            {
+                "item_group_ref_id": str(item.get("source_id", "")),
+                "title": str(item.get("title", "")),
+                "removed_members": removed,
+                "remaining_member_ref_ids": [
+                    str(value) for value in kept_refs
+                ],
+            }
+        )
+
+    return detached
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
@@ -140,6 +221,15 @@ def create_fixture(
     course["source_id"] = new_source_id
     course["title"] = f"{title}{title_suffix}"
 
+    fixture_items = course.get("items", [])
+    if not isinstance(fixture_items, list):
+        raise ValueError("fixture migration course.items must be a list")
+
+    detached_item_groups = _detach_wiki_from_item_groups(
+        fixture_items,
+        wiki_ref,
+    )
+
     metadata = course.get("metadata")
     if isinstance(metadata, dict):
         metadata["operator_fixture"] = {
@@ -147,6 +237,7 @@ def create_fixture(
             "original_source_course_id": old_source_id,
             "synthetic_source_course_id": new_source_id,
             "wiki_ref_id": wiki_ref,
+            "detached_item_groups": detached_item_groups,
         }
 
     _write_json(fixture_migration, document)
@@ -163,6 +254,7 @@ def create_fixture(
             "original_source_course_id": old_source_id,
             "synthetic_source_course_id": new_source_id,
             "wiki_ref_id": wiki_ref,
+            "detached_item_groups": detached_item_groups,
         }
         _write_json(package_path, package)
 
@@ -183,6 +275,7 @@ def create_fixture(
         "synthetic_source_course_id": new_source_id,
         "title": course["title"],
         "wiki_ref_id": wiki_ref,
+        "detached_item_groups": detached_item_groups,
         "wiki_structure": str(fixture_wiki.resolve()),
         "expected_failure": "WIKI_SCHEMA_UNSUPPORTED",
         "migration_json": str(fixture_migration.resolve()),
