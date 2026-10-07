@@ -110,7 +110,7 @@ Avant d'étendre la console, terminer les issues déjà ouvertes dans cet ordre 
    - validation `Ignorer et continuer` ;
    - validation finale `COMPLETED_WITH_SKIPS`.
 
-2. **#69 — Mappings orphelins après suppression d'un cours Moodle**
+2. **#69 — Mappings orphelins après suppression d'un cours Moodle** — **EN COURS / beta2**
    - détection sûre des mappings orphelins ;
    - reset explicite depuis la console ;
    - aucune suppression automatique d'un mapping dont la cible existe encore ;
@@ -128,6 +128,22 @@ Avant d'étendre la console, terminer les issues déjà ouvertes dans cet ordre 
 L'objectif V1.1 est qu'un opérateur parte autant que possible de l'export ZIP ILIAS et non d'un `migration.json` préparé manuellement.
 
 L'issue **#22 — objet ILIAS Groupe complet** reste volontairement `DEFERRED` et ne bloque pas la qualification de la console opérateur.
+
+## Phase 8 beta2 — reset des mappings orphelins
+
+Développement #69 :
+
+- [x] détection du mapping de cours orphelin avant création d'un run ;
+- [x] refus du reset si le cours Moodle cible existe encore ;
+- [x] page de confirmation opérateur ;
+- [x] snapshot JSON + SHA-256 avant suppression ;
+- [x] table d'audit `local_iliasmigration_reset` ;
+- [x] suppression transactionnelle du scope exact ;
+- [x] relance automatique d'un nouveau run après reset ;
+- [x] garde moteur `courseorphanedmapping` en dehors de l'UI ;
+- [ ] validation réelle sur Moodle 5.0.2 : suppression cible -> reset console -> remigration.
+
+Version de développement : `0.21.0-beta2`.
 
 ## Validation de consolidation
 
