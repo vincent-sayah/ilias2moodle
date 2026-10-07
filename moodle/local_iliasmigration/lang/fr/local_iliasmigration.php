@@ -50,3 +50,16 @@ $string['local/iliasmigration:operate'] = 'Lancer et piloter les migrations ILIA
 $string['local/iliasmigration:viewreports'] = 'Consulter les comptes rendus ILIAS2Moodle';
 $string['result'] = 'Résultat';
 $string['coursealreadymigrated'] = 'Ce cours ILIAS a déjà été migré vers le cours Moodle {$a}. La console refuse une seconde migration complète du même cours source.';
+
+$string['resetorphanedmapping'] = 'Réinitialiser les mappings orphelins';
+$string['resetnotallowed'] = 'Ce périmètre de mappings ne peut pas être réinitialisé en sécurité.';
+$string['resetwarning'] = 'Le cours Moodle mappé n’existe plus. En confirmant cette action, la console archive un snapshot d’audit, supprime les mappings orphelins de ce cours source puis relance immédiatement une nouvelle migration.';
+$string['resetcompleted'] = '{$a->count} mappings orphelins ont été réinitialisés. L’enregistrement d’audit #{$a->auditid} a été créé.';
+$string['sourcecourse'] = 'Cours source ILIAS';
+$string['sourceinstance'] = 'Instance source ILIAS';
+$string['deletedtargetcourse'] = 'ID du cours Moodle supprimé';
+$string['mappingcount'] = 'Mappings à réinitialiser';
+$string['mappingtype'] = 'Type de mapping';
+$string['mappingdetails'] = 'Mappings détectés';
+$string['resetauditnotice'] = 'Un snapshot JSON et son SHA-256 sont conservés dans la table d’audit avant suppression des mappings.';
+$string['resetandrelaunch'] = 'Réinitialiser les mappings et relancer la migration';
