@@ -13,15 +13,55 @@ $PAGE->set_title(get_string('operatorconsole', 'local_iliasmigration'));
 $PAGE->set_heading(get_string('operatorconsole', 'local_iliasmigration'));
 
 $manager = new \local_iliasmigration\operator_run_manager();
+$resetter = new \local_iliasmigration\operator_mapping_reset();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_sesskey();
 
     try {
+        $sourcepath = required_param(
+            'sourcepath',
+            PARAM_RAW_TRIMMED
+        );
+        $categoryid = optional_param(
+            'categoryid',
+            0,
+            PARAM_INT
+        );
+        $categorypath = optional_param(
+            'categorypath',
+            '',
+            PARAM_RAW_TRIMMED
+        );
+
+        $inspection = $resetter->inspect_source(
+            $sourcepath
+        );
+
+        if (($inspection['state'] ?? '')
+                === \local_iliasmigration\operator_mapping_reset::STATE_ORPHANED
+                && !empty($inspection['reset_allowed'])) {
+            redirect(new moodle_url(
+                '/local/iliasmigration/reset.php',
+                [
+                    'sourcepath' => $sourcepath,
+                    'categoryid' => $categoryid,
+                    'categorypath' => $categorypath,
+                ]
+            ));
+        }
+
+        if (($inspection['state'] ?? '')
+                === \local_iliasmigration\operator_mapping_reset::STATE_AMBIGUOUS) {
+            throw new \coding_exception(
+                (string) ($inspection['message'] ?? 'Unsafe mapping reset state.')
+            );
+        }
+
         $runid = $manager->create_run(
-            required_param('sourcepath', PARAM_RAW_TRIMMED),
-            optional_param('categoryid', 0, PARAM_INT),
-            optional_param('categorypath', '', PARAM_RAW_TRIMMED),
+            $sourcepath,
+            $categoryid,
+            $categorypath,
             (int) $USER->id
         );
 
