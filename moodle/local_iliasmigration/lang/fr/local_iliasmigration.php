@@ -63,3 +63,4 @@ $string['mappingtype'] = 'Type de mapping';
 $string['mappingdetails'] = 'Mappings détectés';
 $string['resetauditnotice'] = 'Un snapshot JSON et son SHA-256 sont conservés dans la table d’audit avant suppression des mappings.';
 $string['resetandrelaunch'] = 'Réinitialiser les mappings et relancer la migration';
+$string['courseorphanedmapping'] = 'Ce cours ILIAS possède des mappings orphelins vers le cours Moodle supprimé {$a}. Utilisez la réinitialisation opérateur avant de lancer une nouvelle migration.';
