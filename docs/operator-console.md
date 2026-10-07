@@ -2,7 +2,7 @@
 
 ## Objectif
 
-La console opérateur introduite en `0.21.0-beta1` permet de piloter une migration ILIAS → Moodle depuis l'interface Moodle sans lancer manuellement chaque commande CLI.
+La console opérateur introduite en `0.21.0-beta1` et renforcée en `0.21.0-beta2` permet de piloter une migration ILIAS → Moodle depuis l'interface Moodle sans lancer manuellement chaque commande CLI.
 
 Elle s'appuie sur les executors et validateurs déjà validés par le projet et ajoute :
 
@@ -41,6 +41,41 @@ La console refuse de créer un nouveau run complet lorsqu'un mapping `course` va
 Cette protection correspond au scénario d'exploitation normal : un cours source est migré une fois.
 
 Elle ne bloque pas les actions **Réessayer** dans un run déjà créé. L'idempotence des executors reste donc utilisée pour reprendre une étape en erreur sans créer de doublons.
+
+## Réinitialisation après suppression d'un cours Moodle
+
+Si un cours créé par ILIAS2Moodle est supprimé manuellement dans Moodle, les mappings persistants peuvent rester présents. La console détecte désormais ce cas avant la création d'un nouveau run.
+
+États de détection :
+
+```text
+NONE         aucun mapping existant
+LIVE_TARGET  le cours Moodle mappé existe encore : reset interdit
+ORPHANED     le cours Moodle mappé n'existe plus : reset explicite proposé
+AMBIGUOUS    scope de mappings non sûr : reset automatique refusé
+```
+
+Pour un état `ORPHANED`, la console affiche une page de confirmation avec :
+
+- le cours source ILIAS ;
+- l'instance source ;
+- l'ancien ID du cours Moodle supprimé ;
+- le nombre de mappings concernés ;
+- le détail par type de mapping.
+
+L'action **Réinitialiser les mappings et relancer la migration** :
+
+1. recontrôle dans une transaction que le cours Moodle cible n'existe toujours pas ;
+2. sérialise tous les mappings du scope exact `ILIAS + sourceinstance + sourcecourse` ;
+3. calcule le SHA-256 du snapshot ;
+4. écrit le snapshot dans `local_iliasmigration_reset` ;
+5. supprime le scope de mappings orphelins ;
+6. vérifie qu'aucun mapping du scope ne reste ;
+7. crée immédiatement un nouveau run sur le même package et la même catégorie.
+
+La présence d'un cours Moodle cible vivant interdit le reset. La console ne supprime donc jamais les mappings d'une migration encore active.
+
+Un appel direct à `create_run()` est également protégé : un mapping de cours orphelin déclenche `courseorphanedmapping` et impose le passage par le reset explicite.
 
 ## Création d'une migration
 
