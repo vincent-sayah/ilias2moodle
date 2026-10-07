@@ -199,5 +199,131 @@ function xmldb_local_iliasmigration_upgrade(int $oldversion): bool {
         upgrade_plugin_savepoint(true, 2026100402, 'local', 'iliasmigration');
     }
 
+
+    if ($oldversion < 2026100701) {
+        $table = new xmldb_table('local_iliasmigration_reset');
+
+        if (!$dbman->table_exists($table)) {
+            $table->add_field(
+                'id',
+                XMLDB_TYPE_INTEGER,
+                '10',
+                null,
+                XMLDB_NOTNULL,
+                XMLDB_SEQUENCE
+            );
+            $table->add_field(
+                'sourcelms',
+                XMLDB_TYPE_CHAR,
+                '20',
+                null,
+                XMLDB_NOTNULL,
+                null,
+                'ILIAS'
+            );
+            $table->add_field(
+                'sourceinstance',
+                XMLDB_TYPE_CHAR,
+                '128',
+                null,
+                XMLDB_NOTNULL,
+                null,
+                ''
+            );
+            $table->add_field(
+                'sourcecourse',
+                XMLDB_TYPE_CHAR,
+                '64',
+                null,
+                XMLDB_NOTNULL
+            );
+            $table->add_field(
+                'sourcepath',
+                XMLDB_TYPE_CHAR,
+                '512',
+                null,
+                XMLDB_NOTNULL
+            );
+            $table->add_field(
+                'targetcourseid',
+                XMLDB_TYPE_INTEGER,
+                '10',
+                null,
+                null
+            );
+            $table->add_field(
+                'mappingcount',
+                XMLDB_TYPE_INTEGER,
+                '10',
+                null,
+                XMLDB_NOTNULL,
+                null,
+                '0'
+            );
+            $table->add_field(
+                'mappingsha256',
+                XMLDB_TYPE_CHAR,
+                '64',
+                null,
+                XMLDB_NOTNULL
+            );
+            $table->add_field(
+                'snapshotjson',
+                XMLDB_TYPE_TEXT,
+                null,
+                null,
+                XMLDB_NOTNULL
+            );
+            $table->add_field(
+                'userid',
+                XMLDB_TYPE_INTEGER,
+                '10',
+                null,
+                XMLDB_NOTNULL,
+                null,
+                '0'
+            );
+            $table->add_field(
+                'timecreated',
+                XMLDB_TYPE_INTEGER,
+                '10',
+                null,
+                XMLDB_NOTNULL,
+                null,
+                '0'
+            );
+
+            $table->add_key(
+                'primary',
+                XMLDB_KEY_PRIMARY,
+                ['id']
+            );
+            $table->add_index(
+                'source_scope_idx',
+                XMLDB_INDEX_NOTUNIQUE,
+                ['sourcelms', 'sourceinstance', 'sourcecourse']
+            );
+            $table->add_index(
+                'userid_idx',
+                XMLDB_INDEX_NOTUNIQUE,
+                ['userid']
+            );
+            $table->add_index(
+                'created_idx',
+                XMLDB_INDEX_NOTUNIQUE,
+                ['timecreated']
+            );
+
+            $dbman->create_table($table);
+        }
+
+        upgrade_plugin_savepoint(
+            true,
+            2026100701,
+            'local',
+            'iliasmigration'
+        );
+    }
+
     return true;
 }
