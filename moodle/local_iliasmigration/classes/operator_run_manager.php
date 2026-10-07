@@ -244,6 +244,8 @@ final class operator_run_manager {
         );
 
         try {
+            $this->assert_source_unchanged($run);
+
             $result = $this->pipeline->execute_step(
                 (string) $step->stepkey,
                 (string) $run->sourcepath,
@@ -614,6 +616,37 @@ final class operator_run_manager {
             '',
             $targetid
         );
+    }
+
+    /**
+     * Refuse to continue a run if migration.json changed after run creation.
+     *
+     * The source hash is captured when the operator creates the run. A changed
+     * source must be repaired or a new run must be created; continuing against
+     * mutable input would make the audit trail unreliable.
+     */
+    private function assert_source_unchanged(\stdClass $run): void {
+        $sourcepath = (string) ($run->sourcepath ?? '');
+        $expected = strtolower(
+            trim((string) ($run->sourcehash ?? ''))
+        );
+
+        if ($sourcepath === ''
+                || !is_file($sourcepath)
+                || !is_readable($sourcepath)) {
+            throw new \coding_exception(
+                'SOURCE_CHANGED_DURING_RUN: migration.json is missing or unreadable.'
+            );
+        }
+
+        $actual = hash_file('sha256', $sourcepath);
+        if ($actual === false
+                || $expected === ''
+                || !hash_equals($expected, strtolower($actual))) {
+            throw new \coding_exception(
+                'SOURCE_CHANGED_DURING_RUN: migration.json no longer matches the SHA-256 recorded when this run was created.'
+            );
+        }
     }
 
     private function get_step(
