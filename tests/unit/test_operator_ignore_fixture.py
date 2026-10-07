@@ -39,10 +39,36 @@ def test_operator_ignore_fixture_isolated_wiki_failure(
                         "title": "Activités",
                         "items": [
                             {
-                                "source_id": "600",
-                                "type": "wiki",
-                                "title": "Wiki test",
-                                "items": [],
+                                "source_id": "700",
+                                "type": "itgr",
+                                "title": "Informations",
+                                "metadata": {
+                                    "item_group_member_ref_ids": [
+                                        "601",
+                                        "600",
+                                    ],
+                                    "item_group_member_obj_ids": [
+                                        "901",
+                                        "900",
+                                    ],
+                                    "item_group_member_count": 2,
+                                },
+                                "items": [
+                                    {
+                                        "source_id": "601",
+                                        "type": "content_page",
+                                        "title": "Informations",
+                                        "metadata": {"obj_id": "901"},
+                                        "items": [],
+                                    },
+                                    {
+                                        "source_id": "600",
+                                        "type": "wiki",
+                                        "title": "Wiki test",
+                                        "metadata": {"obj_id": "900"},
+                                        "items": [],
+                                    },
+                                ],
                             }
                         ],
                     }
@@ -144,4 +170,31 @@ def test_operator_ignore_fixture_isolated_wiki_failure(
     assert source_wiki["schema_version"] == "1.0"
     assert summary["wiki_ref_id"] == "600"
     assert summary["expected_failure"] == "WIKI_SCHEMA_UNSUPPORTED"
+    assert summary["detached_item_groups"] == [
+        {
+            "item_group_ref_id": "700",
+            "title": "Informations",
+            "removed_members": [
+                {
+                    "source_ref_id": "600",
+                    "source_obj_id": "900",
+                }
+            ],
+            "remaining_member_ref_ids": ["601"],
+        }
+    ]
+
+    item_group = migration["course"]["items"][0]["items"][0]
+    metadata = item_group["metadata"]
+    assert metadata["item_group_member_ref_ids"] == ["601"]
+    assert metadata["item_group_member_obj_ids"] == ["901"]
+    assert metadata["item_group_member_count"] == 1
+
+    children = item_group["items"]
+    assert any(
+        child.get("source_id") == "600"
+        and child.get("type") == "wiki"
+        for child in children
+    )
+
     assert (output / "operator-fixture.json").is_file()
