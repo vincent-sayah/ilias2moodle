@@ -95,3 +95,6 @@ jobs:
 
       - name: Operator source integrity guard
         run: php tests/php/test_operator_source_integrity_guard.php
+
+      - name: Item Group operator error detail
+        run: php tests/php/test_item_group_operator_error_detail.php
