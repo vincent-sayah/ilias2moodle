@@ -89,3 +89,6 @@ jobs:
 
       - name: Operator step summary regression
         run: php tests/php/test_operator_step_summary.php
+
+      - name: Wiki operator error detail
+        run: php tests/php/test_wiki_operator_error_detail.php
