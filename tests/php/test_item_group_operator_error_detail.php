@@ -14,7 +14,7 @@ $checks = [
     'Item Group package validation failed (',
     "\$validation['code']",
     "\$membervalidation['errors']",
-    "'Members: '",
+    "' Members: '",
 ];
 
 foreach ($checks as $check) {
