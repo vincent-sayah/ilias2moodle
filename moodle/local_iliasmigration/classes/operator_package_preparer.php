@@ -20,6 +20,71 @@ final class operator_package_preparer {
         'wiki_content_recovery' => '--wiki-content-recovery',
     ];
 
+
+    /**
+     * List readable native ILIAS ZIP exports from the configured imports root.
+     *
+     * @return array<string,array{path:string,size:int,mtime:int}>
+     */
+    public function available_imports(): array {
+        $config = get_config('local_iliasmigration');
+        $importsroot = $this->existing_directory(
+            (string) (
+                $config->importsroot
+                ?? '/var/moodledata/ilias2moodle/imports'
+            ),
+            'ILIAS imports root'
+        );
+
+        $result = [];
+        $entries = scandir($importsroot);
+
+        if ($entries === false) {
+            throw new \coding_exception(
+                'Unable to read ILIAS imports root: '
+                . $importsroot
+            );
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            if (basename($entry) !== $entry
+                    || strtolower(
+                        pathinfo($entry, PATHINFO_EXTENSION)
+                    ) !== 'zip') {
+                continue;
+            }
+
+            $candidate = realpath(
+                $importsroot
+                . DIRECTORY_SEPARATOR
+                . $entry
+            );
+
+            if ($candidate === false
+                    || !is_file($candidate)
+                    || !is_readable($candidate)
+                    || !$this->is_inside(
+                        $candidate,
+                        $importsroot
+                    )) {
+                continue;
+            }
+
+            $result[$entry] = [
+                'path' => $candidate,
+                'size' => (int) filesize($candidate),
+                'mtime' => (int) filemtime($candidate),
+            ];
+        }
+
+        ksort($result, SORT_NATURAL | SORT_FLAG_CASE);
+        return $result;
+    }
+
     /**
      * Prepare a normalized migration package from one native ILIAS ZIP.
      *
