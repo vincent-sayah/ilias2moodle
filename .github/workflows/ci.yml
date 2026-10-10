@@ -104,3 +104,6 @@ jobs:
 
       - name: Operator package preparer
         run: php tests/php/test_operator_package_preparer.php
+
+      - name: Operator prepare UI
+        run: php tests/php/test_operator_prepare_ui.php
