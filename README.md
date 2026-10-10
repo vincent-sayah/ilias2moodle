@@ -170,7 +170,7 @@ La réconciliation d'ordre V2 reste également un post-traitement CLI gardé dan
 
 La console refuse également de démarrer une seconde migration complète lorsqu'un mapping `course` valide existe déjà pour le même cours ILIAS. Les `Retry` à l'intérieur d'un run restent autorisés.
 
-La beta2 ajoute un **reset contrôlé des mappings orphelins** lorsqu'un cours Moodle migré a été supprimé. La console vérifie que la cible n'existe plus, affiche le scope concerné, conserve un snapshot JSON + SHA-256 dans une table d'audit, supprime les mappings du cours source dans une transaction puis relance une nouvelle migration après confirmation explicite. Un cours cible encore présent interdit le reset.
+La beta2 ajoute un **reset contrôlé des mappings orphelins** lorsqu'un cours Moodle migré a été supprimé. La console vérifie que la cible n'existe plus, affiche le périmètre concerné, conserve un snapshot JSON + SHA-256 dans une table d'audit, supprime dans une même transaction les mappings de l'instance ILIAS canonique et les mappings legacy `sourceinstance=''` du même cours source, puis relance automatiquement une nouvelle migration après confirmation explicite. Un cours cible encore présent interdit le reset. Ce scénario a été validé sur Moodle 5.0.2 avec 618 mappings audités et une remigration complète sans `ERROR_STALE_MAPPING`.
 
 En cas d'échec d'une famille d'objet, la migration s'arrête sur `WAITING_DECISION`. L'opérateur peut **réessayer** l'étape ou **l'ignorer explicitement et continuer**. Toutes les actions sont journalisées et un compte rendu final HTML/JSON est disponible.
 
