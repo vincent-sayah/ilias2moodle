@@ -166,9 +166,10 @@ final class operator_package_preparer {
             . $outputname;
 
         if (file_exists($output)) {
-            throw new \coding_exception(
-                'Prepared package output already exists: '
-                . $output
+            return $this->reuse_existing_package(
+                $output,
+                $zip,
+                $worker
             );
         }
 
@@ -238,6 +239,198 @@ final class operator_package_preparer {
         $result['worker'] = $worker;
 
         return $result;
+    }
+
+    /**
+     * Reuse an already prepared package without overwriting it.
+     *
+     * The package is accepted only when its metadata is readable and
+     * source_archive matches the selected ZIP basename. This keeps the
+     * non-overwrite guarantee while allowing the operator console to reopen
+     * a package prepared earlier (for example after source-side recovery).
+     *
+     * @return array<string,mixed>
+     */
+    private function reuse_existing_package(
+        string $output,
+        string $zip,
+        string $worker
+    ): array {
+        if (!is_dir($output)) {
+            throw new \coding_exception(
+                'Prepared package output exists but is not a directory: '
+                . $output
+            );
+        }
+
+        $packagepath = $output
+            . DIRECTORY_SEPARATOR
+            . 'package.json';
+        $migrationjson = $output
+            . DIRECTORY_SEPARATOR
+            . 'migration.json';
+        $recoveryplanpath = $output
+            . DIRECTORY_SEPARATOR
+            . 'recovery-plan.json';
+
+        if (!is_file($packagepath) || !is_readable($packagepath)) {
+            throw new \coding_exception(
+                'Existing prepared package is incomplete: package.json is missing or unreadable: '
+                . $packagepath
+            );
+        }
+
+        if (!is_file($migrationjson) || !is_readable($migrationjson)) {
+            throw new \coding_exception(
+                'Existing prepared package is incomplete: migration.json is missing or unreadable: '
+                . $migrationjson
+            );
+        }
+
+        try {
+            $package = json_decode(
+                (string) file_get_contents($packagepath),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+            $document = json_decode(
+                (string) file_get_contents($migrationjson),
+                true,
+                512,
+                JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $exception) {
+            throw new \coding_exception(
+                'Existing prepared package contains invalid JSON: '
+                . $exception->getMessage()
+            );
+        }
+
+        if (!is_array($package) || !is_array($document)) {
+            throw new \coding_exception(
+                'Existing prepared package metadata is invalid.'
+            );
+        }
+
+        $sourcearchive = trim(
+            (string) ($package['source_archive'] ?? '')
+        );
+
+        if ($sourcearchive === ''
+                || $sourcearchive !== basename($zip)) {
+            throw new \coding_exception(
+                'Existing prepared package belongs to a different ILIAS ZIP: '
+                . $output
+            );
+        }
+
+        $course = is_array($document['course'] ?? null)
+            ? $document['course']
+            : [];
+        $items = is_array($course['items'] ?? null)
+            ? $course['items']
+            : [];
+
+        $recoveryplan = [];
+        if (is_array($package['recovery_plan'] ?? null)) {
+            $recoveryplan = $package['recovery_plan'];
+        } else if (is_file($recoveryplanpath)
+                && is_readable($recoveryplanpath)) {
+            try {
+                $decodedplan = json_decode(
+                    (string) file_get_contents($recoveryplanpath),
+                    true,
+                    512,
+                    JSON_THROW_ON_ERROR
+                );
+                if (is_array($decodedplan)) {
+                    $recoveryplan = $decodedplan;
+                }
+            } catch (\JsonException $exception) {
+                throw new \coding_exception(
+                    'Existing recovery-plan.json is invalid: '
+                    . $exception->getMessage()
+                );
+            }
+        }
+
+        $missingcount = (int) (
+            $package['missing_count']
+            ?? count(
+                is_array($package['missing'] ?? null)
+                    ? $package['missing']
+                    : []
+            )
+        );
+
+        $result = [
+            'mode' => 'prepare_export',
+            'archive' => $zip,
+            'course' => (string) ($course['source_id'] ?? ''),
+            'title' => (string) ($course['title'] ?? ''),
+            'output' => $output,
+            'total_items' => $this->count_items($items),
+            'extracted' => is_array($package['extracted'] ?? null)
+                ? $package['extracted']
+                : [],
+            'missing_count' => $missingcount,
+            'recovery_required' => array_key_exists(
+                'recovery_required',
+                $recoveryplan
+            )
+                ? !empty($recoveryplan['recovery_required'])
+                : $missingcount > 0,
+            'recovery_plan' => $recoveryplan,
+            'recovery_plan_path' => is_file($recoveryplanpath)
+                ? $recoveryplanpath
+                : null,
+            'exercise_irss_recovery' => is_array(
+                $package['exercise_irss_recovery'] ?? null
+            )
+                ? $package['exercise_irss_recovery']
+                : [],
+            'mediacast_media_recovery' => is_array(
+                $package['mediacast_media_recovery'] ?? null
+            )
+                ? $package['mediacast_media_recovery']
+                : [],
+            'wiki_content_recovery' => is_array(
+                $package['wiki_content_recovery'] ?? null
+            )
+                ? $package['wiki_content_recovery']
+                : [],
+            'migration_json' => $migrationjson,
+            'package_root' => $output,
+            'worker' => $worker,
+            'reused_existing' => true,
+            'worker_stdout' => '',
+            'worker_stderr' => '',
+            'exit_code' => 0,
+        ];
+
+        return $result;
+    }
+
+    /**
+     * @param array<int,mixed> $items
+     */
+    private function count_items(array $items): int {
+        $count = 0;
+
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $count++;
+            $children = is_array($item['items'] ?? null)
+                ? $item['items']
+                : [];
+            $count += $this->count_items($children);
+        }
+
+        return $count;
     }
 
     /**
