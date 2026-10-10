@@ -154,6 +154,35 @@ La couche PHP ne construit pas elle-même `migration.json`. Elle valide les chem
 
 Cette commande constitue le premier bridge V1.1. Le raccordement à l'interface opérateur et à un job/worker asynchrone est l'étape suivante.
 
+### Plan de récupération V1.1
+
+Après `prepare-export`, le package contient désormais également :
+
+```text
+recovery-plan.json
+```
+
+Ce fichier décrit les dépendances read-only encore nécessaires côté ILIAS. Pour une collection IRSS d'Exercise non embarquée dans le ZIP, le plan contient notamment :
+
+- le `ref_id` de l'Exercise ;
+- l'ID d'unité lorsque disponible ;
+- l'UUID exact de collection IRSS ;
+- l'extracteur `tools/ilias_irss_extract.php` ;
+- les arguments nécessaires ;
+- la cible d'exécution `ILIAS_SOURCE` ;
+- l'option de réinjection `--exercise-irss-recovery` ;
+- le chemin attendu du `manifest.json`.
+
+La génération du plan ne déclenche aucune commande distante. Elle constitue le contrat entre le worker de préparation et le futur orchestrateur de récupération. Les dépendances sans contrat automatique restent explicitement dans `unresolved` au lieu d'être ignorées.
+
+Le test réel du cours `282` a produit deux demandes IRSS pour l'Exercise `356` :
+
+```text
+496f99f9-f8c3-48ab-9714-a6a54886877e
+5cf327b1-4b20-42f7-8ee0-7c96c449d210
+```
+
+
 ## Création d'une migration
 
 L'opérateur renseigne :
