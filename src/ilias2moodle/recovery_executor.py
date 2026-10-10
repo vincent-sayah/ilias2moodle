@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
+
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-"
+    r"[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{12}$"
+)
 
 
 def _load_plan(path: Path) -> dict[str, Any]:
@@ -30,6 +39,172 @@ def _load_plan(path: Path) -> dict[str, Any]:
         )
 
     return plan
+
+
+def _positive_id(value: Any, label: str) -> str:
+    candidate = str(value or "").strip()
+    if not candidate.isdigit() or int(candidate) <= 0:
+        raise ValueError(f"{label} invalide.")
+    return candidate
+
+
+def _safe_location(value: Any) -> str:
+    candidate = str(value or "").strip()
+    path = PurePosixPath(candidate)
+
+    if (
+        not candidate
+        or path.is_absolute()
+        or ".." in path.parts
+        or "\\" in candidate
+    ):
+        raise ValueError(
+            "Location MediaObject invalide ou non sûre."
+        )
+
+    return candidate
+
+
+def _safe_filename(value: Any) -> str:
+    candidate = str(value or "").strip()
+    if (
+        not candidate
+        or PurePosixPath(candidate).name != candidate
+        or "/" in candidate
+        or "\\" in candidate
+        or candidate in {".", ".."}
+    ):
+        raise ValueError("Nom de fichier recovery invalide.")
+    return candidate
+
+
+def _safe_expected_manifest(
+    output: Path,
+    value: Any,
+) -> Path | None:
+    candidate = str(value or "").strip()
+    if not candidate:
+        return None
+
+    relative = PurePosixPath(candidate)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError(
+            "expected_manifest invalide ou non sûr."
+        )
+
+    return output.joinpath(*relative.parts)
+
+
+def _build_command(
+    request: dict[str, Any],
+    project_root: Path,
+    ilias_root: Path,
+    client: str,
+    output: Path,
+    php: str,
+) -> list[str]:
+    request_type = str(request.get("type", "")).strip()
+
+    if request_type == "exercise_irss_collection":
+        collection_uuid = str(
+            request.get("collection_uuid", "")
+        ).strip()
+        if not _UUID_RE.fullmatch(collection_uuid):
+            raise ValueError(
+                "UUID de collection IRSS invalide."
+            )
+
+        extractor = (
+            project_root
+            / "tools"
+            / "ilias_irss_extract.php"
+        )
+        arguments = [
+            f"--collection={collection_uuid}",
+        ]
+
+    elif request_type == "mediaobject_file":
+        mob_id = _positive_id(
+            request.get("mob_id"),
+            "MediaObject mob_id",
+        )
+        location = _safe_location(
+            request.get("location")
+        )
+
+        extractor = (
+            project_root
+            / "tools"
+            / "ilias_mediaobject_extract.php"
+        )
+        arguments = [
+            f"--mob-id={mob_id}",
+            f"--location={location}",
+        ]
+
+    elif request_type == "forum_attachment":
+        forum_obj_id = _positive_id(
+            request.get("forum_obj_id"),
+            "Forum obj_id",
+        )
+        post_id = _positive_id(
+            request.get("post_id"),
+            "Forum post_id",
+        )
+        filename = _safe_filename(
+            request.get("filename")
+        )
+
+        extractor = (
+            project_root
+            / "tools"
+            / "ilias_forum_attachment_extract.php"
+        )
+        arguments = [
+            f"--forum-obj-id={forum_obj_id}",
+            f"--post-id={post_id}",
+            f"--filename={filename}",
+        ]
+
+    elif request_type == "wiki_content":
+        wiki_ref_id = _positive_id(
+            request.get("wiki_ref_id"),
+            "Wiki ref_id",
+        )
+        course_ref_id = _positive_id(
+            request.get("course_ref_id"),
+            "Course ref_id",
+        )
+
+        extractor = (
+            project_root
+            / "tools"
+            / "ilias_wiki_content_extract.php"
+        )
+        arguments = [
+            f"--wiki-ref={wiki_ref_id}",
+            f"--course-ref={course_ref_id}",
+        ]
+
+    else:
+        raise ValueError(
+            "Type de recovery non supporté par le worker "
+            f"ILIAS local : {request_type}"
+        )
+
+    if not extractor.is_file():
+        raise FileNotFoundError(
+            f"Extracteur recovery introuvable : {extractor}"
+        )
+
+    return [
+        php,
+        str(extractor),
+        *arguments,
+        f"--ilias-root={ilias_root}",
+        f"--client={client}",
+        f"--output={output}",
+    ]
 
 
 def execute_recovery_plan(
@@ -103,36 +278,14 @@ def execute_recovery_plan(
             )
 
         request_type = str(request.get("type", ""))
-
-        if request_type != "exercise_irss_collection":
-            raise ValueError(
-                "Type de recovery non supporté par le worker "
-                f"ILIAS local : {request_type}"
-            )
-
-        collection_uuid = str(
-            request.get("collection_uuid", "")
-        )
-
-        extractor = (
-            project_root
-            / "tools"
-            / "ilias_irss_extract.php"
-        )
-
-        if not extractor.is_file():
-            raise FileNotFoundError(
-                f"Extracteur IRSS introuvable : {extractor}"
-            )
-
-        command = [
+        command = _build_command(
+            request,
+            project_root,
+            ilias_root,
+            client,
+            output,
             php,
-            str(extractor),
-            f"--collection={collection_uuid}",
-            f"--ilias-root={ilias_root}",
-            f"--client={client}",
-            f"--output={output}",
-        ]
+        )
 
         record: dict[str, Any] = {
             "request_index": index,
@@ -140,10 +293,24 @@ def execute_recovery_plan(
             "source_ref_id": str(
                 request.get("source_ref_id", "")
             ),
-            "collection_uuid": collection_uuid,
             "command": command,
             "dry_run": dry_run,
         }
+
+        for key in (
+            "collection_uuid",
+            "mob_id",
+            "location",
+            "forum_obj_id",
+            "post_id",
+            "filename",
+            "wiki_ref_id",
+            "wiki_obj_id",
+            "course_ref_id",
+            "recovery_option",
+        ):
+            if key in request:
+                record[key] = request[key]
 
         if dry_run:
             record.update(
@@ -167,18 +334,15 @@ def execute_recovery_plan(
             text=True,
         )
 
-        expected_manifest = str(
-            request.get("expected_manifest", "")
-        ).strip()
-        manifest_path = (
-            output / expected_manifest
-            if expected_manifest
-            else None
+        manifest_path = _safe_expected_manifest(
+            output,
+            request.get("expected_manifest", ""),
         )
 
         empty_collection_compat = False
         if (
-            completed.returncode == 3
+            request_type == "exercise_irss_collection"
+            and completed.returncode == 3
             and "RESULTAT    : COLLECTION_VIDE"
             in completed.stdout
             and manifest_path is not None
@@ -197,7 +361,12 @@ def execute_recovery_plan(
                             "",
                         )
                     )
-                    == collection_uuid
+                    == str(
+                        request.get(
+                            "collection_uuid",
+                            "",
+                        )
+                    )
                     and int(
                         manifest_data.get(
                             "resource_count",
@@ -243,12 +412,14 @@ def execute_recovery_plan(
         for request in requests:
             if not isinstance(request, dict):
                 continue
-            expected = str(
-                request.get("expected_manifest", "")
-            ).strip()
-            if not expected:
+
+            candidate = _safe_expected_manifest(
+                output,
+                request.get("expected_manifest", ""),
+            )
+            if candidate is None:
                 continue
-            candidate = output / expected
+
             manifests.append(
                 {
                     "path": str(candidate),
