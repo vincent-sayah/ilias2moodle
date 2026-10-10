@@ -177,15 +177,17 @@ Ce fichier décrit les dépendances read-only encore nécessaires côté ILIAS. 
 
 La génération du plan ne déclenche aucune commande distante. Elle constitue le contrat entre le worker de préparation et le futur orchestrateur de récupération. Les dépendances sans contrat automatique restent explicitement dans `unresolved` au lieu d'être ignorées.
 
-Le dépôt fournit aussi un worker local à exécuter **sur le serveur ILIAS source** :
+Le dépôt fournit aussi un worker local à exécuter **sur le serveur ILIAS source**. Pour éviter d'installer toutes les dépendances Python du parseur sur le serveur ILIAS, le chemin recommandé utilise le wrapper autonome :
 
 ```bash
-./tools/run-ilias2moodle.sh recover-source \
+python3.11 tools/run-recovery-plan.py \
   --plan=/chemin/recovery-plan.json \
   --output=/tmp/ilias2moodle-recovery \
   --ilias-root=/var/www/ilias \
   --client=ilias10
 ```
+
+Ce wrapper n'importe que le module de récupération, basé sur la bibliothèque standard Python. Le sous-commande `recover-source` du CLI principal reste disponible quand l'environnement Python complet ILIAS2Moodle est installé.
 
 Le worker :
 
