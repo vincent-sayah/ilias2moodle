@@ -148,11 +148,11 @@ if (!str_contains(
 
 if (!str_contains(
     $version,
-    "0.22.0-beta4"
+    "0.22.0-beta5"
 )) {
     fwrite(
         STDERR,
-        "Automatic recovery worker must retain the current plugin beta version.\n"
+        "Automatic reprepare task must retain the current plugin beta version.\n"
     );
     exit(1);
 }
