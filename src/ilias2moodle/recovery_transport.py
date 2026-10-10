@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import shutil
 import subprocess
@@ -398,7 +399,7 @@ def fetch_recovery_plan(
 
     try:
         decoded = payload.decode("utf-8")
-        plan = __import__("json").loads(decoded)
+        plan = json.loads(decoded)
     except (UnicodeDecodeError, ValueError) as exc:
         raise ValueError(
             "Recovery-plan reçu invalide."
