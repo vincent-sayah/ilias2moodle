@@ -65,3 +65,13 @@ $string['resetauditnotice'] = 'Un snapshot JSON et son SHA-256 sont conservés d
 $string['resetandrelaunch'] = 'Réinitialiser les mappings et relancer la migration';
 $string['courseorphanedmapping'] = 'Ce cours ILIAS possède des mappings orphelins vers le cours Moodle supprimé {$a}. Utilisez la réinitialisation opérateur avant de lancer une nouvelle migration.';
 $string['mappingquantity'] = 'Nombre';
+
+$string['operatorsettings'] = 'Paramètres opérateur ILIAS2Moodle';
+$string['projectroot'] = 'Racine du projet ILIAS2Moodle';
+$string['projectroot_desc'] = 'Chemin absolu du checkout ILIAS2Moodle contenant tools/run-ilias2moodle.sh.';
+$string['importsroot'] = 'Racine des exports ILIAS';
+$string['importsroot_desc'] = 'Répertoire absolu contenant les exports ZIP natifs ILIAS acceptés par le worker de préparation.';
+$string['packagesroot'] = 'Racine des packages préparés';
+$string['packagesroot_desc'] = 'Répertoire absolu dans lequel le worker crée les packages de migration normalisés.';
+$string['iliasversion'] = 'Version ILIAS source par défaut';
+$string['iliasversion_desc'] = 'Version ILIAS inscrite dans les migration.json générés, par exemple 10.5.';
