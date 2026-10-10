@@ -53,6 +53,8 @@ $servicechecks = [
     "symbolic link",
     "previous_missing_count",
     "assert_package_not_in_use(",
+    "recovery_bundle_import_",
+    "lock_config::get_lock_factory",
     "local_iliasmigration_run",
     "already referenced by an operator run",
     "Recovery bundle did not reduce",
