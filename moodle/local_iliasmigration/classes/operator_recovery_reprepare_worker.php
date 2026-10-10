@@ -130,6 +130,9 @@ final class operator_recovery_reprepare_worker {
                 break;
             }
 
+            $plansha = null;
+            $bundlesha = null;
+
             $package = pathinfo(
                 $marker,
                 PATHINFO_FILENAME
@@ -351,10 +354,10 @@ final class operator_recovery_reprepare_worker {
                     ),
                 ];
 
-                if (isset($plansha)) {
+                if ($plansha !== null) {
                     $state['plan_sha256'] = $plansha;
                 }
-                if (isset($bundlesha)) {
+                if ($bundlesha !== null) {
                     $state['bundle_sha256'] = $bundlesha;
                 }
 
