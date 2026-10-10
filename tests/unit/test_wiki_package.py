@@ -303,3 +303,45 @@ def test_missing_wiki_is_recovered_from_current_pages_and_media(
     assert saved["media"]["822"]["items"][0]["migration_path"] == (
         "wikis/279/media/822/femme_noire_robot.png"
     )
+
+
+def test_missing_wiki_structure_keeps_recovery_identity(
+    tmp_path: Path,
+) -> None:
+    archive_path = tmp_path / "course.zip"
+    with zipfile.ZipFile(archive_path, "w"):
+        pass
+
+    item = MigrationItem(
+        source_id="339",
+        type="wiki",
+        title="wiki test",
+        metadata={
+            "ilias_type": "wiki",
+            "obj_id": "1000",
+            "wiki_export_base": "",
+        },
+    )
+    document = MigrationDocument(
+        course=CourseExport(
+            source_id="282",
+            title="Cours test RC 0.20",
+            items=[item],
+        )
+    )
+
+    result = extract_wiki_assets(
+        document,
+        archive_path,
+        tmp_path / "package",
+    )
+
+    assert result["missing"] == [
+        {
+            "source_id": "339",
+            "wiki_obj_id": "1000",
+            "course_ref_id": "282",
+            "kind": "wiki_structure",
+            "source_path": "",
+        }
+    ]

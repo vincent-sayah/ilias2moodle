@@ -51,10 +51,18 @@ def _project_root(tmp_path: Path) -> Path:
     project = tmp_path / "project"
     tools = project / "tools"
     tools.mkdir(parents=True)
-    (tools / "ilias_irss_extract.php").write_text(
-        "<?php\n",
-        encoding="utf-8",
-    )
+
+    for filename in (
+        "ilias_irss_extract.php",
+        "ilias_mediaobject_extract.php",
+        "ilias_forum_attachment_extract.php",
+        "ilias_wiki_content_extract.php",
+    ):
+        (tools / filename).write_text(
+            "<?php\n",
+            encoding="utf-8",
+        )
+
     return project
 
 
@@ -292,6 +300,138 @@ def test_recovery_executor_refuses_unknown_type(
     with pytest.raises(
         ValueError,
         match="non supporté",
+    ):
+        execute_recovery_plan(
+            plan,
+            tmp_path / "out",
+            ilias,
+            "ilias10",
+            project,
+        )
+
+
+def test_recovery_executor_dry_runs_extended_contracts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = tmp_path / "recovery-plan.json"
+    plan.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "recovery_required": True,
+                "request_count": 3,
+                "requests": [
+                    {
+                        "type": "mediaobject_file",
+                        "status": "REQUIRED",
+                        "source_ref_id": "332",
+                        "mob_id": "980",
+                        "location": "blog.png",
+                        "execution_target": "ILIAS_SOURCE",
+                        "read_only": True,
+                        "recovery_option": "--mediaobject-recovery",
+                        "expected_manifest": "mob_980/manifest.json",
+                    },
+                    {
+                        "type": "forum_attachment",
+                        "status": "REQUIRED",
+                        "source_ref_id": "275",
+                        "forum_obj_id": "807",
+                        "post_id": "18",
+                        "filename": "handout.pdf",
+                        "execution_target": "ILIAS_SOURCE",
+                        "read_only": True,
+                        "recovery_option": (
+                            "--forum-attachment-recovery"
+                        ),
+                        "expected_manifest": (
+                            "forum_807/post_18/manifest.json"
+                        ),
+                    },
+                    {
+                        "type": "wiki_content",
+                        "status": "REQUIRED",
+                        "source_ref_id": "339",
+                        "wiki_ref_id": "339",
+                        "wiki_obj_id": "1000",
+                        "course_ref_id": "282",
+                        "execution_target": "ILIAS_SOURCE",
+                        "read_only": True,
+                        "recovery_option": "--wiki-content-recovery",
+                        "expected_manifest": "wiki_1000/manifest.json",
+                    },
+                ],
+                "unresolved_count": 0,
+                "unresolved": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    project = _project_root(tmp_path)
+    ilias = tmp_path / "ilias"
+    ilias.mkdir()
+
+    monkeypatch.setattr(
+        "ilias2moodle.recovery_executor.shutil.which",
+        lambda name: "/usr/bin/php" if name == "php" else None,
+    )
+
+    result = execute_recovery_plan(
+        plan,
+        tmp_path / "recovery",
+        ilias,
+        "ilias10",
+        project,
+        dry_run=True,
+    )
+
+    assert result["success"] is True
+    assert result["request_count"] == 3
+    assert [entry["type"] for entry in result["results"]] == [
+        "mediaobject_file",
+        "forum_attachment",
+        "wiki_content",
+    ]
+
+    media_command = result["results"][0]["command"]
+    assert "--mob-id=980" in media_command
+    assert "--location=blog.png" in media_command
+
+    forum_command = result["results"][1]["command"]
+    assert "--forum-obj-id=807" in forum_command
+    assert "--post-id=18" in forum_command
+    assert "--filename=handout.pdf" in forum_command
+
+    wiki_command = result["results"][2]["command"]
+    assert "--wiki-ref=339" in wiki_command
+    assert "--course-ref=282" in wiki_command
+
+
+def test_recovery_executor_refuses_unsafe_expected_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = tmp_path / "recovery-plan.json"
+    _write_plan(plan)
+
+    data = json.loads(plan.read_text(encoding="utf-8"))
+    data["requests"][0]["expected_manifest"] = "../outside.json"
+    plan.write_text(json.dumps(data), encoding="utf-8")
+
+    project = _project_root(tmp_path)
+    ilias = tmp_path / "ilias"
+    ilias.mkdir()
+
+    monkeypatch.setattr(
+        "ilias2moodle.recovery_executor.shutil.which",
+        lambda name: "/usr/bin/php",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="expected_manifest invalide",
     ):
         execute_recovery_plan(
             plan,

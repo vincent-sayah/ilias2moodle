@@ -302,7 +302,14 @@ def extract_forum_assets(
                                 {
                                     "source_id":
                                         item.source_id,
+                                    "forum_obj_id": str(
+                                        structure.get("source", {}).get(
+                                            "object_id",
+                                            "",
+                                        )
+                                    ),
                                     "post_id": post_id,
+                                    "filename": filename,
                                     "kind": recovery_error
                                         or "forum_attachment",
                                     "source_path":

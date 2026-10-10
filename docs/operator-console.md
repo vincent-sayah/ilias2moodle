@@ -218,6 +218,20 @@ L'option `--dry-run` permet de valider le plan et les commandes sans lire de res
 
 Une collection IRSS vide est un succès fonctionnel : l'extracteur écrit un manifest avec `resource_count=0` et retourne désormais un code de sortie `0`. Le worker garde aussi une compatibilité avec les anciens bundles qui retournaient `3 / COLLECTION_VIDE`, à condition que le manifest vide soit cohérent.
 
+Le contrat `recovery-plan.json` décrit désormais plusieurs recoveries read-only déjà supportées par le projet :
+
+| Type de dépendance | Extracteur source | Option de réinjection |
+|---|---|---|
+| collection IRSS Exercise | `tools/ilias_irss_extract.php` | `--exercise-irss-recovery` |
+| fichier MediaObject d'un MediaCast | `tools/ilias_mediaobject_extract.php` | `--mediacast-media-recovery` |
+| MediaObject Blog / Media Pool | `tools/ilias_mediaobject_extract.php` | `--mediaobject-recovery` |
+| pièce jointe Forum | `tools/ilias_forum_attachment_extract.php` | `--forum-attachment-recovery` |
+| contenu courant d'un Wiki absent du ZIP | `tools/ilias_wiki_content_extract.php` | `--wiki-content-recovery` |
+
+Chaque requête contient les identifiants source minimaux nécessaires, la cible `ILIAS_SOURCE`, `read_only=true`, la commande d'extraction attendue et le chemin du manifest à produire. Le worker reconstruit lui-même les commandes à partir de champs validés : il n'exécute jamais une chaîne de commande arbitraire fournie par le plan.
+
+Le transport entre Moodle et le serveur ILIAS reste volontairement hors de ce worker. Aucun mot de passe SSH, clé privée ou secret ILIAS n'est stocké dans le plugin Moodle. Le worker de recovery doit être exécuté localement sur le serveur ILIAS, ou par un mécanisme d'orchestration d'infrastructure explicitement approuvé.
+
 Le test réel du cours `282` a produit deux demandes IRSS pour l'Exercise `356` :
 
 ```text

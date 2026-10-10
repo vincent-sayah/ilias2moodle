@@ -242,6 +242,10 @@ def extract_blog_assets(
                             missing.append(
                                 {
                                     "source_id": item.source_id,
+                                    "mob_id": str(media_id),
+                                    "location": str(
+                                        media_item.get("location", "")
+                                    ),
                                     "kind": recovery_error or "blog_media",
                                     "source_path": source_path,
                                 }
