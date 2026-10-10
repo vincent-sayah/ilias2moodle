@@ -65,3 +65,13 @@ $string['resetauditnotice'] = 'A JSON snapshot and SHA-256 of the removed mappin
 $string['resetandrelaunch'] = 'Reset mappings and restart migration';
 $string['courseorphanedmapping'] = 'This ILIAS course has orphaned migration mappings for deleted Moodle course {$a}. Use the operator reset action before starting a new migration.';
 $string['mappingquantity'] = 'Count';
+
+$string['operatorsettings'] = 'ILIAS2Moodle operator settings';
+$string['projectroot'] = 'ILIAS2Moodle project root';
+$string['projectroot_desc'] = 'Absolute path to the ILIAS2Moodle checkout containing tools/run-ilias2moodle.sh.';
+$string['importsroot'] = 'ILIAS export imports root';
+$string['importsroot_desc'] = 'Absolute directory containing native ILIAS ZIP exports accepted by the preparation worker.';
+$string['packagesroot'] = 'Prepared packages root';
+$string['packagesroot_desc'] = 'Absolute directory under which the preparation worker creates normalized migration packages.';
+$string['iliasversion'] = 'Default ILIAS source version';
+$string['iliasversion_desc'] = 'ILIAS source version recorded in generated migration.json files, for example 10.5.';
