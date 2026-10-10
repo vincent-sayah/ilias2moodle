@@ -139,7 +139,7 @@ La matrice détaillée est maintenue dans [`docs/mapping.md`](docs/mapping.md).
 
 ### Objets migrables dans la première version exploitable
 
-La version opérateur courante `0.22.0-beta2` fournit une **console opérateur Moodle** qui prépare un export ZIP ILIAS natif, réutilise les packages préparés, importe un bundle de récupération source contrôlé et automatise le package pédagogique principal. Les familles suivantes sont exécutables automatiquement depuis l'interface, dans cet ordre :
+La version opérateur courante `0.22.0-beta3` fournit une **console opérateur Moodle** qui prépare un export ZIP ILIAS natif, réutilise les packages préparés, importe un bundle de récupération source contrôlé depuis le poste ou directement depuis le serveur Moodle, et automatise le package pédagogique principal. Les familles suivantes sont exécutables automatiquement depuis l'interface, dans cet ordre :
 
 1. structure : cours, sections, sous-sections ;
 2. ressources simples : fichiers, URL, modules HTML ;
