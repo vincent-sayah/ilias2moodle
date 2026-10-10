@@ -426,6 +426,14 @@ def _prepare_export(
     package["recovery_plan"] = build_recovery_plan(
         package["missing"]
     )
+    (output / "recovery-plan.json").write_text(
+        json.dumps(
+            package["recovery_plan"],
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     (output / "package.json").write_text(
         json.dumps(package, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -443,6 +451,9 @@ def _prepare_export(
             "recovery_required"
         ],
         "recovery_plan": package["recovery_plan"],
+        "recovery_plan_path": str(
+            output / "recovery-plan.json"
+        ),
         "exercise_irss_recovery": package["exercise_irss_recovery"],
         "mediacast_media_recovery": package[
             "mediacast_media_recovery"
