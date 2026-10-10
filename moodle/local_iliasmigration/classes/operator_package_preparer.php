@@ -186,12 +186,20 @@ final class operator_package_preparer {
             2 => ['pipe', 'w'],
         ];
 
-        $process = proc_open(
-            $command,
-            $descriptors,
-            $pipes,
-            $cwd
-        );
+        // Child processes inherit the current umask. Keep generated
+        // packages private to the service account and its group even when
+        // the caller has an unusually permissive shell umask.
+        $previousumask = umask(0027);
+        try {
+            $process = proc_open(
+                $command,
+                $descriptors,
+                $pipes,
+                $cwd
+            );
+        } finally {
+            umask($previousumask);
+        }
 
         if (!is_resource($process)) {
             throw new \coding_exception(
