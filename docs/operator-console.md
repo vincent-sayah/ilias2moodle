@@ -839,3 +839,47 @@ runuser -u apache -- php admin/cli/cfg.php \
   --name=iliasversion \
   --set=10.8.0
 ~~~
+
+
+### Qualification finale V20 — chaîne automatique complète
+
+Le scénario `course827_v20_beta6` valide la chaîne complète avec `local_iliasmigration/iliasversion=10.8.0`.
+
+Le timer ILIAS a détecté le package en attente, exécuté les deux recoveries IRSS et publié le bundle avec `failed_count=0`. Au moment du contrôle Moodle, le package était déjà complet et le marqueur de queue avait disparu : le cron Moodle avait donc consommé le bundle et re-préparé le package avant l'intervention manuelle de contrôle.
+
+État final V20 :
+
+~~~text
+source.version      = 10.8.0
+missing_count       = 0
+recovery_required   = false
+request_count       = 0
+unresolved_count    = 0
+~~~
+
+Validation sémantique après suppression du seul champ horodaté `generated_at` :
+
+~~~text
+V13 SHA-256 = fc1d8073abb9bdd43d36f5020aaa3e2c1898ed1d4af99630cf8ada739d97a9fb
+V15 SHA-256 = fc1d8073abb9bdd43d36f5020aaa3e2c1898ed1d4af99630cf8ada739d97a9fb
+V20 SHA-256 = fc1d8073abb9bdd43d36f5020aaa3e2c1898ed1d4af99630cf8ada739d97a9fb
+V13_V20_SEMANTIC_RC = 0
+~~~
+
+La chaîne recovery automatique est donc qualifiée de bout en bout :
+
+~~~text
+Console Moodle
+  -> préparation package
+  -> queue recovery
+  -> timer systemd ILIAS
+  -> list-pending / fetch-plan
+  -> recovery read-only
+  -> création bundle
+  -> publication sécurisée Moodle
+  -> cron Moodle
+  -> re-préparation atomique
+  -> package complet
+~~~
+
+Aucune copie manuelle de plan ou de bundle et aucun clic d'import/re-préparation ne sont nécessaires dans ce scénario.
