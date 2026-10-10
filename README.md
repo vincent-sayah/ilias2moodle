@@ -176,6 +176,8 @@ En cas d'échec d'une famille d'objet, la migration s'arrête sur `WAITING_DECIS
 
 Guide opérateur : [`docs/operator-console.md`](docs/operator-console.md).
 
+Transfert sécurisé des recoveries : [`docs/recovery-secure-transfer.md`](docs/recovery-secure-transfer.md).
+
 
 ## Phase 2 — Structure : terminée
 
