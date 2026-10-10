@@ -65,7 +65,6 @@ def _load_state(path: Path) -> dict[str, Any]:
     except (
         OSError,
         ValueError,
-        json.JSONDecodeError,
     ):
         return {}
     return data if isinstance(data, dict) else {}
