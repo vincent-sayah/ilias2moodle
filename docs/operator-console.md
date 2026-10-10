@@ -171,6 +171,8 @@ Le formulaire :
 
 Le formulaire avancé historique reste disponible afin de ne pas casser les workflows déjà qualifiés.
 
+Si le répertoire de sortie demandé existe déjà, la console ne l'écrase pas. Elle vérifie désormais que le package existant contient des `package.json` et `migration.json` lisibles et que `source_archive` correspond au ZIP sélectionné. Si ces contrôles réussissent, le package est réutilisé et son état courant est affiché ; cela permet notamment de reprendre un package après une récupération côté source. Un répertoire incomplet ou associé à un autre ZIP reste bloqué.
+
 ### Plan de récupération V1.1
 
 Après `prepare-export`, le package contient désormais également :
