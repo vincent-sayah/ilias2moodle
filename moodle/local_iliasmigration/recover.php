@@ -35,12 +35,40 @@ $outputname = required_param(
     PARAM_RAW_TRIMMED
 );
 
-if (!isset($_FILES['recoverybundle'])
-        || !is_array($_FILES['recoverybundle'])
-        || (int) (
-            $_FILES['recoverybundle']['error']
-            ?? UPLOAD_ERR_NO_FILE
-        ) !== UPLOAD_ERR_OK) {
+$serverbundle = optional_param(
+    'serverbundle',
+    '',
+    PARAM_FILE
+);
+
+$upload = isset($_FILES['recoverybundle'])
+        && is_array($_FILES['recoverybundle'])
+    ? $_FILES['recoverybundle']
+    : null;
+
+$uploaderror = is_array($upload)
+    ? (int) (
+        $upload['error']
+        ?? UPLOAD_ERR_NO_FILE
+    )
+    : UPLOAD_ERR_NO_FILE;
+
+$hasupload = $uploaderror === UPLOAD_ERR_OK;
+$hasserverbundle = $serverbundle !== '';
+
+if ($hasupload && $hasserverbundle) {
+    \core\notification::error(
+        get_string(
+            'recoverybundlechooseone',
+            'local_iliasmigration'
+        )
+    );
+    redirect(new moodle_url(
+        '/local/iliasmigration/index.php'
+    ));
+}
+
+if (!$hasupload && !$hasserverbundle) {
     \core\notification::error(
         get_string(
             'recoverybundleuploadmissing',
@@ -52,21 +80,13 @@ if (!isset($_FILES['recoverybundle'])
     ));
 }
 
-$tmpname = (string) (
-    $_FILES['recoverybundle']['tmp_name']
-    ?? ''
-);
-$originalname = (string) (
-    $_FILES['recoverybundle']['name']
-    ?? ''
-);
-
-if ($tmpname === ''
-        || !is_uploaded_file($tmpname)) {
+if ($uploaderror !== UPLOAD_ERR_OK
+        && $uploaderror !== UPLOAD_ERR_NO_FILE) {
     \core\notification::error(
         get_string(
-            'recoverybundleuploadmissing',
-            'local_iliasmigration'
+            'recoverybundleuploaderror',
+            'local_iliasmigration',
+            $uploaderror
         )
     );
     redirect(new moodle_url(
@@ -76,6 +96,57 @@ if ($tmpname === ''
 
 $preparer = new \local_iliasmigration\operator_package_preparer();
 $importer = new \local_iliasmigration\operator_recovery_bundle_importer();
+
+if ($hasupload) {
+    $tmpname = (string) (
+        $upload['tmp_name']
+        ?? ''
+    );
+    $originalname = (string) (
+        $upload['name']
+        ?? ''
+    );
+
+    if ($tmpname === ''
+            || !is_uploaded_file($tmpname)) {
+        \core\notification::error(
+            get_string(
+                'recoverybundleuploadmissing',
+                'local_iliasmigration'
+            )
+        );
+        redirect(new moodle_url(
+            '/local/iliasmigration/index.php'
+        ));
+    }
+} else {
+    try {
+        $serverbundles = $importer
+            ->available_server_bundles();
+
+        if (!array_key_exists(
+            $serverbundle,
+            $serverbundles
+        )) {
+            throw new \coding_exception(
+                'Selected server recovery bundle is not available.'
+            );
+        }
+
+        $tmpname = (string) (
+            $serverbundles[$serverbundle]['path']
+            ?? ''
+        );
+        $originalname = $serverbundle;
+    } catch (Throwable $exception) {
+        \core\notification::error(
+            $exception->getMessage()
+        );
+        redirect(new moodle_url(
+            '/local/iliasmigration/index.php'
+        ));
+    }
+}
 
 try {
     $imports = $preparer->available_imports();

@@ -24,6 +24,109 @@ final class operator_recovery_bundle_importer {
 
     private const MAX_BUNDLE_BYTES = 536870912;
     private const MAX_ARCHIVE_ENTRIES = 10000;
+    private const SERVER_BUNDLES_DIRECTORY = 'bundles';
+
+    /**
+     * List recovery bundles already deposited on the Moodle server.
+     *
+     * Only direct regular .tar.gz/.tgz files from the controlled bundles
+     * directory are exposed. Symlinks and nested/arbitrary paths are ignored.
+     *
+     * @return array<string,array{path:string,size:int,mtime:int}>
+     */
+    public function available_server_bundles(): array {
+        $config = get_config('local_iliasmigration');
+
+        $recoveriesroot = $this->writable_directory(
+            (string) (
+                $config->recoveriesroot
+                ?? '/var/moodledata/ilias2moodle/recovery'
+            ),
+            'ILIAS2Moodle recoveries root'
+        );
+
+        $bundlesroot = $recoveriesroot
+            . DIRECTORY_SEPARATOR
+            . self::SERVER_BUNDLES_DIRECTORY;
+
+        if (!is_dir($bundlesroot)) {
+            if (!mkdir($bundlesroot, 0750, true)
+                    && !is_dir($bundlesroot)) {
+                throw new \coding_exception(
+                    'Unable to create recovery bundles directory: '
+                    . $bundlesroot
+                );
+            }
+        }
+
+        $resolvedroot = realpath($bundlesroot);
+        if ($resolvedroot === false
+                || !is_dir($resolvedroot)
+                || !$this->is_inside(
+                    $resolvedroot,
+                    $recoveriesroot
+                )) {
+            throw new \coding_exception(
+                'Recovery bundles directory is invalid.'
+            );
+        }
+
+        $entries = scandir($resolvedroot);
+        if ($entries === false) {
+            throw new \coding_exception(
+                'Unable to read recovery bundles directory: '
+                . $resolvedroot
+            );
+        }
+
+        $result = [];
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            if (basename($entry) !== $entry
+                    || !$this->is_bundle_filename($entry)) {
+                continue;
+            }
+
+            $candidate = $resolvedroot
+                . DIRECTORY_SEPARATOR
+                . $entry;
+
+            if (is_link($candidate)) {
+                continue;
+            }
+
+            $resolved = realpath($candidate);
+            if ($resolved === false
+                    || !is_file($resolved)
+                    || !is_readable($resolved)
+                    || !$this->is_inside(
+                        $resolved,
+                        $resolvedroot
+                    )) {
+                continue;
+            }
+
+            $size = filesize($resolved);
+            if ($size === false
+                    || $size <= 0
+                    || $size > self::MAX_BUNDLE_BYTES) {
+                continue;
+            }
+
+            $result[$entry] = [
+                'path' => $resolved,
+                'size' => (int) $size,
+                'mtime' => (int) filemtime($resolved),
+            ];
+        }
+
+        ksort($result, SORT_NATURAL | SORT_FLAG_CASE);
+        return $result;
+    }
 
     /**
      * Import one .tar.gz recovery bundle and re-prepare an existing package.
@@ -302,9 +405,8 @@ final class operator_recovery_bundle_importer {
             );
         }
 
-        $name = strtolower(basename($bundlename));
-        if (!str_ends_with($name, '.tar.gz')
-                && !str_ends_with($name, '.tgz')) {
+        $name = basename($bundlename);
+        if (!$this->is_bundle_filename($name)) {
             throw new \coding_exception(
                 'Recovery bundle must be a .tar.gz or .tgz archive.'
             );
@@ -652,6 +754,27 @@ final class operator_recovery_bundle_importer {
         throw new \coding_exception(
             'GNU tar executable was not found.'
         );
+    }
+
+    private function is_bundle_filename(
+        string $filename
+    ): bool {
+        $filename = strtolower(
+            trim($filename)
+        );
+
+        return $filename !== ''
+            && basename($filename) === $filename
+            && (
+                str_ends_with(
+                    $filename,
+                    '.tar.gz'
+                )
+                || str_ends_with(
+                    $filename,
+                    '.tgz'
+                )
+            );
     }
 
     private function writable_directory(

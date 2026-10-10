@@ -232,11 +232,16 @@ Chaque requête contient les identifiants source minimaux nécessaires, la cible
 
 Le transport entre Moodle et le serveur ILIAS reste volontairement hors de ce worker. Aucun mot de passe SSH, clé privée ou secret ILIAS n'est stocké dans le plugin Moodle. Le worker de recovery doit être exécuté localement sur le serveur ILIAS, ou par un mécanisme d'orchestration d'infrastructure explicitement approuvé.
 
-### Import d'un bundle de recovery dans la console — 0.22.0-beta2
+### Import d'un bundle de recovery dans la console — 0.22.0-beta3
 
-Lorsque le plan ne contient aucun `unresolved` et expose au moins une requête automatique, la page de préparation propose désormais **Importer un bundle de récupération**.
+Lorsque le plan ne contient aucun `unresolved` et expose au moins une requête automatique, la page de préparation propose **Importer un bundle de récupération** avec deux modes exclusifs :
 
-Le bundle attendu est un `.tar.gz` ou `.tgz` contenant les manifests et fichiers produits sur le serveur ILIAS. Le plugin :
+- sélectionner un `.tar.gz` / `.tgz` déjà présent dans `local_iliasmigration/recoveriesroot/bundles` sur le serveur Moodle ;
+- envoyer un `.tar.gz` / `.tgz` depuis le poste de l'opérateur.
+
+Aucun chemin serveur libre n'est accepté : la liste est construite uniquement à partir des fichiers réguliers lisibles directement présents dans `recoveriesroot/bundles`; les liens symboliques, sous-répertoires et autres extensions sont ignorés.
+
+Le plugin :
 
 1. refuse les archives vides ou supérieures à 512 MiB ;
 2. inspecte la liste des entrées avant extraction et refuse chemins absolus, `..`, liens symboliques, hard links et autres entrées non régulières ;
