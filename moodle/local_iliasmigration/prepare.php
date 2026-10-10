@@ -202,6 +202,78 @@ if ($recoveryrequired) {
         ),
         ['class' => 'text-muted']
     );
+
+    if ($requests && $unresolved === 0) {
+        echo $OUTPUT->heading(
+            get_string(
+                'importrecoverybundle',
+                'local_iliasmigration'
+            ),
+            4
+        );
+
+        echo html_writer::tag(
+            'p',
+            get_string(
+                'recoverybundleintro',
+                'local_iliasmigration'
+            ),
+            ['class' => 'alert alert-info']
+        );
+
+        echo html_writer::start_tag('form', [
+            'method' => 'post',
+            'action' => (new moodle_url(
+                '/local/iliasmigration/recover.php'
+            ))->out(false),
+            'enctype' => 'multipart/form-data',
+            'class' => 'mb-4',
+        ]);
+
+        foreach ([
+            'sesskey' => sesskey(),
+            'zipname' => $zipname,
+            'outputname' => $outputname,
+        ] as $name => $value) {
+            echo html_writer::empty_tag('input', [
+                'type' => 'hidden',
+                'name' => $name,
+                'value' => $value,
+            ]);
+        }
+
+        echo html_writer::start_div('form-group');
+        echo html_writer::label(
+            get_string(
+                'recoverybundlefile',
+                'local_iliasmigration'
+            ),
+            'id_recoverybundle'
+        );
+        echo html_writer::empty_tag('input', [
+            'type' => 'file',
+            'name' => 'recoverybundle',
+            'id' => 'id_recoverybundle',
+            'class' => 'form-control-file',
+            'accept' => '.tar.gz,.tgz,application/gzip',
+            'required' => 'required',
+        ]);
+        echo html_writer::end_div();
+
+        echo html_writer::tag(
+            'button',
+            get_string(
+                'recoverybundleaction',
+                'local_iliasmigration'
+            ),
+            [
+                'type' => 'submit',
+                'class' => 'btn btn-primary',
+            ]
+        );
+
+        echo html_writer::end_tag('form');
+    }
 } else {
     echo html_writer::div(
         get_string(
