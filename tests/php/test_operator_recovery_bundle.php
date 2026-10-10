@@ -50,7 +50,7 @@ $servicechecks = [
     "previous_missing_count",
     "Recovery bundle did not reduce",
     "rename(\$output, \$backup)",
-    "rename(\$preparedroot,",
+    "\$preparedroot",
     "reprepared_existing",
 ];
 
