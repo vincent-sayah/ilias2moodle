@@ -273,3 +273,146 @@ def test_recovery_sha256_mismatch_is_rejected(tmp_path: Path) -> None:
     assert result["missing"][0]["kind"] == (
         "mediaobject_recovery_integrity_error"
     )
+
+
+def test_missing_asset_recovery_keeps_source_identity(
+    tmp_path: Path,
+) -> None:
+    archive = tmp_path / "course.zip"
+    _empty_zip(archive)
+
+    blog_structure = {
+        "source": {"object_id": "812"},
+        "postings": [],
+        "media": {
+            "817": {
+                "items": [
+                    {
+                        "location": "vid4.mp4",
+                        "archive_path": "missing/vid4.mp4",
+                    }
+                ]
+            }
+        },
+        "files": {},
+    }
+    blog_item = MigrationItem(
+        source_id="277",
+        type="blog",
+        title="Blog",
+        metadata={"blog_structure": blog_structure},
+    )
+    blog_document = MigrationDocument(
+        course=CourseExport(
+            source_id="128",
+            title="Course",
+            items=[blog_item],
+        )
+    )
+
+    blog_result = extract_blog_assets(
+        blog_document,
+        archive,
+        tmp_path / "blog-package",
+    )
+    assert blog_result["missing"] == [
+        {
+            "source_id": "277",
+            "mob_id": "817",
+            "location": "vid4.mp4",
+            "kind": "blog_media",
+            "source_path": "missing/vid4.mp4",
+        }
+    ]
+
+    pool_structure = {
+        "source": {"object_id": "818"},
+        "records": [],
+        "media": {
+            "819": {
+                "items": [
+                    {
+                        "location": "du2.png",
+                        "archive_path": "missing/du2.png",
+                    }
+                ]
+            }
+        },
+    }
+    pool_item = MigrationItem(
+        source_id="278",
+        type="media_pool",
+        title="Media Pool",
+        metadata={"media_pool_structure": pool_structure},
+    )
+    pool_document = MigrationDocument(
+        course=CourseExport(
+            source_id="128",
+            title="Course",
+            items=[pool_item],
+        )
+    )
+
+    pool_result = extract_media_pool_assets(
+        pool_document,
+        archive,
+        tmp_path / "pool-package",
+    )
+    assert pool_result["missing"] == [
+        {
+            "source_id": "278",
+            "mob_id": "819",
+            "location": "du2.png",
+            "kind": "media_pool_media",
+            "source_path": "missing/du2.png",
+        }
+    ]
+
+    forum_structure = {
+        "source": {"object_id": "807"},
+        "threads": [
+            {
+                "posts": [
+                    {
+                        "source_id": "18",
+                        "attachments": [
+                            {
+                                "filename": "handout.pdf",
+                                "archive_path": "missing/handout.pdf",
+                            }
+                        ],
+                        "media_objects": [],
+                    }
+                ]
+            }
+        ],
+    }
+    forum_item = MigrationItem(
+        source_id="275",
+        type="forum",
+        title="Forum",
+        metadata={"forum_structure": forum_structure},
+    )
+    forum_document = MigrationDocument(
+        course=CourseExport(
+            source_id="128",
+            title="Course",
+            items=[forum_item],
+        )
+    )
+
+    forum_result = extract_forum_assets(
+        forum_document,
+        archive,
+        tmp_path / "forum-package",
+    )
+    assert forum_result["missing"] == [
+        {
+            "source_id": "275",
+            "forum_obj_id": "807",
+            "post_id": "18",
+            "filename": "handout.pdf",
+            "kind": "forum_attachment",
+            "source_path": "missing/handout.pdf",
+        }
+    ]
