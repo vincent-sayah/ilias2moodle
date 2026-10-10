@@ -287,10 +287,24 @@ final class operator_recovery_bundle_importer {
                 $recoveryroot
             );
 
+            $sourceversion = trim(
+                (string) (
+                    $existing['source_version']
+                    ?? ''
+                )
+            );
+
+            if ($sourceversion === '') {
+                throw new \coding_exception(
+                    'Existing prepared package has no source version to preserve.'
+                );
+            }
+
             $prepared = $preparer->prepare(
                 $zippath,
                 $tempname,
-                $recoveries
+                $recoveries,
+                $sourceversion
             );
 
             $newmissing = (int) (
