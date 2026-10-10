@@ -596,8 +596,16 @@ def extract_wiki_assets(
                 missing.append(
                     {
                         "source_id": item.source_id,
+                        "wiki_obj_id": str(
+                            item.metadata.get("obj_id", "")
+                        ),
+                        "course_ref_id": str(
+                            document.course.source_id
+                        ),
                         "kind": "wiki_structure",
-                        "source_path": str(item.metadata.get("wiki_export_base", "")),
+                        "source_path": str(
+                            item.metadata.get("wiki_export_base", "")
+                        ),
                     }
                 )
                 continue
