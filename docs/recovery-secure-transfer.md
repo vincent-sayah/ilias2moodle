@@ -39,12 +39,14 @@ getent passwd ilias2moodlepush >/dev/null || \
   useradd \
     --system \
     --create-home \
-    --home-dir /var/lib/ilias2moodlepush \
+    --home-dir /home/ilias2moodlepush \
     --shell /bin/bash \
     ilias2moodlepush
 
 passwd -l ilias2moodlepush
 usermod -aG apache ilias2moodlepush
+
+restorecon -Rv /home/ilias2moodlepush
 ~~~
 
 Préparer le répertoire de bundles :
@@ -66,15 +68,15 @@ install -d \
   -o ilias2moodlepush \
   -g ilias2moodlepush \
   -m 0700 \
-  /var/lib/ilias2moodlepush/.ssh
+  /home/ilias2moodlepush/.ssh
 
-touch /var/lib/ilias2moodlepush/.ssh/authorized_keys
+touch /home/ilias2moodlepush/.ssh/authorized_keys
 
 chown ilias2moodlepush:ilias2moodlepush \
-  /var/lib/ilias2moodlepush/.ssh/authorized_keys
+  /home/ilias2moodlepush/.ssh/authorized_keys
 
 chmod 0600 \
-  /var/lib/ilias2moodlepush/.ssh/authorized_keys
+  /home/ilias2moodlepush/.ssh/authorized_keys
 ~~~
 
 ## Génération de la clé côté ILIAS
