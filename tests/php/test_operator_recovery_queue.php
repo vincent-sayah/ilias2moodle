@@ -77,11 +77,11 @@ foreach ([
 
 if (!str_contains(
     $version,
-    "0.22.0-beta4"
+    "0.22.0-beta5"
 )) {
     fwrite(
         STDERR,
-        "Automatic recovery queue must bump beta version.\n"
+        "Automatic recovery queue must track the current beta version.\n"
     );
     exit(1);
 }

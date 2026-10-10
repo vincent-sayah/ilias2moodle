@@ -53,6 +53,8 @@ $servicechecks = [
     "symbolic link",
     "previous_missing_count",
     "assert_package_not_in_use(",
+    "recovery_bundle_import_",
+    "lock_config::get_lock_factory",
     "local_iliasmigration_run",
     "already referenced by an operator run",
     "Recovery bundle did not reduce",
@@ -148,11 +150,11 @@ if (!str_contains(
 
 if (!str_contains(
     $version,
-    "0.22.0-beta4"
+    "0.22.0-beta5"
 )) {
     fwrite(
         STDERR,
-        "Automatic recovery worker must retain the current plugin beta version.\n"
+        "Automatic reprepare task must retain the current plugin beta version.\n"
     );
     exit(1);
 }

@@ -262,3 +262,48 @@ systemctl list-timers --all | grep ilias2moodle-recovery
 ~~~
 
 Le timer lance le worker environ une fois par minute et le verrou local empêche deux exécutions simultanées.
+
+
+## Dernière étape : re-préparation automatique Moodle — beta5
+
+Une fois le bundle publié par le worker ILIAS, la beta5 ne nécessite plus de clic opérateur.
+
+La tâche planifiée Moodle :
+
+~~~text
+\local_iliasmigration\task\recovery_reprepare_task
+~~~
+
+s'exécute chaque minute via le cron Moodle. Elle rapproche la queue `recoveriesroot/requests` et les bundles `recoveriesroot/bundles`, puis applique automatiquement le bundle correspondant avec les mêmes contrôles que l'import manuel.
+
+Après succès :
+- le package est re-préparé atomiquement ;
+- le marqueur de queue est supprimé si `missing_count=0`, ou renouvelé si un autre recovery reste nécessaire ;
+- le bundle consommé est déplacé dans `recoveriesroot/processed` ;
+- l'état d'exécution est conservé dans `recoveriesroot/reprepare-state`.
+
+Pour qualifier la tâche sans attendre le cron :
+
+~~~bash
+cd /var/www/moodle
+
+runuser -u apache -- php admin/cli/scheduled_task.php \
+  --execute='\local_iliasmigration\task\recovery_reprepare_task'
+~~~
+
+Le flux cible complet devient donc :
+
+~~~text
+Console Moodle
+  -> prepare-export
+  -> queue
+  -> timer systemd ILIAS
+  -> list-pending
+  -> fetch-plan
+  -> recovery read-only
+  -> bundle
+  -> publish
+  -> tâche cron Moodle
+  -> reprepare atomique
+  -> package prêt à migrer
+~~~
