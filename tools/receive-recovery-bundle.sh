@@ -102,9 +102,16 @@ if [[ "$action" == "list-pending" ]]; then
     [[ ! -L "$requests_root" ]] \
         || die "recovery requests root must not be a symlink"
 
-    python_bin="$(command -v python3 || true)"
+    python_bin=""
+
+    if [[ -x /usr/bin/python3.11 ]]; then
+        python_bin="/usr/bin/python3.11"
+    else
+        python_bin="$(command -v python3.11 || true)"
+    fi
+
     [[ -n "$python_bin" ]] \
-        || die "python3 is required for list-pending"
+        || die "python3.11 is required for list-pending"
 
     exec "$python_bin" \
         "${script_dir}/list-recovery-queue.py" \
