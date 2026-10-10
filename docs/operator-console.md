@@ -18,11 +18,11 @@ Elle s'appuie sur les executors et validateurs déjà validés par le projet et 
 
 - plugin `local_iliasmigration` installé ;
 - upgrade Moodle effectué après installation de `0.21.0-beta2` afin de créer la table d'audit des resets ;
-- package ILIAS2Moodle déjà préparé et présent sur le serveur Moodle ;
-- fichier `migration.json` lisible par PHP/Apache ;
+- soit un export ZIP ILIAS natif lisible sous `importsroot`, que la console V1.1 peut préparer ;
+- soit un package ILIAS2Moodle déjà préparé avec un fichier `migration.json` lisible par PHP/Apache ;
 - utilisateur disposant de la capability `local/iliasmigration:operate`.
 
-La console n'effectue pas encore l'extraction ILIAS elle-même. Le package doit donc être préparé en amont avec les outils ILIAS2Moodle.
+La console V1.1 peut préparer localement un export ZIP ILIAS natif en réutilisant le worker Python `prepare-export`. Les récupérations nécessitant un accès à l'instance ILIAS source restent exécutées séparément en lecture seule, puis le package préparé peut être réutilisé par la console.
 
 ## Accès
 
@@ -127,7 +127,7 @@ Valeurs de test usuelles :
 projectroot  = /opt/ilias2moodle
 importsroot  = /var/moodledata/ilias2moodle/imports
 packagesroot = /var/moodledata/ilias2moodle/packages
-iliasversion = 10.5
+iliasversion = 10.8.0
 ```
 
 Le ZIP doit obligatoirement se trouver sous `importsroot`. Le package de sortie est créé sous `packagesroot`. Un package existant n'est jamais écrasé.
@@ -154,7 +154,7 @@ Les récupérations complémentaires supportées par le worker Python restent di
 
 La couche PHP ne construit pas elle-même `migration.json`. Elle valide les chemins, appelle `tools/run-ilias2moodle.sh prepare-export` via une commande argumentée sans shell, contrôle le code retour et vérifie que `migration.json` a effectivement été créé.
 
-Cette commande constitue le premier bridge V1.1. Le raccordement à l'interface opérateur et à un job/worker asynchrone est l'étape suivante.
+Cette commande et le même service sont raccordés à l'interface opérateur V1.1. La préparation reste synchrone côté Moodle ; les récupérations nécessitant l'accès au serveur ILIAS sont pilotées par le `recovery-plan.json` et exécutées séparément en lecture seule.
 
 ### Interface web de préparation
 
@@ -224,6 +224,30 @@ Le test réel du cours `282` a produit deux demandes IRSS pour l'Exercise `356` 
 496f99f9-f8c3-48ab-9714-a6a54886877e
 5cf327b1-4b20-42f7-8ee0-7c96c449d210
 ```
+
+### Qualification V1.1 complète — 10 octobre 2026
+
+La chaîne complète a été qualifiée sur :
+
+- ILIAS `10.8.0` ;
+- cours `obj_id=827 / ref_id=282`, `Cours test RC 0.20` ;
+- Moodle `5.0.2` ;
+- Python `3.11.13` ;
+- package final `course827_v13_ui`.
+
+La préparation finale a retourné `missing_count=0` et a réinjecté deux collections IRSS vides valides. La question Kprim réelle `external_id=6214d3a5600970.08414694` a été normalisée avec `type=kprim`, `max_score=1` et 16 combinaisons.
+
+Les trois Item Groups du cours ont été enrichis depuis l'export natif :
+
+- `349 / obj_id=996` — Module de formation ;
+- `350 / obj_id=997` — Médias ;
+- `355 / obj_id=1004` — Informations.
+
+Le dry-run Item Group a retourné `blocked_item_groups=0`, `root_structure_ready=true` et `apply_ready=true`.
+
+Le run opérateur final a terminé toutes les familles applicables en `SUCCESS`. Les étapes Glossaires et Forums ont été `SKIPPED` car aucun objet correspondant n'était présent dans `migration.json`. Un contrôle fonctionnel final dans Moodle a été réalisé avec succès.
+
+La qualification a également validé le scénario `suppression du cours cible -> mappings ORPHANED -> snapshot d'audit -> reset -> nouvelle migration`, y compris les mappings legacy avec `sourceinstance=''`.
 
 
 ## Création d'une migration
