@@ -38,6 +38,14 @@ $version = file_get_contents($versionpath);
 
 $servicechecks = [
     "STATE_ORPHANED = 'ORPHANED'",
+    "source_instance(\$document)",
+    "unknown-ilias-instance",
+    "sourceinstance = :sourceinstance",
+    "sourceinstance = :legacyinstance",
+    "OR sourceinstance = :legacyinstance",
+    "delete_records_select(",
+    "count_records_select(",
+
     "STATE_LIVE_TARGET = 'LIVE_TARGET'",
     "record_exists('course'",
     "start_delegated_transaction()",
