@@ -33,6 +33,8 @@ $servicechecks = [
     "Only native ILIAS ZIP exports are accepted",
     "Unsafe package output name",
     "migration.json",
+    "recovery-plan.json",
+    "recovery_required",
     "JSON_THROW_ON_ERROR",
 ];
 
