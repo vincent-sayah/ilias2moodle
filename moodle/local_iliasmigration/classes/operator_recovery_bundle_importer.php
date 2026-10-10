@@ -45,6 +45,13 @@ final class operator_recovery_bundle_importer {
             $outputname
         );
 
+        $this->assert_package_not_in_use(
+            (string) (
+                $existing['migration_json']
+                ?? ''
+            )
+        );
+
         $previousmissing = (int) (
             $existing['missing_count'] ?? 0
         );
@@ -258,6 +265,29 @@ final class operator_recovery_bundle_importer {
             if (is_dir($extractbase)) {
                 $this->remove_tree($extractbase);
             }
+        }
+    }
+
+    private function assert_package_not_in_use(
+        string $migrationjson
+    ): void {
+        global $DB;
+
+        $migrationjson = trim($migrationjson);
+
+        if ($migrationjson === '') {
+            throw new \coding_exception(
+                'Prepared package migration.json path is missing.'
+            );
+        }
+
+        if ($DB->record_exists(
+            'local_iliasmigration_run',
+            ['sourcepath' => $migrationjson]
+        )) {
+            throw new \coding_exception(
+                'Recovery bundle import is refused because this migration.json is already referenced by an operator run.'
+            );
         }
     }
 
