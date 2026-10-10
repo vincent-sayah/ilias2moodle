@@ -37,6 +37,7 @@ $outputname = required_param(
 
 $preparer = new \local_iliasmigration\operator_package_preparer();
 $recoveryimporter = new \local_iliasmigration\operator_recovery_bundle_importer();
+$recoveryqueue = new \local_iliasmigration\operator_recovery_queue();
 
 try {
     $imports = $preparer->available_imports();
@@ -50,6 +51,12 @@ try {
     $result = $preparer->prepare(
         (string) $imports[$zipname]['path'],
         $outputname
+    );
+
+    $recoveryqueue->sync(
+        $outputname,
+        $zipname,
+        $result
     );
 } catch (Throwable $exception) {
     \core\notification::error(
