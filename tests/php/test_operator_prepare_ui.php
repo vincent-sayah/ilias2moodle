@@ -8,8 +8,10 @@ $preparepath = $root
     . '/moodle/local_iliasmigration/prepare.php';
 $servicepath = $root
     . '/moodle/local_iliasmigration/classes/operator_package_preparer.php';
+$recoverpath = $root
+    . '/moodle/local_iliasmigration/recover.php';
 
-foreach ([$indexpath, $preparepath, $servicepath] as $path) {
+foreach ([$indexpath, $preparepath, $servicepath, $recoverpath] as $path) {
     if (!is_file($path)) {
         fwrite(STDERR, "Missing file: {$path}\n");
         exit(1);

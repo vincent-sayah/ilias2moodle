@@ -232,6 +232,27 @@ Chaque requête contient les identifiants source minimaux nécessaires, la cible
 
 Le transport entre Moodle et le serveur ILIAS reste volontairement hors de ce worker. Aucun mot de passe SSH, clé privée ou secret ILIAS n'est stocké dans le plugin Moodle. Le worker de recovery doit être exécuté localement sur le serveur ILIAS, ou par un mécanisme d'orchestration d'infrastructure explicitement approuvé.
 
+### Import d'un bundle de recovery dans la console — 0.22.0-beta2
+
+Lorsque le plan ne contient aucun `unresolved` et expose au moins une requête automatique, la page de préparation propose désormais **Importer un bundle de récupération**.
+
+Le bundle attendu est un `.tar.gz` ou `.tgz` contenant les manifests et fichiers produits sur le serveur ILIAS. Le plugin :
+
+1. refuse les archives vides ou supérieures à 512 MiB ;
+2. inspecte la liste des entrées avant extraction et refuse chemins absolus, `..`, liens symboliques, hard links et autres entrées non régulières ;
+3. extrait dans `local_iliasmigration/recoveriesroot` avec `tar` sans propriétaire ni permissions source ;
+4. exige un unique root contenant tous les `expected_manifest` du `recovery-plan.json` courant ;
+5. reconstruit les options `prepare-export` depuis une liste fermée ; aucune option arbitraire du bundle n'est exécutée ;
+6. re-prépare le cours dans un package temporaire distinct ;
+7. refuse le remplacement si le bundle n'a pas réduit le nombre de dépendances non résolues ;
+8. remplace le package courant par renommage atomique uniquement après succès ;
+9. restaure l'ancien package si le remplacement échoue ;
+10. supprime les répertoires temporaires après traitement.
+
+Le bundle est donc un **conteneur de résultats**, pas un script. Aucun fichier du bundle n'est exécuté par Moodle.
+
+Le scénario qualifié V14 → V15 utilise deux manifests IRSS vides valides. Après réinjection, `missing_count` passe de 2 à 0 et le `migration.json` produit est sémantiquement identique au package V13 de référence après exclusion du seul champ horodaté `generated_at`.
+
 Le test réel du cours `282` a produit deux demandes IRSS pour l'Exercise `356` :
 
 ```text

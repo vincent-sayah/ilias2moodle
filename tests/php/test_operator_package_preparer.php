@@ -92,6 +92,7 @@ $settingchecks = [
     "local_iliasmigration/projectroot",
     "local_iliasmigration/importsroot",
     "local_iliasmigration/packagesroot",
+    "local_iliasmigration/recoveriesroot",
     "local_iliasmigration/iliasversion",
 ];
 
