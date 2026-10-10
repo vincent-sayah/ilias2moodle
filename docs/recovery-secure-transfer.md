@@ -201,4 +201,64 @@ Sans --bundle explicite, le bundle est créé automatiquement à côté du répe
 - vérification stricte de la clé hôte Moodle ;
 - la console Moodle revalide ensuite l'archive et les manifests avant re-préparation.
 
-Le transport ne remplace pas les contrôles beta3 : il les précède.
+Le transport ne remplace pas les contrôles de la console : il les précède.
+
+## Worker périodique ILIAS — beta4
+
+La beta4 ajoute `tools/recovery-worker.py`. Le worker utilise la même clé privée dédiée et le même canal forced-command.
+
+Le protocole ajoute l'action `list-pending`. Moodle ne renvoie que les packages explicitement placés dans `recoveriesroot/requests` par la console et dont :
+- le SHA-256 du plan correspond toujours au marqueur de queue ;
+- `recovery_required=true` ;
+- la liste `requests` est non vide ;
+- `unresolved_count=0` ;
+- aucun bundle déterministe `<package>_recovery.tar.gz` n'est déjà présent.
+
+Le worker garde un état local dans `/var/lib/ilias2moodle-recovery-worker`. Un plan ayant échoué n'est pas relancé à chaque minute tant que son SHA-256 ne change pas ; un retry explicite reste possible avec `--retry-failed`.
+
+### Installation systemd sur [SRV ILIAS]
+
+Copier l'exemple d'environnement :
+
+~~~bash
+install -d -o root -g root -m 0700 /etc/ilias2moodle
+
+cp \
+  /opt/ilias2moodle/deploy/systemd/recovery-worker.env.example \
+  /etc/ilias2moodle/recovery-worker.env
+
+chmod 0600 /etc/ilias2moodle/recovery-worker.env
+~~~
+
+Adapter au minimum `MOODLE_HOST` et `ILIAS_CLIENT_ID`.
+
+Installer les unités :
+
+~~~bash
+cp \
+  /opt/ilias2moodle/deploy/systemd/ilias2moodle-recovery-worker.service \
+  /etc/systemd/system/
+
+cp \
+  /opt/ilias2moodle/deploy/systemd/ilias2moodle-recovery-worker.timer \
+  /etc/systemd/system/
+
+systemctl daemon-reload
+~~~
+
+Avant d'activer le timer, exécuter une qualification manuelle :
+
+~~~bash
+systemctl start ilias2moodle-recovery-worker.service
+systemctl status ilias2moodle-recovery-worker.service --no-pager
+journalctl -u ilias2moodle-recovery-worker.service -n 100 --no-pager
+~~~
+
+Après qualification :
+
+~~~bash
+systemctl enable --now ilias2moodle-recovery-worker.timer
+systemctl list-timers --all | grep ilias2moodle-recovery
+~~~
+
+Le timer lance le worker environ une fois par minute et le verrou local empêche deux exécutions simultanées.

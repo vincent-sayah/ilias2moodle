@@ -88,6 +88,31 @@ if [[ "$action" == "publish" ]]; then
     exit 0
 fi
 
+if [[ "$action" == "list-pending" ]]; then
+    [[ -n "$packages_root" ]] \
+        || die "packages root is required for list-pending"
+    [[ -z "${arg1:-}" && -z "${arg2:-}" && -z "${arg3:-}" && -z "${extra:-}" ]] \
+        || die "unexpected list-pending arguments"
+
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    requests_root="$(dirname "$bundles_root")/requests"
+
+    [[ -d "$requests_root" ]] \
+        || die "recovery requests root does not exist"
+    [[ ! -L "$requests_root" ]] \
+        || die "recovery requests root must not be a symlink"
+
+    python_bin="$(command -v python3 || true)"
+    [[ -n "$python_bin" ]] \
+        || die "python3 is required for list-pending"
+
+    exec "$python_bin" \
+        "${script_dir}/list-recovery-queue.py" \
+        --packages-root "$packages_root" \
+        --bundles-root "$bundles_root" \
+        --requests-root "$requests_root"
+fi
+
 if [[ "$action" == "fetch-plan" ]]; then
     package_name="${arg1:-}"
 

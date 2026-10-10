@@ -37,6 +37,8 @@ $outputname = required_param(
 
 $preparer = new \local_iliasmigration\operator_package_preparer();
 $recoveryimporter = new \local_iliasmigration\operator_recovery_bundle_importer();
+$recoveryqueue = new \local_iliasmigration\operator_recovery_queue();
+$queuerequest = null;
 
 try {
     $imports = $preparer->available_imports();
@@ -50,6 +52,12 @@ try {
     $result = $preparer->prepare(
         (string) $imports[$zipname]['path'],
         $outputname
+    );
+
+    $queuerequest = $recoveryqueue->sync(
+        $outputname,
+        $zipname,
+        $result
     );
 } catch (Throwable $exception) {
     \core\notification::error(
@@ -203,6 +211,20 @@ if ($recoveryrequired) {
         ),
         ['class' => 'text-muted']
     );
+
+    if ($queuerequest !== null) {
+        echo html_writer::div(
+            get_string(
+                'recoveryqueued',
+                'local_iliasmigration',
+                (string) (
+                    $queuerequest['package_name']
+                    ?? $outputname
+                )
+            ),
+            'alert alert-info'
+        );
+    }
 
     if ($requests && $unresolved === 0) {
         echo $OUTPUT->heading(

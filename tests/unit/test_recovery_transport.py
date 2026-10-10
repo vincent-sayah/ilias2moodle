@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 import tarfile
 from pathlib import Path
@@ -10,6 +11,7 @@ import pytest
 from ilias2moodle.recovery_transport import (
     build_recovery_bundle,
     fetch_recovery_plan,
+    list_pending_recovery_jobs,
     publish_recovery_bundle,
 )
 
@@ -280,3 +282,66 @@ def test_fetch_recovery_plan_rejects_bad_digest(
             known_hosts_file=known_hosts,
             ssh_executable="/usr/bin/ssh",
         )
+
+
+
+def test_list_pending_recovery_jobs_validates_response(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    identity = tmp_path / "id_ed25519"
+    identity.write_text("private", encoding="utf-8")
+    known_hosts = tmp_path / "known_hosts"
+    known_hosts.write_text("host key\n", encoding="utf-8")
+
+    digest = "a" * 64
+    response = json.dumps({
+        "schema_version": "1.0",
+        "job_count": 1,
+        "jobs": [
+            {
+                "package_name": "course827_worker",
+                "bundle_name": "course827_worker_recovery.tar.gz",
+                "plan_sha256": digest,
+                "plan_size": 1234,
+                "request_count": 2,
+            }
+        ],
+        "skipped_count": 0,
+        "skipped": [],
+    }).encode("utf-8")
+
+    def fake_run(
+        command: list[str],
+        *,
+        capture_output: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[bytes]:
+        assert command[-1] == "list-pending"
+        assert capture_output is True
+        assert check is False
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=response,
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(
+        "ilias2moodle.recovery_transport.subprocess.run",
+        fake_run,
+    )
+
+    result = list_pending_recovery_jobs(
+        host="moodle.local",
+        user="ilias2moodlepush",
+        identity_file=identity,
+        known_hosts_file=known_hosts,
+        ssh_executable="/usr/bin/ssh",
+    )
+
+    assert result["job_count"] == 1
+    assert result["jobs"][0]["package_name"] == (
+        "course827_worker"
+    )
+    assert result["jobs"][0]["plan_sha256"] == digest

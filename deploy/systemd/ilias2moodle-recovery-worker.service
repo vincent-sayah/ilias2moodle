@@ -1,0 +1,25 @@
+[Unit]
+Description=ILIAS2Moodle source recovery worker
+Documentation=file:/opt/ilias2moodle/docs/recovery-secure-transfer.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/ilias2moodle/recovery-worker.env
+WorkingDirectory=/opt/ilias2moodle
+UMask=0027
+ExecStart=/usr/bin/python3.11 /opt/ilias2moodle/tools/recovery-worker.py --host=${MOODLE_HOST} --port=${MOODLE_PORT} --user=${MOODLE_USER} --identity=/etc/ilias2moodle/recovery_push_ed25519 --known-hosts=/etc/ilias2moodle/moodle_known_hosts --ilias-root=/var/www/ilias --client=${ILIAS_CLIENT_ID} --state-root=/var/lib/ilias2moodle-recovery-worker --max-jobs=5
+NoNewPrivileges=true
+PrivateDevices=true
+ProtectSystem=full
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

@@ -260,6 +260,14 @@ Le scénario qualifié V14 → V15 utilise deux manifests IRSS vides valides. Ap
 
 Le mode serveur de la `0.22.0-beta3` a ensuite été validé fonctionnellement le 10 octobre 2026 : le bundle déjà présent dans `recoveriesroot/bundles` est proposé dans la console, sélectionné sans upload Windows, validé puis réinjecté avec re-préparation réussie du package.
 
+### File automatique de recovery — 0.22.0-beta4
+
+Lorsqu'une préparation retourne des requests exécutables et `unresolved_count=0`, la console crée désormais un marqueur atomique dans `recoveriesroot/requests`. Ce marqueur contient uniquement le nom du package, le ZIP source, le nombre de requests et le SHA-256 du `recovery-plan.json`.
+
+Le worker ILIAS ne scanne pas tous les anciens packages : il demande `list-pending` via le même canal SSH restreint et ne reçoit que les marqueurs encore cohérents avec le plan courant. Un marqueur dont le SHA-256 ne correspond plus au plan est ignoré. Si le bundle déterministe `<package>_recovery.tar.gz` est déjà présent côté Moodle, le job n'est plus proposé.
+
+Après import/re-préparation réussie et disparition du besoin de recovery, la console supprime automatiquement le marqueur de queue.
+
 Le test réel du cours `282` a produit deux demandes IRSS pour l'Exercise `356` :
 
 ```text

@@ -148,11 +148,11 @@ if (!str_contains(
 
 if (!str_contains(
     $version,
-    "0.22.0-beta3"
+    "0.22.0-beta4"
 )) {
     fwrite(
         STDERR,
-        "Dual-source recovery bundle UI must bump the plugin beta version.\n"
+        "Automatic recovery worker must retain the current plugin beta version.\n"
     );
     exit(1);
 }
