@@ -9,6 +9,7 @@ import pytest
 
 from ilias2moodle.recovery_transport import (
     build_recovery_bundle,
+    fetch_recovery_plan,
     publish_recovery_bundle,
 )
 
@@ -165,5 +166,117 @@ def test_publish_recovery_bundle_rejects_unsafe_name(
             identity_file=identity,
             known_hosts_file=known_hosts,
             remote_name=name,
+            ssh_executable="/usr/bin/ssh",
+        )
+
+
+
+def test_fetch_recovery_plan_validates_and_writes_atomically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    identity = tmp_path / "id_ed25519"
+    identity.write_text("private", encoding="utf-8")
+    known_hosts = tmp_path / "known_hosts"
+    known_hosts.write_text(
+        "192.168.56.54 ssh-ed25519 AAAATEST\n",
+        encoding="utf-8",
+    )
+
+    payload = (
+        b'{"schema_version":"1.0","recovery_required":true,'
+        b'"request_count":0,"requests":[]}'
+    )
+    digest = hashlib.sha256(payload).hexdigest()
+    response = (
+        f"PLAN course827_v18 {digest} {len(payload)}\n"
+    ).encode("ascii") + payload
+
+    captured: dict[str, object] = {}
+
+    def fake_run(
+        command: list[str],
+        *,
+        capture_output: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[bytes]:
+        captured["command"] = command
+        captured["capture_output"] = capture_output
+        captured["check"] = check
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=response,
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(
+        "ilias2moodle.recovery_transport.subprocess.run",
+        fake_run,
+    )
+
+    output = tmp_path / "plan.json"
+    result = fetch_recovery_plan(
+        package_name="course827_v18",
+        output=output,
+        host="192.168.56.54",
+        user="ilias2moodlepush",
+        identity_file=identity,
+        known_hosts_file=known_hosts,
+        ssh_executable="/usr/bin/ssh",
+    )
+
+    assert output.read_bytes() == payload
+    assert result["fetched"] is True
+    assert result["sha256"] == digest
+    assert captured["command"][-1] == (
+        "fetch-plan course827_v18"
+    )
+    assert "StrictHostKeyChecking=yes" in captured["command"]
+
+
+def test_fetch_recovery_plan_rejects_bad_digest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    identity = tmp_path / "id_ed25519"
+    identity.write_text("private", encoding="utf-8")
+    known_hosts = tmp_path / "known_hosts"
+    known_hosts.write_text("host key\n", encoding="utf-8")
+
+    payload = b'{"schema_version":"1.0","requests":[]}'
+    response = (
+        f"PLAN course827_v18 {'0' * 64} {len(payload)}\n"
+    ).encode("ascii") + payload
+
+    def fake_run(
+        command: list[str],
+        *,
+        capture_output: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=response,
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(
+        "ilias2moodle.recovery_transport.subprocess.run",
+        fake_run,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="SHA-256 recovery-plan reçu incorrect",
+    ):
+        fetch_recovery_plan(
+            package_name="course827_v18",
+            output=tmp_path / "plan.json",
+            host="moodle.local",
+            user="ilias2moodlepush",
+            identity_file=identity,
+            known_hosts_file=known_hosts,
             ssh_executable="/usr/bin/ssh",
         )
