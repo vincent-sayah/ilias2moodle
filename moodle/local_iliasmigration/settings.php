@@ -43,6 +43,14 @@ if ($hassiteconfig) {
     ));
 
     $settings->add(new admin_setting_configtext(
+        'local_iliasmigration/recoveriesroot',
+        get_string('recoveriesroot', 'local_iliasmigration'),
+        get_string('recoveriesroot_desc', 'local_iliasmigration'),
+        '/var/moodledata/ilias2moodle/recovery',
+        PARAM_RAW_TRIMMED
+    ));
+
+    $settings->add(new admin_setting_configtext(
         'local_iliasmigration/iliasversion',
         get_string('iliasversion', 'local_iliasmigration'),
         get_string('iliasversion_desc', 'local_iliasmigration'),
