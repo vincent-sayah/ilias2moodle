@@ -266,3 +266,121 @@ Voir :
 - `docs/operator-console.md` ;
 - `docs/roadmap.md` ;
 - PR #67.
+
+
+## Validation complémentaire Phase 8 / Operator V1.1 — 10 octobre 2026
+
+Une qualification complète de la console opérateur et du workflow de préparation natif a été réalisée sur un cours enrichi.
+
+### Environnement
+
+- source : ILIAS `10.8.0` ;
+- cours : `obj_id=827 / ref_id=282`, `Cours test RC 0.20` ;
+- cible : Moodle `5.0.2` ;
+- Python : `3.11.13` ;
+- plugin : `local_iliasmigration 0.22.0-beta1`, build `2026101001` ;
+- package final : `course827_v13_ui`.
+
+### Préparation du package
+
+Le package final a été produit avec :
+
+```text
+total_items = 39
+missing_count = 0
+exercise_irss_collections_recovered = 2
+exercise_irss_files_recovered = 0
+```
+
+Les deux collections IRSS de l'Exercise `356` étaient des collections valides et vides. Elles ont donc été traitées comme un succès fonctionnel et non comme une dépendance bloquante.
+
+### Phase 6 — Kprim
+
+La question réelle :
+
+```text
+external_id = 6214d3a5600970.08414694
+ILIAS type  = assKprimChoice
+title       = Formation Générale (53)
+```
+
+est normalisée comme :
+
+```text
+type = kprim
+max_score = 1.0
+kprim_scoring_supported = true
+combination_count = 16
+```
+
+Le dry-run Phase 6 final a retourné :
+
+```text
+blocked_tests = 0
+blocked_question_pools = 0
+package_checks_ready = true
+ready = true
+apply_ready = true
+scoring_policy_ready = true
+```
+
+### Item Groups
+
+Trois Item Groups ILIAS étaient présents dans l'export natif :
+
+| ref_id | obj_id | Titre | Cible Moodle |
+|---:|---:|---|---|
+| 349 | 996 | Module de formation | section |
+| 350 | 997 | Médias | section |
+| 355 | 1004 | Informations | `mod_subsection` |
+
+Le parseur préserve désormais le schéma ItemGroup, les membres `obj_id/ref_id`, `HideTitle`, `Behaviour` et les références non résolues.
+
+Dry-run final :
+
+```text
+discovered_item_groups = 3
+checked_item_groups = 3
+blocked_item_groups = 0
+root_section_count = 2
+subsection_count = 1
+member_count = 7
+root_structure_ready = true
+ready = true
+apply_ready = true
+```
+
+### Reset des mappings orphelins
+
+La qualification a volontairement supprimé plusieurs cours Moodle cibles pendant les itérations de test. La console a détecté les mappings `ORPHANED`, produit un snapshot d'audit avec SHA-256, supprimé le périmètre logique concerné puis relancé la migration.
+
+Le scénario couvre également les mappings historiques `sourceinstance=''`.
+
+### Run final
+
+Le run final V13 a terminé avec succès :
+
+| Étape | Résultat |
+|---|---|
+| Structure du cours | SUCCESS |
+| Ressources simples | SUCCESS |
+| SCORM | SUCCESS |
+| Learning Modules vers Book | SUCCESS |
+| Banques de questions et Quiz | SUCCESS |
+| Content Pages | SUCCESS |
+| Glossaires | SKIPPED — aucun objet source |
+| Wikis | SUCCESS |
+| Exercices | SUCCESS |
+| Forums | SKIPPED — aucun objet source |
+| MediaCasts | SUCCESS |
+| Blogs | SUCCESS |
+| Media Pools | SUCCESS |
+| Item Groups | SUCCESS |
+
+Le contrôle fonctionnel final dans Moodle a été validé après la migration.
+
+### Conclusion Phase 8 V1.1
+
+Le workflow `export ZIP ILIAS -> préparation -> récupération IRSS -> validation -> reset audité si nécessaire -> migration opérateur -> contrôle fonctionnel Moodle` est validé de bout en bout sur ILIAS 10.8.0 et Moodle 5.0.2 pour le cours `827/282`.
+
+Cette qualification constitue la référence fonctionnelle de la branche opérateur intégrée à `main`.
