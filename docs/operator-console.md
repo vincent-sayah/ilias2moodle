@@ -108,6 +108,52 @@ Après confirmation opérateur, la console a :
 
 Le scénario `suppression cible -> ORPHANED -> audit -> reset complet -> relance automatique -> remigration` est donc validé de bout en bout.
 
+## V1.1 — préparation d'un export ZIP natif
+
+La V1.1 commence par réutiliser le worker Python existant `prepare-export` au lieu de réimplémenter le parsing ILIAS en PHP.
+
+Configuration Moodle :
+
+```text
+local_iliasmigration/projectroot
+local_iliasmigration/importsroot
+local_iliasmigration/packagesroot
+local_iliasmigration/iliasversion
+```
+
+Valeurs de test usuelles :
+
+```text
+projectroot  = /opt/ilias2moodle
+importsroot  = /var/moodledata/ilias2moodle/imports
+packagesroot = /var/moodledata/ilias2moodle/packages
+iliasversion = 10.5
+```
+
+Le ZIP doit obligatoirement se trouver sous `importsroot`. Le package de sortie est créé sous `packagesroot`. Un package existant n'est jamais écrasé.
+
+Commande Moodle :
+
+```bash
+php local/iliasmigration/cli/prepare_package.php \
+  --zip=/var/moodledata/ilias2moodle/imports/export-ilias.zip \
+  --output-name=course827
+```
+
+Les récupérations complémentaires supportées par le worker Python restent disponibles :
+
+```text
+--exercise-irss-recovery
+--mediacast-media-recovery
+--mediaobject-recovery
+--forum-attachment-recovery
+--wiki-content-recovery
+```
+
+La couche PHP ne construit pas elle-même `migration.json`. Elle valide les chemins, appelle `tools/run-ilias2moodle.sh prepare-export` via une commande argumentée sans shell, contrôle le code retour et vérifie que `migration.json` a effectivement été créé.
+
+Cette commande constitue le premier bridge V1.1. Le raccordement à l'interface opérateur et à un job/worker asynchrone est l'étape suivante.
+
 ## Création d'une migration
 
 L'opérateur renseigne :
