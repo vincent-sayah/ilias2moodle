@@ -96,6 +96,7 @@ if ($uploaderror !== UPLOAD_ERR_OK
 
 $preparer = new \local_iliasmigration\operator_package_preparer();
 $importer = new \local_iliasmigration\operator_recovery_bundle_importer();
+$recoveryqueue = new \local_iliasmigration\operator_recovery_queue();
 
 if ($hasupload) {
     $tmpname = (string) (
@@ -162,6 +163,12 @@ try {
         $outputname,
         $tmpname,
         $originalname
+    );
+
+    $recoveryqueue->sync(
+        $outputname,
+        $zipname,
+        $result
     );
 } catch (Throwable $exception) {
     \core\notification::error(
