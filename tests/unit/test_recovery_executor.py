@@ -8,7 +8,6 @@ import pytest
 
 from ilias2moodle.recovery_executor import execute_recovery_plan
 
-
 UUID = "496f99f9-f8c3-48ab-9714-a6a54886877e"
 
 
