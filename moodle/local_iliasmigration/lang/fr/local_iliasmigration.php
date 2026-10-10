@@ -74,7 +74,7 @@ $string['importsroot_desc'] = 'Répertoire absolu contenant les exports ZIP nati
 $string['packagesroot'] = 'Racine des packages préparés';
 $string['packagesroot_desc'] = 'Répertoire absolu dans lequel le worker crée les packages de migration normalisés.';
 $string['recoveriesroot'] = 'Racine des bundles de récupération';
-$string['recoveriesroot_desc'] = 'Répertoire absolu utilisé pour extraire et valider les bundles de récupération source avant une re-préparation atomique du package.';
+$string['recoveriesroot_desc'] = 'Répertoire absolu utilisé pour extraire et valider les bundles de récupération. Les bundles déjà présents sur le serveur et proposés dans la console sont lus dans le sous-répertoire bundles/.';
 $string['iliasversion'] = 'Version ILIAS source par défaut';
 $string['iliasversion_desc'] = 'Version ILIAS inscrite dans les migration.json générés, par exemple 10.5.';
 
