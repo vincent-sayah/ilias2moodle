@@ -258,6 +258,8 @@ Le bundle est donc un **conteneur de résultats**, pas un script. Aucun fichier 
 
 Le scénario qualifié V14 → V15 utilise deux manifests IRSS vides valides. Après réinjection, `missing_count` passe de 2 à 0 et le `migration.json` produit est sémantiquement identique au package V13 de référence après exclusion du seul champ horodaté `generated_at`.
 
+Le mode serveur de la `0.22.0-beta3` a ensuite été validé fonctionnellement le 10 octobre 2026 : le bundle déjà présent dans `recoveriesroot/bundles` est proposé dans la console, sélectionné sans upload Windows, validé puis réinjecté avec re-préparation réussie du package.
+
 Le test réel du cours `282` a produit deux demandes IRSS pour l'Exercise `356` :
 
 ```text
