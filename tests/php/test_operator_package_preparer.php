@@ -32,7 +32,7 @@ $servicechecks = [
     "reuse_existing_package(",
     "'source_archive'",
     "'reused_existing' => true",
-    "'recovery_required' => $missingcount > 0",
+    "'recovery_required' => \$missingcount > 0",
     "Existing prepared package belongs to a different ILIAS ZIP",
     "Existing prepared package is incomplete",
     "Only native ILIAS ZIP exports are accepted",
