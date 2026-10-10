@@ -139,7 +139,23 @@ final class operator_recovery_bundle_importer {
         string $bundlepath,
         string $bundlename
     ): array {
-        $preparer = new operator_package_preparer();
+        $lockfactory = \core\lock\lock_config::get_lock_factory(
+            'local_iliasmigration'
+        );
+        $lock = $lockfactory->get_lock(
+            'recovery_bundle_import_'
+                . sha1($outputname),
+            0
+        );
+
+        if (!$lock) {
+            throw new \coding_exception(
+                'Another recovery import is already running for this package.'
+            );
+        }
+
+        try {
+            $preparer = new operator_package_preparer();
 
         // Reuse mode performs all existing package/source archive guards
         // without modifying the package.
@@ -368,6 +384,9 @@ final class operator_recovery_bundle_importer {
             if (is_dir($extractbase)) {
                 $this->remove_tree($extractbase);
             }
+        }
+        } finally {
+            $lock->release();
         }
     }
 
