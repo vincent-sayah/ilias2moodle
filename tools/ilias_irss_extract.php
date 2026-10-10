@@ -431,8 +431,13 @@ try {
     echo "Manifest   : $manifestFile\n";
 
     if ($count === 0) {
+        /*
+         * Une collection vide est un état valide : le manifest matérialise
+         * explicitement resource_count=0 et permet au package builder de
+         * lever le blocage sans inventer de fichier.
+         */
         echo "RESULTAT    : COLLECTION_VIDE\n";
-        exit(3);
+        exit(0);
     }
 
     echo "RESULTAT    : EXTRACTION_OK\n";
