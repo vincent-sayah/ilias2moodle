@@ -12,6 +12,9 @@ packages="${tmp}/packages"
 requests="${tmp}/requests"
 mkdir -p "$bundles" "$packages" "$requests"
 
+grep -q 'command -v python3.11' "$RECEIVER"
+grep -q 'sys.version_info >= (3, 11)' "$RECEIVER"
+
 payload="${tmp}/payload.tar.gz"
 printf 'recovery-payload\n' > "$payload"
 
