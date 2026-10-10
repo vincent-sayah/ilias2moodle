@@ -82,7 +82,7 @@ foreach ([
 
 if (!str_contains(
     $version,
-    "0.22.0-beta5"
+    "0.22.0-beta6"
 )) {
     fwrite(
         STDERR,

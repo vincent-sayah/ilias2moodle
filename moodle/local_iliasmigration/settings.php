@@ -54,7 +54,7 @@ if ($hassiteconfig) {
         'local_iliasmigration/iliasversion',
         get_string('iliasversion', 'local_iliasmigration'),
         get_string('iliasversion_desc', 'local_iliasmigration'),
-        '10.5',
+        '',
         PARAM_RAW_TRIMMED
     ));
 

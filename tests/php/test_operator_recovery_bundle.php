@@ -39,6 +39,7 @@ $servicechecks = [
     "is_link(\$candidate)",
     "import_and_reprepare(",
     "operator_package_preparer",
+    "'source_version'",
     "MAX_BUNDLE_BYTES",
     "MAX_ARCHIVE_ENTRIES",
     "expected_manifest",
@@ -150,7 +151,7 @@ if (!str_contains(
 
 if (!str_contains(
     $version,
-    "0.22.0-beta5"
+    "0.22.0-beta6"
 )) {
     fwrite(
         STDERR,

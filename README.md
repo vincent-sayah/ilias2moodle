@@ -139,7 +139,7 @@ La matrice détaillée est maintenue dans [`docs/mapping.md`](docs/mapping.md).
 
 ### Objets migrables dans la première version exploitable
 
-La version opérateur courante `0.22.0-beta5` fournit une **console opérateur Moodle** qui prépare un export ZIP ILIAS natif, réutilise les packages préparés, importe un bundle de récupération source contrôlé depuis le poste ou directement depuis le serveur Moodle, et automatise le package pédagogique principal. Les familles suivantes sont exécutables automatiquement depuis l'interface, dans cet ordre :
+La version opérateur courante `0.22.0-beta6` fournit une **console opérateur Moodle** qui prépare un export ZIP ILIAS natif, réutilise les packages préparés, importe un bundle de récupération source contrôlé depuis le poste ou directement depuis le serveur Moodle, et automatise le package pédagogique principal. Les familles suivantes sont exécutables automatiquement depuis l'interface, dans cet ordre :
 
 1. structure : cours, sections, sous-sections ;
 2. ressources simples : fichiers, URL, modules HTML ;
@@ -317,8 +317,8 @@ moodle/local_iliasmigration
 Version de développement de la console opérateur :
 
 ```text
-0.22.0-beta5
-2026101005
+0.22.0-beta6
+2026101006
 ```
 
 La dernière RC POC antérieure reste `0.20.0-rc3`.
@@ -409,7 +409,7 @@ Un sujet reste volontairement hors du périmètre fonctionnel :
 
 Le ticket #41 de progression avancée est désormais clôturé : le POC enrichi a confirmé que les résultats Test peuvent être conservés fidèlement comme historique, tandis que le SCORM ILIAS ne fournit pas l'historique détaillé nécessaire pour reconstruire sans approximation toutes les tentatives Moodle.
 
-La Phase 8 est en beta. La chaîne opérateur `0.22.0-beta1` a été validée de bout en bout le 10 octobre 2026 sur ILIAS `10.8.0` → Moodle `5.0.2` avec le cours `obj_id=827 / ref_id=282` (`Cours test RC 0.20`). Le package final `course827_v13_ui` a terminé avec toutes les familles applicables en `SUCCESS`; Glossaires et Forums ont été `SKIPPED` car absents du package. Le cycle de recovery V14 → V15 a confirmé que le worker read-only résout les deux collections IRSS et reproduit un `migration.json` sémantiquement identique à V13. Le mode serveur de la beta3 a ensuite été validé : le bundle est sélectionné directement sur Moodle, réinjecté et le package est re-préparé sans passage par Windows. Le scénario V18 a validé le flux sécurisé complet `fetch-plan → recovery ILIAS → bundle → push Moodle` sans copie manuelle dans aucun sens. La beta4 a ensuite été qualifiée sur le scénario V19 : la console crée la queue, le worker ILIAS périodique détecte le plan, exécute les recoveries et renvoie automatiquement le bundle vers Moodle. La `0.22.0-beta5` ajoute la dernière étape côté Moodle : une tâche planifiée détecte le bundle arrivé, re-prépare automatiquement le package, archive le bundle consommé et nettoie/actualise la queue sans clic opérateur.
+La Phase 8 est en beta. La chaîne opérateur `0.22.0-beta1` a été validée de bout en bout le 10 octobre 2026 sur ILIAS `10.8.0` → Moodle `5.0.2` avec le cours `obj_id=827 / ref_id=282` (`Cours test RC 0.20`). Le package final `course827_v13_ui` a terminé avec toutes les familles applicables en `SUCCESS`; Glossaires et Forums ont été `SKIPPED` car absents du package. Le cycle de recovery V14 → V15 a confirmé que le worker read-only résout les deux collections IRSS et reproduit un `migration.json` sémantiquement identique à V13. Le mode serveur de la beta3 a ensuite été validé : le bundle est sélectionné directement sur Moodle, réinjecté et le package est re-préparé sans passage par Windows. Le scénario V18 a validé le flux sécurisé complet `fetch-plan → recovery ILIAS → bundle → push Moodle` sans copie manuelle dans aucun sens. La beta4 a ensuite été qualifiée sur le scénario V19 : la console crée la queue, le worker ILIAS périodique détecte le plan, exécute les recoveries et renvoie automatiquement le bundle vers Moodle. La beta5 ajoute la dernière étape côté Moodle : une tâche planifiée détecte le bundle arrivé, re-prépare automatiquement le package, archive le bundle consommé et nettoie/actualise la queue sans clic opérateur. La `0.22.0-beta6` corrige la provenance de la version ILIAS : aucune valeur `10.5` n'est plus inventée par défaut, la première préparation exige la version exacte configurée et toute re-préparation conserve ensuite la version déjà inscrite dans le package.
 
 La release candidate courante est `0.20.0-rc3`. Elle reprend la correction d'installation neuve MySQL/MariaDB introduite en `0.20.0-rc2` et ajoute la consolidation Phase 7 validée sur PHP 8.3.35 avec 14/14 tests PHP réussis. La RC3 a ensuite été installée et qualifiée sur une Moodle 5.0.2 fraîche : 89 fichiers PHP sans erreur de syntaxe, copie candidate strictement identique après déploiement, aucun CRLF installé, premier upgrade réussi et second upgrade sans mise à jour nécessaire. Le tag `v0.20.0-rc1` reste conservé pour la traçabilité.
 

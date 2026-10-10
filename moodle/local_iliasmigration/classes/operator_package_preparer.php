@@ -91,12 +91,14 @@ final class operator_package_preparer {
      * @param string $zippath Absolute ZIP path under configured imports root.
      * @param string $outputname Directory name to create under packages root.
      * @param array<string,string> $recoveries Optional complementary recovery roots.
+     * @param string|null $sourceversion Exact source ILIAS version override.
      * @return array<string,mixed> Parsed prepare-export summary.
      */
     public function prepare(
         string $zippath,
         string $outputname,
-        array $recoveries = []
+        array $recoveries = [],
+        ?string $sourceversion = null
     ): array {
         $config = get_config('local_iliasmigration');
 
@@ -174,11 +176,26 @@ final class operator_package_preparer {
         }
 
         $iliasversion = trim(
-            (string) ($config->iliasversion ?? '10.5')
+            (string) (
+                $sourceversion
+                ?? ($config->iliasversion ?? '')
+            )
         );
+
         if ($iliasversion === '') {
             throw new \coding_exception(
-                'Default ILIAS source version must not be empty.'
+                'ILIAS source version is not configured. '
+                . 'Set local_iliasmigration/iliasversion '
+                . 'to the exact source version before preparing a package.'
+            );
+        }
+
+        if (!preg_match(
+            '/^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$/',
+            $iliasversion
+        )) {
+            throw new \coding_exception(
+                'ILIAS source version must use a numeric x.y or x.y.z format.'
             );
         }
 
@@ -325,6 +342,19 @@ final class operator_package_preparer {
             );
         }
 
+        $source = is_array($document['source'] ?? null)
+            ? $document['source']
+            : [];
+        $sourceversion = trim(
+            (string) ($source['version'] ?? '')
+        );
+
+        if ($sourceversion === '') {
+            throw new \coding_exception(
+                'Existing prepared package has no ILIAS source version.'
+            );
+        }
+
         $course = is_array($document['course'] ?? null)
             ? $document['course']
             : [];
@@ -401,6 +431,7 @@ final class operator_package_preparer {
             'migration_json' => $migrationjson,
             'package_root' => $output,
             'worker' => $worker,
+            'source_version' => $sourceversion,
             'reused_existing' => true,
             'worker_stdout' => '',
             'worker_stderr' => '',

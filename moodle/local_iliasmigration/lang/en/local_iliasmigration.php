@@ -76,7 +76,7 @@ $string['packagesroot_desc'] = 'Absolute directory under which the preparation w
 $string['recoveriesroot'] = 'Recovery bundles root';
 $string['recoveriesroot_desc'] = 'Absolute directory used to extract and validate recovery bundles. Server-side bundles offered by the console are read from its bundles/ subdirectory.';
 $string['iliasversion'] = 'Default ILIAS source version';
-$string['iliasversion_desc'] = 'ILIAS source version recorded in generated migration.json files, for example 10.5.';
+$string['iliasversion_desc'] = 'Exact version of the ILIAS instance that produced the exports, for example 10.8.0. Configure it before the first preparation; subsequent re-preparations preserve the version already recorded in the package.';
 
 $string['prepareexport'] = 'Prepare an ILIAS export';
 $string['prepareexportintro'] = 'Select a native ILIAS ZIP already deposited in the configured imports directory. The console will run the existing prepare-export worker and report whether the package is ready or still needs source recovery.';

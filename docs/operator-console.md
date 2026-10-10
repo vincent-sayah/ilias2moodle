@@ -132,6 +132,8 @@ iliasversion = 10.8.0
 
 Le ZIP doit obligatoirement se trouver sous `importsroot`. Le package de sortie est créé sous `packagesroot`. Un package existant n'est jamais écrasé.
 
+La valeur `local_iliasmigration/iliasversion` doit être configurée avec la **version exacte** de l'instance ILIAS source avant la première préparation. Depuis la beta6, le plugin n'utilise plus de fallback silencieux `10.5`. Lors d'un recovery/reprepare, la version déjà enregistrée dans le `migration.json` du package est réutilisée explicitement, même si le réglage Moodle change ensuite.
+
 Commande Moodle :
 
 ```bash
@@ -808,3 +810,32 @@ runuser -u apache -- php admin/cli/scheduled_task.php \
 ~~~
 
 En exploitation, cette tâche est exécutée par le cron Moodle standard. Aucun second timer systemd n'est ajouté côté Moodle.
+
+
+### Préservation de la version ILIAS — 0.22.0-beta6
+
+La qualification V19 a isolé une divergence unique entre les packages de référence V13/V15 et V19 :
+
+~~~text
+V13/V15 : source.version = 10.8.0
+V19     : source.version = 10.5
+~~~
+
+Tous les autres champs normalisés étaient identiques. La cause était le fallback historique `10.5` du bridge Moodle.
+
+La beta6 supprime ce fallback et impose :
+- version source configurée explicitement pour une première préparation ;
+- format numérique `x.y` ou `x.y.z` ;
+- lecture de `source.version` dans le package existant ;
+- conservation de cette version lors de toute re-préparation recovery.
+
+Pour le POC actuel :
+
+~~~bash
+cd /var/www/moodle
+
+runuser -u apache -- php admin/cli/cfg.php \
+  --component=local_iliasmigration \
+  --name=iliasversion \
+  --set=10.8.0
+~~~

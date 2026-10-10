@@ -41,6 +41,10 @@ $servicechecks = [
     "recovery-plan.json",
     "recovery_required",
     "JSON_THROW_ON_ERROR",
+    "?string \$sourceversion = null",
+    "'source_version' => \$sourceversion",
+    "ILIAS source version is not configured",
+    "numeric x.y or x.y.z format",
 ];
 
 foreach ($servicechecks as $check) {
@@ -95,6 +99,28 @@ $settingchecks = [
     "local_iliasmigration/recoveriesroot",
     "local_iliasmigration/iliasversion",
 ];
+
+if (str_contains(
+    $service,
+    "config->iliasversion ?? '10.5'"
+)) {
+    fwrite(
+        STDERR,
+        "Package preparer must not silently fall back to ILIAS 10.5.\n"
+    );
+    exit(1);
+}
+
+if (str_contains(
+    $settings,
+    "'10.5',"
+)) {
+    fwrite(
+        STDERR,
+        "ILIAS source version setting must not default silently to 10.5.\n"
+    );
+    exit(1);
+}
 
 foreach ($settingchecks as $check) {
     if (!str_contains($settings, $check)) {
