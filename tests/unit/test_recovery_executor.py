@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
+
 import pytest
 
 from ilias2moodle.recovery_executor import execute_recovery_plan
@@ -133,11 +135,12 @@ def test_recovery_executor_runs_irss_extractor(
             encoding="utf-8",
         )
 
-        return type("Result", (), dict(
+        return subprocess.CompletedProcess(
+            args=command,
             returncode=0,
             stdout="RESULTAT    : EXTRACTION_OK\n",
             stderr="",
-        ))()
+        )
 
     monkeypatch.setattr(
         "ilias2moodle.recovery_executor.subprocess.run",
