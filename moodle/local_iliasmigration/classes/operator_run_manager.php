@@ -600,14 +600,20 @@ final class operator_run_manager {
             );
         }
 
-        if (!$mapping || (int) $mapping->targetid <= 0) {
+        if (!$mapping) {
             return;
         }
 
-        $targetid = (int) $mapping->targetid;
+        $targetid = (int) ($mapping->targetid ?? 0);
 
-        if (!$DB->record_exists('course', ['id' => $targetid])) {
-            return;
+        if ($targetid <= 0
+                || !$DB->record_exists('course', ['id' => $targetid])) {
+            throw new \moodle_exception(
+                'courseorphanedmapping',
+                'local_iliasmigration',
+                '',
+                $targetid > 0 ? $targetid : '-'
+            );
         }
 
         throw new \moodle_exception(

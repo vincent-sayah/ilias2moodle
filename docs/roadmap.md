@@ -99,18 +99,18 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS 
 - [ ] refactoriser/raccorder la réconciliation d'ordre V2 à la console ;
 - [ ] granularité d'ignorance par `source_ref_id` à l'intérieur d'une même famille ;
 - [x] validation end-to-end nominale de la beta1 sur VM Moodle 5.0.2 : run #2 `COMPLETED`, cours Moodle `id=4 / ILIAS-282`, 621 mappings ;
-- [ ] validation du scénario `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` avant promotion RC.
+- [x] validation du scénario `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` : run #4 puis revalidation run #6.
 
 ## Suite Phase 8 — ordre de traitement
 
 Avant d'étendre la console, terminer les issues déjà ouvertes dans cet ordre :
 
-1. **#68 — Console opérateur beta1**
-   - test volontaire d'échec Wiki ;
-   - validation `Ignorer et continuer` ;
-   - validation finale `COMPLETED_WITH_SKIPS`.
+1. **#68 — Console opérateur beta1** — **TERMINÉE**
+   - test volontaire d'échec Wiki validé ;
+   - `Ignorer et continuer` validé ;
+   - `COMPLETED_WITH_SKIPS` validé.
 
-2. **#69 — Mappings orphelins après suppression d'un cours Moodle**
+2. **#69 — Mappings orphelins après suppression d'un cours Moodle** — **TERMINÉE / beta2**
    - détection sûre des mappings orphelins ;
    - reset explicite depuis la console ;
    - aucune suppression automatique d'un mapping dont la cible existe encore ;
@@ -128,6 +128,22 @@ Avant d'étendre la console, terminer les issues déjà ouvertes dans cet ordre 
 L'objectif V1.1 est qu'un opérateur parte autant que possible de l'export ZIP ILIAS et non d'un `migration.json` préparé manuellement.
 
 L'issue **#22 — objet ILIAS Groupe complet** reste volontairement `DEFERRED` et ne bloque pas la qualification de la console opérateur.
+
+## Phase 8 beta2 — reset des mappings orphelins
+
+Développement #69 :
+
+- [x] détection du mapping de cours orphelin avant création d'un run ;
+- [x] refus du reset si le cours Moodle cible existe encore ;
+- [x] page de confirmation opérateur ;
+- [x] snapshot JSON + SHA-256 avant suppression ;
+- [x] table d'audit `local_iliasmigration_reset` ;
+- [x] suppression transactionnelle du scope exact ;
+- [x] relance automatique d'un nouveau run après reset ;
+- [x] garde moteur `courseorphanedmapping` en dehors de l'UI ;
+- [x] validation réelle Moodle 5.0.2 : audit #2 de 618 mappings (6 legacy + 612 instance canonique), relance automatique, run #6 `COMPLETED_WITH_SKIPS` sans `ERROR_STALE_MAPPING`.
+
+Version de développement : `0.21.0-beta2`.
 
 ## Validation de consolidation
 

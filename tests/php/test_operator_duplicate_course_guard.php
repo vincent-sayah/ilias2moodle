@@ -15,6 +15,7 @@ $checks = [
     "'targettype' => 'course'",
     "record_exists('course', ['id' => \$targetid])",
     "'coursealreadymigrated'",
+    "'courseorphanedmapping'",
 ];
 
 foreach ($checks as $check) {
