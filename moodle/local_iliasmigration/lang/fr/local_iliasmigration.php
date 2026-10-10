@@ -114,3 +114,4 @@ $string['recoverybundleuploadmissing'] = 'Sélectionnez un bundle présent sur l
 $string['recoverybundlechooseone'] = 'Choisissez un seul mode : bundle serveur ou fichier envoyé depuis le poste.';
 $string['recoverybundleuploaderror'] = 'Le transfert du bundle a échoué avec le code PHP {$a}.';
 $string['recoveryqueued'] = 'Le package {$a} a été placé dans la file de récupération automatique. Le worker ILIAS peut récupérer le plan et déposer le bundle sans transfert manuel.';
+$string['task_recovery_reprepare'] = 'Re-préparation automatique des packages après recovery ILIAS';
