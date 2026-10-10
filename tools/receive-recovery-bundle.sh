@@ -102,9 +102,21 @@ if [[ "$action" == "list-pending" ]]; then
     [[ ! -L "$requests_root" ]] \
         || die "recovery requests root must not be a symlink"
 
-    python_bin="$(command -v python3 || true)"
+    python_bin="$(command -v python3.11 || true)"
+
+    if [[ -z "$python_bin" ]]; then
+        candidate="$(command -v python3 || true)"
+
+        if [[ -n "$candidate" ]] \
+                && "$candidate" -c \
+                    'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' \
+                    >/dev/null 2>&1; then
+            python_bin="$candidate"
+        fi
+    fi
+
     [[ -n "$python_bin" ]] \
-        || die "python3 is required for list-pending"
+        || die "Python >= 3.11 is required for list-pending"
 
     exec "$python_bin" \
         "${script_dir}/list-recovery-queue.py" \
