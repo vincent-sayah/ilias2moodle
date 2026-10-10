@@ -135,10 +135,12 @@ Le ZIP doit obligatoirement se trouver sous `importsroot`. Le package de sortie 
 Commande Moodle :
 
 ```bash
-php local/iliasmigration/cli/prepare_package.php \
+runuser -u apache -- php local/iliasmigration/cli/prepare_package.php \
   --zip=/var/moodledata/ilias2moodle/imports/export-ilias.zip \
   --output-name=course827
 ```
+
+Pour un test CLI sur AlmaLinux, exécuter la commande avec le compte du serveur web (`apache`) reproduit le contexte réel de la console. Le bridge impose en plus un umask `0027` au worker : les nouveaux répertoires/fichiers sont donc créés avec des droits restrictifs au lieu de `777/666`.
 
 Les récupérations complémentaires supportées par le worker Python restent disponibles :
 
