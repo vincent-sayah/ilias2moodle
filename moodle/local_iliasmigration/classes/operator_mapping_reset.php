@@ -120,7 +120,7 @@ final class operator_mapping_reset {
             self::STATE_ORPHANED,
             true,
             $resolved,
-            $scopeinstance,
+            $sourceinstance,
             $sourcecourse,
             $targetcourseid > 0 ? $targetcourseid : null,
             $mappings,
