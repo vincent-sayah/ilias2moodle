@@ -165,6 +165,77 @@ def test_recovery_executor_runs_irss_extractor(
     ]
 
 
+def test_recovery_executor_accepts_legacy_empty_collection_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = tmp_path / "recovery-plan.json"
+    _write_plan(plan)
+
+    project = _project_root(tmp_path)
+    ilias = tmp_path / "ilias"
+    ilias.mkdir()
+    output = tmp_path / "recovery"
+
+    monkeypatch.setattr(
+        "ilias2moodle.recovery_executor.shutil.which",
+        lambda name: "/usr/bin/php" if name == "php" else None,
+    )
+
+    def fake_run(
+        command: list[str],
+        **kwargs: object,
+    ):
+        output_arg = next(
+            value
+            for value in command
+            if value.startswith("--output=")
+        )
+        output_root = Path(
+            output_arg.split("=", 1)[1]
+        )
+        collection = output_root / UUID
+        collection.mkdir(parents=True)
+        (collection / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "collection_uuid": UUID,
+                    "resource_count": 0,
+                    "files": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=3,
+            stdout="RESULTAT    : COLLECTION_VIDE\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "ilias2moodle.recovery_executor.subprocess.run",
+        fake_run,
+    )
+
+    result = execute_recovery_plan(
+        plan,
+        output,
+        ilias,
+        "ilias10",
+        project,
+    )
+
+    assert result["success"] is True
+    assert result["failed_count"] == 0
+    assert (
+        result["results"][0]["status"]
+        == "SUCCESS_EMPTY_COMPAT"
+    )
+    assert result["results"][0]["exit_code"] == 3
+
+
 def test_recovery_executor_refuses_non_read_only(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
