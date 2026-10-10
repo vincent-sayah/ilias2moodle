@@ -9,7 +9,8 @@ trap 'rm -rf "$tmp"' EXIT
 
 bundles="${tmp}/bundles"
 packages="${tmp}/packages"
-mkdir -p "$bundles" "$packages"
+requests="${tmp}/requests"
+mkdir -p "$bundles" "$packages" "$requests"
 
 payload="${tmp}/payload.tar.gz"
 printf 'recovery-payload\n' > "$payload"
@@ -69,5 +70,51 @@ if SSH_ORIGINAL_COMMAND="fetch-plan ../escape" \
     echo "Receiver accepted an unsafe package name" >&2
     exit 1
 fi
+
+worker_package="course827_worker"
+mkdir -p "${packages}/${worker_package}"
+
+worker_plan="${packages}/${worker_package}/recovery-plan.json"
+printf '%s' '{"schema_version":"1.0","recovery_required":true,"request_count":1,"requests":[{"type":"exercise_irss_collection"}],"unresolved_count":0,"unresolved":[]}' > "$worker_plan"
+
+worker_sha="$(sha256sum "$worker_plan" | awk '{print $1}')"
+
+cat > "${requests}/${worker_package}.json" <<EOF
+{"schema_version":"1.0","package_name":"${worker_package}","zip_name":"course.zip","plan_sha256":"${worker_sha}","request_count":1}
+EOF
+
+SSH_ORIGINAL_COMMAND="list-pending" \
+    bash "$RECEIVER" "$bundles" "$packages" \
+    > "${tmp}/pending.json"
+
+python3 - "${tmp}/pending.json" <<'PY'
+import json
+import sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["job_count"] == 1
+job = data["jobs"][0]
+assert job["package_name"] == "course827_worker"
+assert job["bundle_name"] == "course827_worker_recovery.tar.gz"
+assert job["request_count"] == 1
+PY
+
+touch "${bundles}/${worker_package}_recovery.tar.gz"
+
+SSH_ORIGINAL_COMMAND="list-pending" \
+    bash "$RECEIVER" "$bundles" "$packages" \
+    > "${tmp}/pending-after-bundle.json"
+
+python3 - "${tmp}/pending-after-bundle.json" <<'PY'
+import json
+import sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["job_count"] == 0
+assert any(
+    item.get("reason") == "bundle_already_present"
+    for item in data["skipped"]
+)
+PY
 
 echo "RECOVERY_RECEIVER_OK"
