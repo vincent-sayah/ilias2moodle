@@ -37,6 +37,8 @@ from ilias2moodle.mediacast_package import (
 )
 from ilias2moodle.model import MigrationDocument
 from ilias2moodle.package_builder import MigrationPackageBuilder
+from ilias2moodle.recovery_executor import execute_recovery_plan
+from ilias2moodle.recovery_plan import build_recovery_plan
 from ilias2moodle.report import write_reports
 from ilias2moodle.wiki_package import (
     enrich_document_wikis,
@@ -127,6 +129,51 @@ def _build_parser() -> argparse.ArgumentParser:
             "Répertoire contenant les contenus Wiki courants récupérés "
             "depuis ILIAS, indexés par wiki_<obj>."
         ),
+    )
+
+    recover_source = subparsers.add_parser(
+        "recover-source",
+        help=(
+            "Exécuter localement sur le serveur ILIAS un recovery-plan.json "
+            "avec les extracteurs read-only supportés"
+        ),
+    )
+    recover_source.add_argument(
+        "--plan",
+        required=True,
+        type=Path,
+        help="Chemin vers recovery-plan.json",
+    )
+    recover_source.add_argument(
+        "--output",
+        required=True,
+        type=Path,
+        help="Répertoire de sortie des ressources récupérées",
+    )
+    recover_source.add_argument(
+        "--ilias-root",
+        required=True,
+        type=Path,
+        help="Racine de l'installation ILIAS source",
+    )
+    recover_source.add_argument(
+        "--client",
+        required=True,
+        help="Client ILIAS source",
+    )
+    recover_source.add_argument(
+        "--project-root",
+        type=Path,
+        default=Path(__file__).resolve().parents[2],
+        help=(
+            "Racine du checkout ILIAS2Moodle contenant tools/ "
+            "(défaut: checkout courant)"
+        ),
+    )
+    recover_source.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Afficher les commandes sans exécuter les extracteurs",
     )
     return parser
 
@@ -422,6 +469,17 @@ def _prepare_export(
     }
 
     package["missing_count"] = len(package["missing"])
+    package["recovery_plan"] = build_recovery_plan(
+        package["missing"]
+    )
+    (output / "recovery-plan.json").write_text(
+        json.dumps(
+            package["recovery_plan"],
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     (output / "package.json").write_text(
         json.dumps(package, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -435,6 +493,13 @@ def _prepare_export(
         "total_items": report["total_items"],
         "extracted": package["extracted"],
         "missing_count": package["missing_count"],
+        "recovery_required": package["recovery_plan"][
+            "recovery_required"
+        ],
+        "recovery_plan": package["recovery_plan"],
+        "recovery_plan_path": str(
+            output / "recovery-plan.json"
+        ),
         "exercise_irss_recovery": package["exercise_irss_recovery"],
         "mediacast_media_recovery": package[
             "mediacast_media_recovery"
@@ -471,6 +536,23 @@ def main(argv: list[str] | None = None) -> int:
             args.forum_attachment_recovery,
             args.wiki_content_recovery,
         )
+    if args.command == "recover-source":
+        result = execute_recovery_plan(
+            args.plan,
+            args.output,
+            args.ilias_root,
+            args.client,
+            args.project_root,
+            args.dry_run,
+        )
+        print(
+            json.dumps(
+                result,
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0 if result["success"] else 1
 
     parser.error("Commande inconnue")
     return 2

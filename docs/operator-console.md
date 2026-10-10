@@ -108,6 +108,124 @@ Après confirmation opérateur, la console a :
 
 Le scénario `suppression cible -> ORPHANED -> audit -> reset complet -> relance automatique -> remigration` est donc validé de bout en bout.
 
+## V1.1 — préparation d'un export ZIP natif
+
+La V1.1 commence par réutiliser le worker Python existant `prepare-export` au lieu de réimplémenter le parsing ILIAS en PHP.
+
+Configuration Moodle :
+
+```text
+local_iliasmigration/projectroot
+local_iliasmigration/importsroot
+local_iliasmigration/packagesroot
+local_iliasmigration/iliasversion
+```
+
+Valeurs de test usuelles :
+
+```text
+projectroot  = /opt/ilias2moodle
+importsroot  = /var/moodledata/ilias2moodle/imports
+packagesroot = /var/moodledata/ilias2moodle/packages
+iliasversion = 10.5
+```
+
+Le ZIP doit obligatoirement se trouver sous `importsroot`. Le package de sortie est créé sous `packagesroot`. Un package existant n'est jamais écrasé.
+
+Commande Moodle :
+
+```bash
+runuser -u apache -- php local/iliasmigration/cli/prepare_package.php \
+  --zip=/var/moodledata/ilias2moodle/imports/export-ilias.zip \
+  --output-name=course827
+```
+
+Pour un test CLI sur AlmaLinux, exécuter la commande avec le compte du serveur web (`apache`) reproduit le contexte réel de la console. Le bridge impose en plus un umask `0027` au worker : les nouveaux répertoires/fichiers sont donc créés avec des droits restrictifs au lieu de `777/666`.
+
+Les récupérations complémentaires supportées par le worker Python restent disponibles :
+
+```text
+--exercise-irss-recovery
+--mediacast-media-recovery
+--mediaobject-recovery
+--forum-attachment-recovery
+--wiki-content-recovery
+```
+
+La couche PHP ne construit pas elle-même `migration.json`. Elle valide les chemins, appelle `tools/run-ilias2moodle.sh prepare-export` via une commande argumentée sans shell, contrôle le code retour et vérifie que `migration.json` a effectivement été créé.
+
+Cette commande constitue le premier bridge V1.1. Le raccordement à l'interface opérateur et à un job/worker asynchrone est l'étape suivante.
+
+### Interface web de préparation
+
+La console V1.1 affiche désormais un bloc **Préparer un export ILIAS** avant le formulaire historique de lancement à partir de `migration.json`.
+
+Le formulaire :
+
+1. liste uniquement les fichiers `.zip` lisibles réellement présents sous `importsroot` ;
+2. demande un nom de package de sortie ;
+3. appelle le même service `operator_package_preparer` que le CLI ;
+4. affiche le cours détecté, le titre, le nombre d'objets et le nombre de dépendances restantes ;
+5. affiche le `recovery_plan` lorsqu'une récupération côté source est requise ;
+6. lorsque `missing_count=0`, propose **Utiliser ce package pour une migration**, ce qui préremplit le chemin `migration.json` dans le formulaire de migration existant.
+
+Le formulaire avancé historique reste disponible afin de ne pas casser les workflows déjà qualifiés.
+
+Si le répertoire de sortie demandé existe déjà, la console ne l'écrase pas. Elle vérifie désormais que le package existant contient des `package.json` et `migration.json` lisibles et que `source_archive` correspond au ZIP sélectionné. Si ces contrôles réussissent, le package est réutilisé et son état courant est affiché ; cela permet notamment de reprendre un package après une récupération côté source. Un répertoire incomplet ou associé à un autre ZIP reste bloqué.
+
+### Plan de récupération V1.1
+
+Après `prepare-export`, le package contient désormais également :
+
+```text
+recovery-plan.json
+```
+
+Ce fichier décrit les dépendances read-only encore nécessaires côté ILIAS. Pour une collection IRSS d'Exercise non embarquée dans le ZIP, le plan contient notamment :
+
+- le `ref_id` de l'Exercise ;
+- l'ID d'unité lorsque disponible ;
+- l'UUID exact de collection IRSS ;
+- l'extracteur `tools/ilias_irss_extract.php` ;
+- les arguments nécessaires ;
+- la cible d'exécution `ILIAS_SOURCE` ;
+- l'option de réinjection `--exercise-irss-recovery` ;
+- le chemin attendu du `manifest.json`.
+
+La génération du plan ne déclenche aucune commande distante. Elle constitue le contrat entre le worker de préparation et le futur orchestrateur de récupération. Les dépendances sans contrat automatique restent explicitement dans `unresolved` au lieu d'être ignorées.
+
+Le dépôt fournit aussi un worker local à exécuter **sur le serveur ILIAS source**. Pour éviter d'installer toutes les dépendances Python du parseur sur le serveur ILIAS, le chemin recommandé utilise le wrapper autonome :
+
+```bash
+python3.11 tools/run-recovery-plan.py \
+  --plan=/chemin/recovery-plan.json \
+  --output=/tmp/ilias2moodle-recovery \
+  --ilias-root=/var/www/ilias \
+  --client=ilias10
+```
+
+Ce wrapper n'importe que le module de récupération, basé sur la bibliothèque standard Python. Le sous-commande `recover-source` du CLI principal reste disponible quand l'environnement Python complet ILIAS2Moodle est installé.
+
+Le worker :
+
+1. refuse toute requête qui n'est pas marquée `read_only=true` ;
+2. refuse une cible autre que `ILIAS_SOURCE` ;
+3. exécute les extracteurs avec une liste d'arguments, sans shell ;
+4. vérifie la présence des manifests attendus ;
+5. renvoie un résumé JSON global.
+
+L'option `--dry-run` permet de valider le plan et les commandes sans lire de ressources ILIAS.
+
+Une collection IRSS vide est un succès fonctionnel : l'extracteur écrit un manifest avec `resource_count=0` et retourne désormais un code de sortie `0`. Le worker garde aussi une compatibilité avec les anciens bundles qui retournaient `3 / COLLECTION_VIDE`, à condition que le manifest vide soit cohérent.
+
+Le test réel du cours `282` a produit deux demandes IRSS pour l'Exercise `356` :
+
+```text
+496f99f9-f8c3-48ab-9714-a6a54886877e
+5cf327b1-4b20-42f7-8ee0-7c96c449d210
+```
+
+
 ## Création d'une migration
 
 L'opérateur renseigne :

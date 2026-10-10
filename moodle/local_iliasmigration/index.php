@@ -14,6 +14,8 @@ $PAGE->set_heading(get_string('operatorconsole', 'local_iliasmigration'));
 
 $manager = new \local_iliasmigration\operator_run_manager();
 $resetter = new \local_iliasmigration\operator_mapping_reset();
+$preparer = new \local_iliasmigration\operator_package_preparer();
+$prefillsourcepath = optional_param('sourcepath', '', PARAM_RAW_TRIMMED);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_sesskey();
@@ -75,6 +77,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 echo $OUTPUT->header();
+
+echo $OUTPUT->heading(
+    get_string('prepareexport', 'local_iliasmigration'),
+    3
+);
+echo html_writer::tag(
+    'p',
+    get_string('prepareexportintro', 'local_iliasmigration'),
+    ['class' => 'alert alert-info']
+);
+
+try {
+    $imports = $preparer->available_imports();
+} catch (Throwable $exception) {
+    $imports = [];
+    \core\notification::error(
+        $exception->getMessage()
+    );
+}
+
+if (!$imports) {
+    echo html_writer::div(
+        get_string('noimports', 'local_iliasmigration'),
+        'alert alert-secondary'
+    );
+} else {
+    $importoptions = [];
+    foreach ($imports as $name => $metadata) {
+        $size = display_size(
+            (int) ($metadata['size'] ?? 0)
+        );
+        $importoptions[$name] =
+            $name . ' — ' . $size;
+    }
+
+    echo html_writer::start_tag('form', [
+        'method' => 'post',
+        'action' => (new moodle_url(
+            '/local/iliasmigration/prepare.php'
+        ))->out(false),
+        'class' => 'mb-5',
+    ]);
+
+    echo html_writer::empty_tag('input', [
+        'type' => 'hidden',
+        'name' => 'sesskey',
+        'value' => sesskey(),
+    ]);
+
+    echo html_writer::start_div('form-group');
+    echo html_writer::label(
+        get_string('importzip', 'local_iliasmigration'),
+        'id_zipname'
+    );
+    echo html_writer::select(
+        $importoptions,
+        'zipname',
+        '',
+        false,
+        [
+            'id' => 'id_zipname',
+            'class' => 'form-control',
+            'required' => 'required',
+        ]
+    );
+    echo html_writer::end_div();
+
+    echo html_writer::start_div('form-group');
+    echo html_writer::label(
+        get_string('outputname', 'local_iliasmigration'),
+        'id_outputname'
+    );
+    echo html_writer::empty_tag('input', [
+        'type' => 'text',
+        'name' => 'outputname',
+        'id' => 'id_outputname',
+        'class' => 'form-control',
+        'required' => 'required',
+        'placeholder' => 'course827',
+        'pattern' => '[A-Za-z0-9][A-Za-z0-9._-]{0,63}',
+    ]);
+    echo html_writer::end_div();
+
+    echo html_writer::tag(
+        'button',
+        get_string('preparepackage', 'local_iliasmigration'),
+        ['type' => 'submit', 'class' => 'btn btn-primary']
+    );
+
+    echo html_writer::end_tag('form');
+}
+
 echo $OUTPUT->heading(get_string('newmigration', 'local_iliasmigration'), 3);
 echo html_writer::tag(
     'p',
@@ -104,6 +198,7 @@ echo html_writer::empty_tag('input', [
     'id' => 'id_sourcepath',
     'class' => 'form-control',
     'required' => 'required',
+    'value' => $prefillsourcepath,
     'placeholder' => '/opt/ilias2moodle/work/course/migration.json',
 ]);
 echo html_writer::end_div();
