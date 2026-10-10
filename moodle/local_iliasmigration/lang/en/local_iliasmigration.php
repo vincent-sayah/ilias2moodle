@@ -114,3 +114,4 @@ $string['recoverybundleuploadmissing'] = 'Select either a server-side recovery b
 $string['recoverybundlechooseone'] = 'Choose only one mode: server bundle or workstation upload.';
 $string['recoverybundleuploaderror'] = 'Recovery bundle upload failed with PHP error code {$a}.';
 $string['recoveryqueued'] = 'Package {$a} was queued for automatic source recovery. The ILIAS worker can fetch the plan and publish the bundle without manual transfer.';
+$string['task_recovery_reprepare'] = 'Automatically re-prepare packages after ILIAS recovery';
