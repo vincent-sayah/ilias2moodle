@@ -441,3 +441,168 @@ def fetch_recovery_plan(
         "receiver_stderr": stderr,
         "command": command,
     }
+
+
+
+def list_pending_recovery_jobs(
+    *,
+    host: str,
+    user: str,
+    identity_file: Path,
+    known_hosts_file: Path,
+    port: int = 22,
+    ssh_executable: str | None = None,
+) -> dict[str, Any]:
+    """List queued recovery jobs through the forced-command SSH key."""
+
+    host = host.strip()
+    user = user.strip()
+
+    if not _HOST_RE.fullmatch(host):
+        raise ValueError("Hôte SSH invalide.")
+    if not _USER_RE.fullmatch(user):
+        raise ValueError("Utilisateur SSH invalide.")
+    if port < 1 or port > 65535:
+        raise ValueError("Port SSH invalide.")
+
+    identity_file = identity_file.expanduser().resolve()
+    known_hosts_file = known_hosts_file.expanduser().resolve()
+
+    if not identity_file.is_file():
+        raise FileNotFoundError(
+            f"Clé privée SSH introuvable : {identity_file}"
+        )
+    if not known_hosts_file.is_file():
+        raise FileNotFoundError(
+            f"known_hosts SSH introuvable : {known_hosts_file}"
+        )
+    if known_hosts_file.stat().st_size <= 0:
+        raise ValueError("known_hosts SSH est vide.")
+
+    ssh = ssh_executable or shutil.which("ssh")
+    if not ssh:
+        raise FileNotFoundError(
+            "Exécutable ssh introuvable dans PATH."
+        )
+
+    command = [
+        ssh,
+        "-T",
+        "-p",
+        str(port),
+        "-i",
+        str(identity_file),
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "IdentitiesOnly=yes",
+        "-o",
+        "StrictHostKeyChecking=yes",
+        "-o",
+        f"UserKnownHostsFile={known_hosts_file}",
+        f"{user}@{host}",
+        "list-pending",
+    ]
+
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        check=False,
+    )
+
+    stdout = completed.stdout.decode(
+        "utf-8",
+        errors="replace",
+    ).strip()
+    stderr = completed.stderr.decode(
+        "utf-8",
+        errors="replace",
+    ).strip()
+
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "Liste SSH des recoveries en attente en échec "
+            f"(exit={completed.returncode}) : "
+            f"{stderr or stdout}"
+        )
+
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "Réponse list-pending invalide."
+        ) from exc
+
+    if not isinstance(data, dict):
+        raise ValueError(
+            "Réponse list-pending doit être un objet JSON."
+        )
+    if str(data.get("schema_version", "")) != "1.0":
+        raise ValueError(
+            "Schéma list-pending non supporté."
+        )
+
+    jobs = data.get("jobs")
+    if not isinstance(jobs, list):
+        raise ValueError(
+            "Réponse list-pending jobs invalide."
+        )
+
+    validated: list[dict[str, Any]] = []
+
+    for index, job in enumerate(jobs, start=1):
+        if not isinstance(job, dict):
+            raise ValueError(
+                f"Job pending #{index} invalide."
+            )
+
+        package_name = _validate_package_name(
+            str(job.get("package_name", ""))
+        )
+        bundle_name = _validate_bundle_name(
+            str(job.get("bundle_name", ""))
+        )
+        plan_sha256 = str(
+            job.get("plan_sha256", "")
+        ).lower()
+
+        if not re.fullmatch(
+            r"[0-9a-f]{64}",
+            plan_sha256,
+        ):
+            raise ValueError(
+                f"SHA-256 pending #{index} invalide."
+            )
+
+        request_count = int(
+            job.get("request_count", 0)
+        )
+        plan_size = int(
+            job.get("plan_size", 0)
+        )
+
+        if request_count <= 0:
+            raise ValueError(
+                f"request_count pending #{index} invalide."
+            )
+        if (
+            plan_size <= 0
+            or plan_size > _MAX_PLAN_BYTES
+        ):
+            raise ValueError(
+                f"plan_size pending #{index} invalide."
+            )
+
+        validated.append({
+            "package_name": package_name,
+            "bundle_name": bundle_name,
+            "plan_sha256": plan_sha256,
+            "plan_size": plan_size,
+            "request_count": request_count,
+        })
+
+    data["jobs"] = validated
+    data["job_count"] = len(validated)
+    data["receiver_stderr"] = stderr
+    data["command"] = command
+    return data
