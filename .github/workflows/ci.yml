@@ -111,6 +111,9 @@ jobs:
       - name: Operator recovery bundle import
         run: php tests/php/test_operator_recovery_bundle.php
 
+      - name: Operator recovery queue
+        run: php tests/php/test_operator_recovery_queue.php
+
       - name: Recovery bundle forced-command receiver
         run: |
           bash -n tools/receive-recovery-bundle.sh
