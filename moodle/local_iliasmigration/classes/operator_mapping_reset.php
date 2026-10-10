@@ -49,10 +49,7 @@ final class operator_mapping_reset {
         $sourcecourse = trim(
             (string) ($document['course']['source_id'] ?? '')
         );
-        $sourceinstance = rtrim(
-            trim((string) ($document['source']['instance'] ?? '')),
-            '/'
-        );
+        $sourceinstance = $this->source_instance($document);
 
         if ($sourcecourse === '') {
             throw new \coding_exception(
@@ -60,29 +57,19 @@ final class operator_mapping_reset {
             );
         }
 
-        $scopeinstance = $sourceinstance;
-        $legacy = false;
-
-        $mappings = $this->mappings_for_scope(
-            $scopeinstance,
+        $mappings = $this->mappings_for_course(
+            $sourceinstance,
             $sourcecourse
         );
-
-        if (!$mappings && $sourceinstance !== '') {
-            $scopeinstance = '';
-            $mappings = $this->mappings_for_scope(
-                $scopeinstance,
-                $sourcecourse
-            );
-            $legacy = (bool) $mappings;
-        }
+        $legacy = $sourceinstance !== ''
+            && $this->has_legacy_scope($mappings);
 
         if (!$mappings) {
             return $this->inspection(
                 self::STATE_NONE,
                 false,
                 $resolved,
-                $scopeinstance,
+                $sourceinstance,
                 $sourcecourse,
                 null,
                 [],
@@ -102,7 +89,7 @@ final class operator_mapping_reset {
                 self::STATE_AMBIGUOUS,
                 false,
                 $resolved,
-                $scopeinstance,
+                $sourceinstance,
                 $sourcecourse,
                 null,
                 $mappings,
@@ -120,7 +107,7 @@ final class operator_mapping_reset {
                 self::STATE_LIVE_TARGET,
                 false,
                 $resolved,
-                $scopeinstance,
+                $sourceinstance,
                 $sourcecourse,
                 $targetcourseid,
                 $mappings,
@@ -170,7 +157,7 @@ final class operator_mapping_reset {
             $sourcecourse =
                 (string) $inspection['sourcecourse'];
 
-            $mappings = $this->mappings_for_scope(
+            $mappings = $this->mappings_for_course(
                 $sourceinstance,
                 $sourcecourse
             );
@@ -236,22 +223,28 @@ final class operator_mapping_reset {
             );
 
             // The audit record is deliberately inserted before deletion.
-            $DB->delete_records(
+            [$instancesql, $instanceparams] =
+                $this->source_instance_condition($sourceinstance);
+
+            $params = [
+                'sourcelms' => 'ILIAS',
+                'sourcecourse' => $sourcecourse,
+            ] + $instanceparams;
+
+            $DB->delete_records_select(
                 'local_iliasmigration_map',
-                [
-                    'sourcelms' => 'ILIAS',
-                    'sourceinstance' => $sourceinstance,
-                    'sourcecourse' => $sourcecourse,
-                ]
+                'sourcelms = :sourcelms'
+                    . ' AND sourcecourse = :sourcecourse'
+                    . ' AND ' . $instancesql,
+                $params
             );
 
-            $remaining = $DB->count_records(
+            $remaining = $DB->count_records_select(
                 'local_iliasmigration_map',
-                [
-                    'sourcelms' => 'ILIAS',
-                    'sourceinstance' => $sourceinstance,
-                    'sourcecourse' => $sourcecourse,
-                ]
+                'sourcelms = :sourcelms'
+                    . ' AND sourcecourse = :sourcecourse'
+                    . ' AND ' . $instancesql,
+                $params
             );
 
             if ($remaining !== 0) {
@@ -279,23 +272,103 @@ final class operator_mapping_reset {
     }
 
     /**
+     * Return mappings belonging to the canonical source instance plus the
+     * historical legacy scope sourceinstance=''.
+     *
+     * Structure mappings created by early plugin versions used the empty
+     * sourceinstance while later phases use the canonical ILIAS identity.
+     * Reset must therefore treat both as one logical source-course scope.
+     *
      * @return array<int, \stdClass>
      */
-    private function mappings_for_scope(
+    private function mappings_for_course(
         string $sourceinstance,
         string $sourcecourse
     ): array {
         global $DB;
 
-        return $DB->get_records(
+        [$instancesql, $instanceparams] =
+            $this->source_instance_condition($sourceinstance);
+
+        $params = [
+            'sourcelms' => 'ILIAS',
+            'sourcecourse' => $sourcecourse,
+        ] + $instanceparams;
+
+        return $DB->get_records_select(
             'local_iliasmigration_map',
-            [
-                'sourcelms' => 'ILIAS',
-                'sourceinstance' => $sourceinstance,
-                'sourcecourse' => $sourcecourse,
-            ],
+            'sourcelms = :sourcelms'
+                . ' AND sourcecourse = :sourcecourse'
+                . ' AND ' . $instancesql,
+            $params,
             'id ASC'
         );
+    }
+
+    /**
+     * SQL condition covering the canonical instance and its legacy blank scope.
+     *
+     * @return array{0:string,1:array<string,string>}
+     */
+    private function source_instance_condition(
+        string $sourceinstance
+    ): array {
+        if ($sourceinstance === '') {
+            return [
+                'sourceinstance = :legacyinstance',
+                ['legacyinstance' => ''],
+            ];
+        }
+
+        return [
+            '(sourceinstance = :sourceinstance'
+                . ' OR sourceinstance = :legacyinstance)',
+            [
+                'sourceinstance' => $sourceinstance,
+                'legacyinstance' => '',
+            ],
+        ];
+    }
+
+    /**
+     * Whether the collected logical scope includes historical blank-instance
+     * mappings.
+     *
+     * @param array<int, \stdClass> $mappings
+     */
+    private function has_legacy_scope(array $mappings): bool {
+        foreach ($mappings as $mapping) {
+            if ((string) ($mapping->sourceinstance ?? '') === '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Resolve the stable source-instance identity exactly like plan_builder.
+     */
+    private function source_instance(array $document): string {
+        $metadata = is_array($document['course']['metadata'] ?? null)
+            ? $document['course']['metadata']
+            : [];
+
+        $installationurl = trim(
+            (string) ($metadata['installation_url'] ?? '')
+        );
+        if ($installationurl !== '') {
+            return rtrim($installationurl, '/');
+        }
+
+        $installationid = trim(
+            (string) ($metadata['installation_id'] ?? '')
+        );
+        if ($installationid !== '') {
+            return 'installation-id:' . $installationid;
+        }
+
+        return 'unknown-ilias-instance';
     }
 
     /**
