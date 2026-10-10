@@ -307,3 +307,21 @@ Console Moodle
   -> reprepare atomique
   -> package prêt à migrer
 ~~~
+
+
+## Qualification finale V20
+
+Le scénario V20 valide en exploitation réelle la chaîne automatique complète avec les deux ordonnanceurs actifs :
+
+- timer systemd côté ILIAS ;
+- cron Moodle exécuté chaque minute sous le compte `apache`.
+
+Le worker ILIAS a traité `course827_v20_beta6` avec `processed_count=1`, `failed_count=0` et deux requests recovery. Le package Moodle était déjà passé à `missing_count=0` au moment du contrôle, preuve que la tâche cron Moodle avait consommé le bundle automatiquement.
+
+Le `migration.json` V20, normalisé par suppression de `generated_at`, est strictement identique aux références V13 et V15 :
+
+~~~text
+fc1d8073abb9bdd43d36f5020aaa3e2c1898ed1d4af99630cf8ada739d97a9fb
+~~~
+
+La chaîne recovery ne nécessite donc plus de transfert manuel ni de déclenchement manuel dans le scénario nominal.
