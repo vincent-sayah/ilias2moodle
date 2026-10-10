@@ -76,7 +76,7 @@ $string['packagesroot_desc'] = 'Répertoire absolu dans lequel le worker crée l
 $string['recoveriesroot'] = 'Racine des bundles de récupération';
 $string['recoveriesroot_desc'] = 'Répertoire absolu utilisé pour extraire et valider les bundles de récupération. Les bundles déjà présents sur le serveur et proposés dans la console sont lus dans le sous-répertoire bundles/.';
 $string['iliasversion'] = 'Version ILIAS source par défaut';
-$string['iliasversion_desc'] = 'Version ILIAS inscrite dans les migration.json générés, par exemple 10.5.';
+$string['iliasversion_desc'] = 'Version exacte de l’instance ILIAS ayant produit les exports, par exemple 10.8.0. Ce champ doit être configuré avant la première préparation ; les re-préparations conservent ensuite la version du package existant.';
 
 $string['prepareexport'] = 'Préparer un export ILIAS';
 $string['prepareexportintro'] = 'Sélectionnez un ZIP ILIAS natif déjà déposé dans le répertoire d’import configuré. La console lance le worker prepare-export existant et indique si le package est prêt ou s’il nécessite encore une récupération côté source.';
