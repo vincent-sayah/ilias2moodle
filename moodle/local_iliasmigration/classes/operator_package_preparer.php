@@ -375,12 +375,10 @@ final class operator_package_preparer {
                 ? $package['extracted']
                 : [],
             'missing_count' => $missingcount,
-            'recovery_required' => array_key_exists(
-                'recovery_required',
-                $recoveryplan
-            )
-                ? !empty($recoveryplan['recovery_required'])
-                : $missingcount > 0,
+            // package.json reflects the latest preparation pass. A
+            // recovery-plan.json may legitimately be older after a manual
+            // recovery/reprepare cycle, so missing_count is authoritative.
+            'recovery_required' => $missingcount > 0,
             'recovery_plan' => $recoveryplan,
             'recovery_plan_path' => is_file($recoveryplanpath)
                 ? $recoveryplanpath
