@@ -55,8 +55,6 @@ $servicechecks = [
     "'sourcelms' => 'ILIAS'",
     "'sourceinstance' => \$sourceinstance",
     "'sourcecourse' => \$sourcecourse",
-    "delete_records(",
-    "count_records(",
 ];
 
 foreach ($servicechecks as $check) {
@@ -75,7 +73,7 @@ $auditpos = strpos(
 );
 $deletepos = strpos(
     $service,
-    "\$DB->delete_records(\n                'local_iliasmigration_map'"
+    "\$DB->delete_records_select(\n                'local_iliasmigration_map'"
 );
 
 if ($auditpos === false || $deletepos === false || $auditpos >= $deletepos) {
