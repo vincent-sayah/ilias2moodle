@@ -315,8 +315,8 @@ moodle/local_iliasmigration
 Version de développement de la console opérateur :
 
 ```text
-0.22.0-beta2
-2026101002
+0.22.0-beta3
+2026101003
 ```
 
 La dernière RC POC antérieure reste `0.20.0-rc3`.
