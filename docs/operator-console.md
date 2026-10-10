@@ -156,6 +156,21 @@ La couche PHP ne construit pas elle-même `migration.json`. Elle valide les chem
 
 Cette commande constitue le premier bridge V1.1. Le raccordement à l'interface opérateur et à un job/worker asynchrone est l'étape suivante.
 
+### Interface web de préparation
+
+La console V1.1 affiche désormais un bloc **Préparer un export ILIAS** avant le formulaire historique de lancement à partir de `migration.json`.
+
+Le formulaire :
+
+1. liste uniquement les fichiers `.zip` lisibles réellement présents sous `importsroot` ;
+2. demande un nom de package de sortie ;
+3. appelle le même service `operator_package_preparer` que le CLI ;
+4. affiche le cours détecté, le titre, le nombre d'objets et le nombre de dépendances restantes ;
+5. affiche le `recovery_plan` lorsqu'une récupération côté source est requise ;
+6. lorsque `missing_count=0`, propose **Utiliser ce package pour une migration**, ce qui préremplit le chemin `migration.json` dans le formulaire de migration existant.
+
+Le formulaire avancé historique reste disponible afin de ne pas casser les workflows déjà qualifiés.
+
 ### Plan de récupération V1.1
 
 Après `prepare-export`, le package contient désormais également :
