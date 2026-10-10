@@ -199,6 +199,8 @@ Le worker :
 
 L'option `--dry-run` permet de valider le plan et les commandes sans lire de ressources ILIAS.
 
+Une collection IRSS vide est un succès fonctionnel : l'extracteur écrit un manifest avec `resource_count=0` et retourne désormais un code de sortie `0`. Le worker garde aussi une compatibilité avec les anciens bundles qui retournaient `3 / COLLECTION_VIDE`, à condition que le manifest vide soit cohérent.
+
 Le test réel du cours `282` a produit deux demandes IRSS pour l'Exercise `356` :
 
 ```text
