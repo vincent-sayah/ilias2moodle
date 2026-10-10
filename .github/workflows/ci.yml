@@ -110,3 +110,8 @@ jobs:
 
       - name: Operator recovery bundle import
         run: php tests/php/test_operator_recovery_bundle.php
+
+      - name: Recovery bundle forced-command receiver
+        run: |
+          bash -n tools/receive-recovery-bundle.sh
+          bash tests/shell/test_receive_recovery_bundle.sh
