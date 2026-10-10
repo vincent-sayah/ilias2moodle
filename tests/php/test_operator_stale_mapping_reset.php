@@ -139,9 +139,16 @@ if (!str_contains($upgrade, "2026100701")
     exit(1);
 }
 
-if (!str_contains($version, '$plugin->version = 2026100701;')
-        || !str_contains($version, "0.21.0-beta2")) {
-    fwrite(STDERR, "Plugin beta2 version metadata is missing.\n");
+if (!preg_match(
+        '/\\$plugin->version\\s*=\\s*([0-9]+);/',
+        $version,
+        $versionmatch
+    )
+        || (int) $versionmatch[1] < 2026100701) {
+    fwrite(
+        STDERR,
+        "Plugin version is older than the beta2 reset baseline.\n"
+    );
     exit(1);
 }
 
