@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-"
