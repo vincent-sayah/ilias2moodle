@@ -39,6 +39,7 @@ from ilias2moodle.model import MigrationDocument
 from ilias2moodle.package_builder import MigrationPackageBuilder
 from ilias2moodle.report import write_reports
 from ilias2moodle.recovery_plan import build_recovery_plan
+from ilias2moodle.recovery_executor import execute_recovery_plan
 from ilias2moodle.wiki_package import (
     enrich_document_wikis,
     extract_wiki_assets,
@@ -128,6 +129,51 @@ def _build_parser() -> argparse.ArgumentParser:
             "Répertoire contenant les contenus Wiki courants récupérés "
             "depuis ILIAS, indexés par wiki_<obj>."
         ),
+    )
+
+    recover_source = subparsers.add_parser(
+        "recover-source",
+        help=(
+            "Exécuter localement sur le serveur ILIAS un recovery-plan.json "
+            "avec les extracteurs read-only supportés"
+        ),
+    )
+    recover_source.add_argument(
+        "--plan",
+        required=True,
+        type=Path,
+        help="Chemin vers recovery-plan.json",
+    )
+    recover_source.add_argument(
+        "--output",
+        required=True,
+        type=Path,
+        help="Répertoire de sortie des ressources récupérées",
+    )
+    recover_source.add_argument(
+        "--ilias-root",
+        required=True,
+        type=Path,
+        help="Racine de l'installation ILIAS source",
+    )
+    recover_source.add_argument(
+        "--client",
+        required=True,
+        help="Client ILIAS source",
+    )
+    recover_source.add_argument(
+        "--project-root",
+        type=Path,
+        default=Path(__file__).resolve().parents[2],
+        help=(
+            "Racine du checkout ILIAS2Moodle contenant tools/ "
+            "(défaut: checkout courant)"
+        ),
+    )
+    recover_source.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Afficher les commandes sans exécuter les extracteurs",
     )
     return parser
 
@@ -490,6 +536,23 @@ def main(argv: list[str] | None = None) -> int:
             args.forum_attachment_recovery,
             args.wiki_content_recovery,
         )
+    if args.command == "recover-source":
+        result = execute_recovery_plan(
+            args.plan,
+            args.output,
+            args.ilias_root,
+            args.client,
+            args.project_root,
+            args.dry_run,
+        )
+        print(
+            json.dumps(
+                result,
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0 if result["success"] else 1
 
     parser.error("Commande inconnue")
     return 2
