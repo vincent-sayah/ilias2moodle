@@ -153,7 +153,22 @@ final class operator_package_preparer {
             );
         }
 
+        $recoveryplan = $output
+            . DIRECTORY_SEPARATOR
+            . 'recovery-plan.json';
+
+        if (!empty($result['recovery_required'])
+                && (!is_file($recoveryplan)
+                    || !is_readable($recoveryplan))) {
+            throw new \coding_exception(
+                'prepare-export reported recovery requirements without creating recovery-plan.json.'
+            );
+        }
+
         $result['migration_json'] = $migrationjson;
+        $result['recovery_plan_path'] = is_file($recoveryplan)
+            ? $recoveryplan
+            : null;
         $result['package_root'] = $output;
         $result['worker'] = $worker;
 
