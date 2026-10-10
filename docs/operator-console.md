@@ -778,3 +778,33 @@ Restent à valider ultérieurement avant promotion RC :
 - un scénario contrôlé `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` ;
 - le contrôle fonctionnel final du rapport après amélioration des compteurs par étape ;
 - les extensions Phase 7 et la réconciliation d'ordre V2 ne sont toujours pas automatisées par cette beta.
+
+
+### Re-préparation automatique côté Moodle — 0.22.0-beta5
+
+La beta5 ajoute la tâche Moodle `\local_iliasmigration\task\recovery_reprepare_task`, planifiée chaque minute via `db/tasks.php`.
+
+Pour chaque marqueur `recoveriesroot/requests/<package>.json`, le worker Moodle :
+
+1. vérifie le schéma du marqueur, le nom du package, le ZIP source et le SHA-256 du `recovery-plan.json` courant ;
+2. attend le bundle déterministe `<package>_recovery.tar.gz` dans `recoveriesroot/bundles` ;
+3. refuse un plan devenu obsolète ;
+4. évite de rejouer chaque minute le même couple plan + bundle après un échec ;
+5. appelle le même service sécurisé `operator_recovery_bundle_importer` que l'interface manuelle ;
+6. re-prépare le package dans un répertoire temporaire puis le remplace atomiquement uniquement si le nombre de dépendances diminue ;
+7. synchronise la queue : suppression si le package est complet, nouveau marqueur si un recovery supplémentaire est encore nécessaire ;
+8. archive le bundle consommé dans `recoveriesroot/processed` avec les préfixes SHA-256 du plan et du bundle ;
+9. conserve l'état de traitement dans `recoveriesroot/reprepare-state`.
+
+Le bouton manuel d'import du bundle reste disponible comme solution de secours.
+
+Qualification CLI d'une tâche Moodle :
+
+~~~bash
+cd /var/www/moodle
+
+runuser -u apache -- php admin/cli/scheduled_task.php \
+  --execute='\local_iliasmigration\task\recovery_reprepare_task'
+~~~
+
+En exploitation, cette tâche est exécutée par le cron Moodle standard. Aucun second timer systemd n'est ajouté côté Moodle.
