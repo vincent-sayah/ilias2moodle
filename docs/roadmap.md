@@ -99,18 +99,18 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS 
 - [ ] refactoriser/raccorder la réconciliation d'ordre V2 à la console ;
 - [ ] granularité d'ignorance par `source_ref_id` à l'intérieur d'une même famille ;
 - [x] validation end-to-end nominale de la beta1 sur VM Moodle 5.0.2 : run #2 `COMPLETED`, cours Moodle `id=4 / ILIAS-282`, 621 mappings ;
-- [ ] validation du scénario `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` avant promotion RC.
+- [x] validation du scénario `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` : run #4 puis revalidation run #6.
 
 ## Suite Phase 8 — ordre de traitement
 
 Avant d'étendre la console, terminer les issues déjà ouvertes dans cet ordre :
 
-1. **#68 — Console opérateur beta1**
-   - test volontaire d'échec Wiki ;
-   - validation `Ignorer et continuer` ;
-   - validation finale `COMPLETED_WITH_SKIPS`.
+1. **#68 — Console opérateur beta1** — **TERMINÉE**
+   - test volontaire d'échec Wiki validé ;
+   - `Ignorer et continuer` validé ;
+   - `COMPLETED_WITH_SKIPS` validé.
 
-2. **#69 — Mappings orphelins après suppression d'un cours Moodle** — **EN COURS / beta2**
+2. **#69 — Mappings orphelins après suppression d'un cours Moodle** — **TERMINÉE / beta2**
    - détection sûre des mappings orphelins ;
    - reset explicite depuis la console ;
    - aucune suppression automatique d'un mapping dont la cible existe encore ;
@@ -141,7 +141,7 @@ Développement #69 :
 - [x] suppression transactionnelle du scope exact ;
 - [x] relance automatique d'un nouveau run après reset ;
 - [x] garde moteur `courseorphanedmapping` en dehors de l'UI ;
-- [ ] validation réelle sur Moodle 5.0.2 : suppression cible -> reset console -> remigration.
+- [x] validation réelle Moodle 5.0.2 : audit #2 de 618 mappings (6 legacy + 612 instance canonique), relance automatique, run #6 `COMPLETED_WITH_SKIPS` sans `ERROR_STALE_MAPPING`.
 
 Version de développement : `0.21.0-beta2`.
 
