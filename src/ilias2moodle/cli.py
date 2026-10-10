@@ -38,6 +38,7 @@ from ilias2moodle.mediacast_package import (
 from ilias2moodle.model import MigrationDocument
 from ilias2moodle.package_builder import MigrationPackageBuilder
 from ilias2moodle.report import write_reports
+from ilias2moodle.recovery_plan import build_recovery_plan
 from ilias2moodle.wiki_package import (
     enrich_document_wikis,
     extract_wiki_assets,
@@ -422,6 +423,9 @@ def _prepare_export(
     }
 
     package["missing_count"] = len(package["missing"])
+    package["recovery_plan"] = build_recovery_plan(
+        package["missing"]
+    )
     (output / "package.json").write_text(
         json.dumps(package, ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -435,6 +439,10 @@ def _prepare_export(
         "total_items": report["total_items"],
         "extracted": package["extracted"],
         "missing_count": package["missing_count"],
+        "recovery_required": package["recovery_plan"][
+            "recovery_required"
+        ],
+        "recovery_plan": package["recovery_plan"],
         "exercise_irss_recovery": package["exercise_irss_recovery"],
         "mediacast_media_recovery": package[
             "mediacast_media_recovery"
