@@ -17,7 +17,7 @@ Elle s'appuie sur les executors et validateurs déjà validés par le projet et 
 ## Prérequis
 
 - plugin `local_iliasmigration` installé ;
-- upgrade Moodle effectué après installation de `0.21.0-beta1` ;
+- upgrade Moodle effectué après installation de `0.21.0-beta2` afin de créer la table d'audit des resets ;
 - package ILIAS2Moodle déjà préparé et présent sur le serveur Moodle ;
 - fichier `migration.json` lisible par PHP/Apache ;
 - utilisateur disposant de la capability `local/iliasmigration:operate`.
@@ -66,16 +66,47 @@ Pour un état `ORPHANED`, la console affiche une page de confirmation avec :
 L'action **Réinitialiser les mappings et relancer la migration** :
 
 1. recontrôle dans une transaction que le cours Moodle cible n'existe toujours pas ;
-2. sérialise tous les mappings du scope exact `ILIAS + sourceinstance + sourcecourse` ;
+2. sérialise tous les mappings du périmètre logique du cours source : instance ILIAS canonique **et** scope historique `sourceinstance=''` lorsqu'il existe ;
 3. calcule le SHA-256 du snapshot ;
 4. écrit le snapshot dans `local_iliasmigration_reset` ;
-5. supprime le scope de mappings orphelins ;
+5. supprime dans la même transaction les mappings de l'instance canonique et les mappings legacy vides du même `sourcecourse` ;
 6. vérifie qu'aucun mapping du scope ne reste ;
 7. crée immédiatement un nouveau run sur le même package et la même catégorie.
 
 La présence d'un cours Moodle cible vivant interdit le reset. La console ne supprime donc jamais les mappings d'une migration encore active.
 
 Un appel direct à `create_run()` est également protégé : un mapping de cours orphelin déclenche `courseorphanedmapping` et impose le passage par le reset explicite.
+
+### Validation réelle du reset — run #6
+
+Validation réalisée le 10 octobre 2026 sur Moodle 5.0.2 avec le fixture `sourcecourse=9283`.
+
+Le scénario a volontairement supprimé le cours Moodle cible puis relancé la migration depuis la console. Une première itération a mis en évidence que les mappings historiques de Structure utilisaient `sourceinstance=''` alors que les phases suivantes utilisaient l'instance canonique `http://192.168.56.50`. Le reset beta2 traite désormais ces deux scopes comme un seul périmètre logique.
+
+Audit final #2 :
+
+```text
+sourcecourse        = 9283
+ancien cours Moodle = 7
+mappings audités    = 618
+snapshot JSON       = 618
+SHA-256             = OK
+
+sourceinstance=''                  = 6
+sourceinstance=http://192.168.56.50 = 612
+```
+
+Après confirmation opérateur, la console a :
+
+- conservé la catégorie cible `1` ;
+- supprimé l'ensemble des 618 mappings orphelins ;
+- créé automatiquement le nouveau run #6 ;
+- recréé le cours Moodle sous un nouvel ID (`8`) ;
+- exécuté Structure, Ressources, SCORM, Book, Questions/Quiz et Content Pages sans `ERROR_STALE_MAPPING` ;
+- poursuivi après l'ignore contrôlé du Wiki de qualification ;
+- terminé en `COMPLETED_WITH_SKIPS`.
+
+Le scénario `suppression cible -> ORPHANED -> audit -> reset complet -> relance automatique -> remigration` est donc validé de bout en bout.
 
 ## Création d'une migration
 
