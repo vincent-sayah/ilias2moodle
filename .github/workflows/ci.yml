@@ -101,3 +101,6 @@ jobs:
 
       - name: Operator stale mapping reset
         run: php tests/php/test_operator_stale_mapping_reset.php
+
+      - name: Operator package preparer
+        run: php tests/php/test_operator_package_preparer.php
