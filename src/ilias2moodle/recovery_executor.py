@@ -167,20 +167,73 @@ def execute_recovery_plan(
             text=True,
         )
 
+        expected_manifest = str(
+            request.get("expected_manifest", "")
+        ).strip()
+        manifest_path = (
+            output / expected_manifest
+            if expected_manifest
+            else None
+        )
+
+        empty_collection_compat = False
+        if (
+            completed.returncode == 3
+            and "RESULTAT    : COLLECTION_VIDE"
+            in completed.stdout
+            and manifest_path is not None
+            and manifest_path.is_file()
+        ):
+            try:
+                manifest_data = json.loads(
+                    manifest_path.read_text(
+                        encoding="utf-8"
+                    )
+                )
+                empty_collection_compat = (
+                    str(
+                        manifest_data.get(
+                            "collection_uuid",
+                            "",
+                        )
+                    )
+                    == collection_uuid
+                    and int(
+                        manifest_data.get(
+                            "resource_count",
+                            -1,
+                        )
+                    )
+                    == 0
+                    and isinstance(
+                        manifest_data.get("files"),
+                        list,
+                    )
+                )
+            except (
+                OSError,
+                ValueError,
+                TypeError,
+                json.JSONDecodeError,
+            ):
+                empty_collection_compat = False
+
+        status = "FAILED"
+        if completed.returncode == 0:
+            status = "SUCCESS"
+        elif empty_collection_compat:
+            status = "SUCCESS_EMPTY_COMPAT"
+
         record.update(
             {
                 "exit_code": completed.returncode,
                 "stdout": completed.stdout,
                 "stderr": completed.stderr,
-                "status": (
-                    "SUCCESS"
-                    if completed.returncode == 0
-                    else "FAILED"
-                ),
+                "status": status,
             }
         )
 
-        if completed.returncode != 0:
+        if status == "FAILED":
             failed += 1
 
         results.append(record)
