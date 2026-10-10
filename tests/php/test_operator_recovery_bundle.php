@@ -116,7 +116,7 @@ foreach ($recoverchecks as $check) {
 $preparechecks = [
     "/local/iliasmigration/recover.php",
     "'enctype' => 'multipart/form-data'",
-    "'name' => 'serverbundle'",
+    "'serverbundle',",
     "available_server_bundles()",
     "recoverybundleserver",
     "'name' => 'recoverybundle'",
