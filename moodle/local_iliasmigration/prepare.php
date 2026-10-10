@@ -36,6 +36,7 @@ $outputname = required_param(
 );
 
 $preparer = new \local_iliasmigration\operator_package_preparer();
+$recoveryimporter = new \local_iliasmigration\operator_recovery_bundle_importer();
 
 try {
     $imports = $preparer->available_imports();
@@ -221,6 +222,16 @@ if ($recoveryrequired) {
             ['class' => 'alert alert-info']
         );
 
+        $serverbundles = [];
+        try {
+            $serverbundles = $recoveryimporter
+                ->available_server_bundles();
+        } catch (Throwable $exception) {
+            \core\notification::warning(
+                $exception->getMessage()
+            );
+        }
+
         echo html_writer::start_tag('form', [
             'method' => 'post',
             'action' => (new moodle_url(
@@ -242,6 +253,60 @@ if ($recoveryrequired) {
             ]);
         }
 
+        if ($serverbundles) {
+            $serveroptions = [];
+            foreach (
+                $serverbundles
+                as $name => $metadata
+            ) {
+                $serveroptions[$name] =
+                    $name
+                    . ' — '
+                    . display_size(
+                        (int) (
+                            $metadata['size']
+                            ?? 0
+                        )
+                    );
+            }
+
+            echo html_writer::start_div(
+                'form-group'
+            );
+            echo html_writer::label(
+                get_string(
+                    'recoverybundleserver',
+                    'local_iliasmigration'
+                ),
+                'id_serverbundle'
+            );
+            echo html_writer::select(
+                $serveroptions,
+                'serverbundle',
+                '',
+                [
+                    '' => get_string(
+                        'recoverybundleservernone',
+                        'local_iliasmigration'
+                    ),
+                ],
+                [
+                    'id' => 'id_serverbundle',
+                    'class' => 'form-control',
+                ]
+            );
+            echo html_writer::end_div();
+
+            echo html_writer::tag(
+                'p',
+                get_string(
+                    'recoverybundleorupload',
+                    'local_iliasmigration'
+                ),
+                ['class' => 'text-muted']
+            );
+        }
+
         echo html_writer::start_div('form-group');
         echo html_writer::label(
             get_string(
@@ -256,7 +321,6 @@ if ($recoveryrequired) {
             'id' => 'id_recoverybundle',
             'class' => 'form-control-file',
             'accept' => '.tar.gz,.tgz,application/gzip',
-            'required' => 'required',
         ]);
         echo html_writer::end_div();
 
