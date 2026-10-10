@@ -86,14 +86,12 @@ def test_publish_recovery_bundle_uses_strict_ssh(
         command: list[str],
         *,
         stdin,
-        stdout,
-        stderr,
+        capture_output: bool,
         check: bool,
     ) -> subprocess.CompletedProcess[bytes]:
         captured["command"] = command
         captured["payload"] = stdin.read()
-        captured["stdout"] = stdout
-        captured["stderr"] = stderr
+        captured["capture_output"] = capture_output
         captured["check"] = check
         return subprocess.CompletedProcess(
             command,
