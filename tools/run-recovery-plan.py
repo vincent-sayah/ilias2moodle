@@ -15,6 +15,7 @@ if str(SRC) not in sys.path:
 from ilias2moodle.recovery_executor import execute_recovery_plan  # noqa: E402
 from ilias2moodle.recovery_transport import (  # noqa: E402
     build_recovery_bundle,
+    fetch_recovery_plan,
     publish_recovery_bundle,
 )
 
@@ -26,11 +27,20 @@ def main() -> int:
             "recovery-plan.json read-only."
         )
     )
-    parser.add_argument(
+    plansource = parser.add_mutually_exclusive_group(
+        required=True
+    )
+    plansource.add_argument(
         "--plan",
-        required=True,
         type=Path,
-        help="Chemin vers recovery-plan.json",
+        help="Chemin local vers recovery-plan.json",
+    )
+    plansource.add_argument(
+        "--fetch-package",
+        help=(
+            "Nom du package Moodle dont le recovery-plan.json "
+            "doit être récupéré via le canal SSH restreint."
+        ),
     )
     parser.add_argument(
         "--output",
@@ -71,8 +81,8 @@ def main() -> int:
     parser.add_argument(
         "--publish-host",
         help=(
-            "Publier le bundle vers le récepteur SSH forcé "
-            "du serveur Moodle."
+            "Hôte Moodle du canal SSH restreint. "
+            "Utilisé pour fetch-plan et pour publier le bundle."
         ),
     )
     parser.add_argument(
@@ -103,9 +113,20 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    publish_requested = args.publish_host is not None
+    remote_requested = (
+        args.publish_host is not None
+    )
+    fetch_requested = (
+        args.fetch_package is not None
+    )
+    publish_requested = remote_requested
 
-    if publish_requested and (
+    if fetch_requested and not remote_requested:
+        parser.error(
+            "--fetch-package exige --publish-host."
+        )
+
+    if remote_requested and (
         args.publish_identity is None
         or args.publish_known_hosts is None
     ):
@@ -124,14 +145,40 @@ def main() -> int:
         )
 
     try:
+        plan_path = args.plan
+        fetched_plan = None
+
+        if fetch_requested:
+            plan_path = args.output.with_name(
+                args.output.name
+                + "-recovery-plan.json"
+            )
+            fetched_plan = fetch_recovery_plan(
+                package_name=args.fetch_package,
+                output=plan_path,
+                host=args.publish_host,
+                user=args.publish_user,
+                identity_file=args.publish_identity,
+                known_hosts_file=args.publish_known_hosts,
+                port=args.publish_port,
+            )
+
+        if plan_path is None:
+            raise ValueError(
+                "Aucun recovery-plan disponible."
+            )
+
         result = execute_recovery_plan(
-            args.plan,
+            plan_path,
             args.output,
             args.ilias_root,
             args.client,
             args.project_root,
             args.dry_run,
         )
+
+        if fetched_plan is not None:
+            result["plan_fetch"] = fetched_plan
 
         if result["success"] and (
             args.bundle is not None

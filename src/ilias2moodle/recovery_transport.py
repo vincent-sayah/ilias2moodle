@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import shutil
 import subprocess
@@ -14,6 +15,10 @@ _BUNDLE_NAME_RE = re.compile(
 )
 _USER_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _HOST_RE = re.compile(r"^[A-Za-z0-9_.:\-]+$")
+_PACKAGE_NAME_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+)
+_MAX_PLAN_BYTES = 2_097_152
 
 
 def _validate_bundle_name(value: str) -> str:
@@ -21,6 +26,15 @@ def _validate_bundle_name(value: str) -> str:
     if not _BUNDLE_NAME_RE.fullmatch(candidate):
         raise ValueError(
             "Nom de bundle invalide. Utiliser un nom simple en .tar.gz ou .tgz."
+        )
+    return candidate
+
+
+def _validate_package_name(value: str) -> str:
+    candidate = value.strip()
+    if not _PACKAGE_NAME_RE.fullmatch(candidate):
+        raise ValueError(
+            "Nom de package recovery invalide."
         )
     return candidate
 
@@ -229,6 +243,201 @@ def publish_recovery_bundle(
         "user": user,
         "port": port,
         "receiver_stdout": stdout,
+        "receiver_stderr": stderr,
+        "command": command,
+    }
+
+
+
+def fetch_recovery_plan(
+    *,
+    package_name: str,
+    output: Path,
+    host: str,
+    user: str,
+    identity_file: Path,
+    known_hosts_file: Path,
+    port: int = 22,
+    ssh_executable: str | None = None,
+) -> dict[str, Any]:
+    """Fetch one recovery-plan.json through the forced-command SSH key."""
+
+    package_name = _validate_package_name(
+        package_name
+    )
+
+    host = host.strip()
+    user = user.strip()
+
+    if not _HOST_RE.fullmatch(host):
+        raise ValueError("Hôte SSH invalide.")
+    if not _USER_RE.fullmatch(user):
+        raise ValueError("Utilisateur SSH invalide.")
+    if port < 1 or port > 65535:
+        raise ValueError("Port SSH invalide.")
+
+    identity_file = identity_file.expanduser().resolve()
+    known_hosts_file = known_hosts_file.expanduser().resolve()
+
+    if not identity_file.is_file():
+        raise FileNotFoundError(
+            f"Clé privée SSH introuvable : {identity_file}"
+        )
+    if not known_hosts_file.is_file():
+        raise FileNotFoundError(
+            f"known_hosts SSH introuvable : {known_hosts_file}"
+        )
+    if known_hosts_file.stat().st_size <= 0:
+        raise ValueError("known_hosts SSH est vide.")
+
+    ssh = ssh_executable or shutil.which("ssh")
+    if not ssh:
+        raise FileNotFoundError(
+            "Exécutable ssh introuvable dans PATH."
+        )
+
+    command = [
+        ssh,
+        "-T",
+        "-p",
+        str(port),
+        "-i",
+        str(identity_file),
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "IdentitiesOnly=yes",
+        "-o",
+        "StrictHostKeyChecking=yes",
+        "-o",
+        f"UserKnownHostsFile={known_hosts_file}",
+        f"{user}@{host}",
+        f"fetch-plan {package_name}",
+    ]
+
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        check=False,
+    )
+
+    stderr = completed.stderr.decode(
+        "utf-8",
+        errors="replace",
+    ).strip()
+
+    if completed.returncode != 0:
+        stdout_text = completed.stdout.decode(
+            "utf-8",
+            errors="replace",
+        ).strip()
+        raise RuntimeError(
+            "Récupération SSH du recovery-plan en échec "
+            f"(exit={completed.returncode}) : "
+            f"{stderr or stdout_text}"
+        )
+
+    header, separator, payload = completed.stdout.partition(
+        b"\n"
+    )
+    if not separator:
+        raise ValueError(
+            "Réponse recovery-plan sans en-tête valide."
+        )
+
+    try:
+        header_text = header.decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            "En-tête recovery-plan non ASCII."
+        ) from exc
+
+    parts = header_text.split(" ")
+    if len(parts) != 4 or parts[0] != "PLAN":
+        raise ValueError(
+            "En-tête recovery-plan invalide."
+        )
+
+    received_package = parts[1]
+    expected_sha = parts[2].lower()
+    expected_size_text = parts[3]
+
+    if received_package != package_name:
+        raise ValueError(
+            "Le serveur a retourné un package inattendu."
+        )
+    if not re.fullmatch(
+        r"[0-9a-f]{64}",
+        expected_sha,
+    ):
+        raise ValueError(
+            "SHA-256 recovery-plan invalide."
+        )
+    if not expected_size_text.isdigit():
+        raise ValueError(
+            "Taille recovery-plan invalide."
+        )
+
+    expected_size = int(expected_size_text)
+    if (
+        expected_size <= 0
+        or expected_size > _MAX_PLAN_BYTES
+    ):
+        raise ValueError(
+            "Taille recovery-plan hors limite."
+        )
+    if len(payload) != expected_size:
+        raise ValueError(
+            "Taille recovery-plan reçue incorrecte."
+        )
+
+    digest = hashlib.sha256(payload).hexdigest()
+    if digest != expected_sha:
+        raise ValueError(
+            "SHA-256 recovery-plan reçu incorrect."
+        )
+
+    try:
+        decoded = payload.decode("utf-8")
+        plan = json.loads(decoded)
+    except (UnicodeDecodeError, ValueError) as exc:
+        raise ValueError(
+            "Recovery-plan reçu invalide."
+        ) from exc
+
+    if not isinstance(plan, dict):
+        raise ValueError(
+            "Recovery-plan reçu doit être un objet JSON."
+        )
+    if str(plan.get("schema_version", "")) != "1.0":
+        raise ValueError(
+            "Recovery-plan reçu utilise un schéma non supporté."
+        )
+
+    output = output.expanduser().resolve()
+    output.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    tmp = output.with_name(
+        f".{output.name}.tmp"
+    )
+    try:
+        tmp.write_bytes(payload)
+        tmp.replace(output)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    return {
+        "fetched": True,
+        "package_name": package_name,
+        "plan": str(output),
+        "size": expected_size,
+        "sha256": digest,
+        "host": host,
+        "user": user,
+        "port": port,
         "receiver_stderr": stderr,
         "command": command,
     }

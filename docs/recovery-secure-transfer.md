@@ -107,10 +107,10 @@ La clé privée ne doit jamais quitter ILIAS.
 Recopier uniquement la clé publique affichée sur ILIAS dans authorized_keys, précédée des options suivantes :
 
 ~~~text
-restrict,command="/bin/bash /opt/ilias2moodle/tools/receive-recovery-bundle.sh /var/moodledata/ilias2moodle/recovery/bundles" ssh-ed25519 AAAA... ilias2moodle recovery push
+restrict,command="/bin/bash /opt/ilias2moodle/tools/receive-recovery-bundle.sh /var/moodledata/ilias2moodle/recovery/bundles /var/moodledata/ilias2moodle/packages" ssh-ed25519 AAAA... ilias2moodle recovery push
 ~~~
 
-Le mot-clé restrict désactive notamment le forwarding, l'agent, X11 et le PTY. La commande forcée ignore toute tentative d'exécuter une autre commande distante.
+Le mot-clé restrict désactive notamment le forwarding, l'agent, X11 et le PTY. La commande forcée ignore toute tentative d'exécuter une autre commande distante. Les deux répertoires sont fixés côté Moodle : le premier reçoit les bundles, le second expose uniquement le fichier recovery-plan.json d'un package dont le nom a été validé.
 
 ## Épinglage de la clé hôte Moodle
 
@@ -163,22 +163,27 @@ La console opérateur doit proposer automatiquement le bundle reçu.
 
 ## Recovery + bundle + publication en une commande
 
+Le mode historique accepte toujours un plan local avec --plan.
+
+Le mode complètement intégré utilise --fetch-package : ILIAS récupère d'abord le recovery-plan.json directement dans le package Moodle, vérifie taille, SHA-256, JSON et schema_version, exécute le recovery puis renvoie le bundle.
+
 ### [SRV ILIAS]
 
 ~~~bash
 cd /opt/ilias2moodle
 
 python3.11 tools/run-recovery-plan.py \
-  --plan=/tmp/course827_v14-recovery-plan.json \
-  --output=/tmp/course827_v17_recovery \
+  --fetch-package=course827_v18_fullauto \
+  --output=/tmp/course827_v18_recovery \
   --ilias-root=/var/www/ilias \
   --client=ilias10 \
-  --bundle=/tmp/course827_v17_recovery.tar.gz \
   --publish-host=192.168.56.54 \
   --publish-user=ilias2moodlepush \
   --publish-identity=/etc/ilias2moodle/recovery_push_ed25519 \
   --publish-known-hosts=/etc/ilias2moodle/moodle_known_hosts
 ~~~
+
+Sans --bundle explicite, le bundle est créé automatiquement à côté du répertoire output sous le nom <output>.tar.gz.
 
 ## Garanties de sécurité
 
@@ -188,6 +193,9 @@ python3.11 tools/run-recovery-plan.py \
 - SHA-256 annoncé vérifié côté Moodle ;
 - écriture temporaire puis renommage atomique ;
 - aucun chemin distant fourni par ILIAS ;
+- lecture du plan limitée à packages/<nom-validé>/recovery-plan.json ;
+- taille maximale du plan : 2 MiB ;
+- SHA-256, taille, UTF-8, JSON et schema_version du plan revalidés sur ILIAS ;
 - aucune commande shell arbitraire transmise ;
 - aucune clé privée stockée dans Moodle ;
 - vérification stricte de la clé hôte Moodle ;
