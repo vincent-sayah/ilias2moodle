@@ -33,6 +33,10 @@ $settings = file_get_contents($settingspath);
 $version = file_get_contents($versionpath);
 
 $servicechecks = [
+    "available_server_bundles()",
+    "SERVER_BUNDLES_DIRECTORY",
+    "is_bundle_filename(",
+    "is_link(\$candidate)",
     "import_and_reprepare(",
     "operator_package_preparer",
     "MAX_BUNDLE_BYTES",
@@ -85,8 +89,15 @@ foreach ([
 $recoverchecks = [
     "require_sesskey();",
     "\$_FILES['recoverybundle']",
+    "optional_param(",
+    "'serverbundle'",
+    "PARAM_FILE",
     "UPLOAD_ERR_OK",
+    "UPLOAD_ERR_NO_FILE",
     "is_uploaded_file(\$tmpname)",
+    "available_server_bundles()",
+    "array_key_exists(",
+    "recoverybundlechooseone",
     "operator_recovery_bundle_importer",
     "import_and_reprepare(",
     "usepreparedpackage",
@@ -105,6 +116,9 @@ foreach ($recoverchecks as $check) {
 $preparechecks = [
     "/local/iliasmigration/recover.php",
     "'enctype' => 'multipart/form-data'",
+    "'name' => 'serverbundle'",
+    "available_server_bundles()",
+    "recoverybundleserver",
     "'name' => 'recoverybundle'",
     "recoverybundleaction",
     "'zipname' => \$zipname",
@@ -134,11 +148,11 @@ if (!str_contains(
 
 if (!str_contains(
     $version,
-    "0.22.0-beta2"
+    "0.22.0-beta3"
 )) {
     fwrite(
         STDERR,
-        "Recovery bundle UI must bump the plugin beta version.\n"
+        "Dual-source recovery bundle UI must bump the plugin beta version.\n"
     );
     exit(1);
 }
