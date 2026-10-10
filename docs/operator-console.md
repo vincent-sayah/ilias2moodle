@@ -230,7 +230,7 @@ Le contrat `recovery-plan.json` décrit désormais plusieurs recoveries read-onl
 
 Chaque requête contient les identifiants source minimaux nécessaires, la cible `ILIAS_SOURCE`, `read_only=true`, la commande d'extraction attendue et le chemin du manifest à produire. Le worker reconstruit lui-même les commandes à partir de champs validés : il n'exécute jamais une chaîne de commande arbitraire fournie par le plan.
 
-Le transport entre Moodle et le serveur ILIAS reste volontairement hors de ce worker. Aucun mot de passe SSH, clé privée ou secret ILIAS n'est stocké dans le plugin Moodle. Le worker de recovery doit être exécuté localement sur le serveur ILIAS, ou par un mécanisme d'orchestration d'infrastructure explicitement approuvé.
+Le worker de recovery reste exécuté localement sur ILIAS. Le transport ILIAS → Moodle peut désormais être assuré par le mécanisme SSH restreint documenté dans `docs/recovery-secure-transfer.md` : la clé privée reste sur ILIAS et la clé publique Moodle est associée à une commande forcée de dépôt. Aucun secret n'est stocké dans le plugin Moodle.
 
 ### Import d'un bundle de recovery dans la console — 0.22.0-beta3
 
