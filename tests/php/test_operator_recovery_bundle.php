@@ -39,6 +39,7 @@ $servicechecks = [
     "is_link(\$candidate)",
     "import_and_reprepare(",
     "operator_package_preparer",
+    "'source_version'",
     "MAX_BUNDLE_BYTES",
     "MAX_ARCHIVE_ENTRIES",
     "expected_manifest",
