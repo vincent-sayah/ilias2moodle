@@ -29,7 +29,11 @@ $servicechecks = [
     "'--ilias-version'",
     "proc_open(",
     "is_inside(\$zip, \$importsroot)",
-    "Prepared package output already exists",
+    "reuse_existing_package(",
+    "'source_archive'",
+    "'reused_existing' => true",
+    "Existing prepared package belongs to a different ILIAS ZIP",
+    "Existing prepared package is incomplete",
     "Only native ILIAS ZIP exports are accepted",
     "Unsafe package output name",
     "migration.json",
@@ -46,6 +50,14 @@ foreach ($servicechecks as $check) {
         );
         exit(1);
     }
+}
+
+if (str_contains($service, "Prepared package output already exists")) {
+    fwrite(
+        STDERR,
+        "Existing valid prepared packages must be reusable by the operator console.\n"
+    );
+    exit(1);
 }
 
 if (str_contains($service, "shell_exec(")
