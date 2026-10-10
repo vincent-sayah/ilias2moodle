@@ -175,6 +175,26 @@ Ce fichier décrit les dépendances read-only encore nécessaires côté ILIAS. 
 
 La génération du plan ne déclenche aucune commande distante. Elle constitue le contrat entre le worker de préparation et le futur orchestrateur de récupération. Les dépendances sans contrat automatique restent explicitement dans `unresolved` au lieu d'être ignorées.
 
+Le dépôt fournit aussi un worker local à exécuter **sur le serveur ILIAS source** :
+
+```bash
+./tools/run-ilias2moodle.sh recover-source \
+  --plan=/chemin/recovery-plan.json \
+  --output=/tmp/ilias2moodle-recovery \
+  --ilias-root=/var/www/ilias \
+  --client=ilias10
+```
+
+Le worker :
+
+1. refuse toute requête qui n'est pas marquée `read_only=true` ;
+2. refuse une cible autre que `ILIAS_SOURCE` ;
+3. exécute les extracteurs avec une liste d'arguments, sans shell ;
+4. vérifie la présence des manifests attendus ;
+5. renvoie un résumé JSON global.
+
+L'option `--dry-run` permet de valider le plan et les commandes sans lire de ressources ILIAS.
+
 Le test réel du cours `282` a produit deux demandes IRSS pour l'Exercise `356` :
 
 ```text
