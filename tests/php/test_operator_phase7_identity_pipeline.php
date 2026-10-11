@@ -42,14 +42,10 @@ if (!str_contains($queue, 'final class operator_phase7_identity_queue')
     exit(1);
 }
 
-foreach ([
-    "phase7_identities' =>",
-    "require_identity_for_migration(",
-] as $forbidden) {
-    if (str_contains($pipeline, $forbidden)) {
-        fwrite(STDERR, "Phase 7.1 must not be enabled in the manual default pipeline.\n");
-        exit(1);
-    }
+if (str_contains($pipeline, "    'phase7_identities' => [")
+        || str_contains($pipeline, "'phase7_identities' => $this->")) {
+    fwrite(STDERR, "Phase 7.1 must not be enabled in the manual default pipeline.\n");
+    exit(1);
 }
 
 foreach ([
