@@ -4,6 +4,8 @@
 
 La Phase 7.3 est clôturée en mode **rapport historique uniquement**.
 
+> Cette phase reste hors du pipeline opérateur standard beta9.2. Elle constitue un outil spécialisé d'audit historique et n'est pas une étape automatique de la migration de contenu.
+
 Aucune donnée de progression ou de résultat ILIAS n'est injectée dans les structures natives Moodle lorsque la sémantique source ne peut pas être reconstruite fidèlement. Cette décision évite de fabriquer des tentatives, notes ou états de completion.
 
 ## POC avancé de validation
