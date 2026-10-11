@@ -25,6 +25,7 @@ $expected = [
     'wikis',
     'exercises',
     'forums',
+    'phase7_forum_contributions',
     'mediacasts',
     'blogs',
     'media_pools',
