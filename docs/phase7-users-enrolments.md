@@ -4,6 +4,8 @@
 
 Phase 7.1 validée sur le POC réel.
 
+> Depuis `0.22.0-beta9`, cette phase n'est plus exécutée automatiquement par le pipeline opérateur standard. Les extracteurs, mappings et executors restent disponibles pour un traitement spécialisé ou une future réintégration contrôlée.
+
 Cette phase établit le rapprochement fiable des identités ILIAS vers Moodle avant les traitements dépendant d'un utilisateur : inscriptions, rôles, contributions Forum, auteurs Blog, auteurs Wiki et données de progression.
 
 L'objet ILIAS Groupe complet n'est pas inclus dans ce périmètre. Sa migration reste différée.
@@ -177,7 +179,7 @@ global admin mapping = ILIAS 6 -> Moodle 2/admin
 La Phase 7.1 est clôturée pour le périmètre du POC.
 
 
-## Intégration console opérateur — beta7
+## Intégration historique console opérateur — beta7
 
 La version `0.22.0-beta7` raccorde la Phase 7.1 à la console opérateur V1.1.
 
@@ -185,4 +187,4 @@ L'extraction complémentaire reste strictement read-only côté ILIAS et utilise
 
 La migration complète est bloquée tant que l'artefact d'identités n'est pas disponible. Une fois prêt, l'étape `Utilisateurs, inscriptions et rôles` s'exécute immédiatement après la création de la structure Moodle et avant les familles de contenus.
 
-Cette intégration ne change pas la politique métier Phase 7.1 ; elle automatise uniquement l'acquisition de la source et l'appel de l'executor existant.
+Cette intégration ne changeait pas la politique métier Phase 7.1 ; elle automatisait uniquement l'acquisition de la source et l'appel de l'executor existant. Elle est conservée comme historique depuis le retour au workflow manuel beta9.
