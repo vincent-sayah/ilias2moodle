@@ -64,6 +64,13 @@ final class operator_pipeline {
                 'label' => get_string('step_forums', 'local_iliasmigration'),
                 'types' => ['forum'],
             ],
+            'phase7_forum_contributions' => [
+                'label' => get_string(
+                    'step_phase7_forum_contributions',
+                    'local_iliasmigration'
+                ),
+                'types' => ['forum'],
+            ],
             'mediacasts' => [
                 'label' => get_string('step_mediacasts', 'local_iliasmigration'),
                 'types' => ['mediacast'],
@@ -208,6 +215,12 @@ final class operator_pipeline {
             'forums' => (
                 new phase65_forum_executor($migrationjson)
             )->execute($document, $categoryid),
+            'phase7_forum_contributions' =>
+                $this->execute_phase7_forum_contributions(
+                    $document,
+                    $migrationjson,
+                    $categoryid
+                ),
             'mediacasts' => (
                 new phase65_mediacast_executor($migrationjson)
             )->execute($document, $categoryid),
@@ -290,6 +303,24 @@ final class operator_pipeline {
             ];
         }
 
+        if ($stepkey === 'phase7_forum_contributions') {
+            $phase7summary = [
+                'forum_count' => (int) (
+                    $result['forum_count']
+                    ?? 0
+                ),
+                'ready_for_apply' => $result[
+                    'ready_for_apply'
+                ] ?? null,
+                'apply_counts' => $result[
+                    'apply_counts'
+                ] ?? null,
+                'forum_results' => $result[
+                    'forum_results'
+                ] ?? null,
+            ];
+        }
+
         return [
             'mode' => $result['mode'] ?? null,
             'phase' => $result['phase'] ?? null,
@@ -327,6 +358,10 @@ final class operator_pipeline {
             throw new \coding_exception(
                 'Unknown operator pipeline step: ' . $stepkey
             );
+        }
+
+        if ($stepkey === 'phase7_forum_contributions') {
+            return [];
         }
 
         $allowedkinds = $stepkey === 'structure'
@@ -505,6 +540,116 @@ final class operator_pipeline {
         return $candidate;
     }
 
+    private function execute_phase7_forum_contributions(
+        array $document,
+        string $migrationjson,
+        int $categoryid
+    ): array {
+        $forumrefs = [];
+        $this->collect_source_refs_by_type(
+            is_array($document['course']['items'] ?? null)
+                ? $document['course']['items']
+                : [],
+            'forum',
+            $forumrefs
+        );
+
+        $forumrefs = array_values(
+            array_unique($forumrefs)
+        );
+        sort($forumrefs, SORT_NATURAL);
+
+        if (!$forumrefs) {
+            return [
+                'phase' => '7.4',
+                'mode' => 'apply',
+                'operator_status' => 'SKIPPED_NOT_APPLICABLE',
+                'writes_performed' => false,
+                'ready_for_apply' => true,
+                'forum_count' => 0,
+                'apply_counts' => [
+                    'discussions_created' => 0,
+                    'discussions_kept' => 0,
+                    'posts_created' => 0,
+                    'posts_kept' => 0,
+                    'attachments_created' => 0,
+                    'mappings_created' => 0,
+                    'root_mappings_repaired' => 0,
+                ],
+                'forum_results' => [],
+            ];
+        }
+
+        $aggregate = [
+            'discussions_created' => 0,
+            'discussions_kept' => 0,
+            'posts_created' => 0,
+            'posts_kept' => 0,
+            'attachments_created' => 0,
+            'mappings_created' => 0,
+            'root_mappings_repaired' => 0,
+        ];
+        $results = [];
+        $writes = false;
+
+        foreach ($forumrefs as $forumref) {
+            $result = (
+                new phase7_forum_contribution_executor(
+                    $migrationjson
+                )
+            )->execute(
+                $document,
+                $categoryid,
+                $forumref
+            );
+
+            if (empty($result['ready_for_apply'])) {
+                throw new \coding_exception(
+                    'Phase 7.4 Forum result is not ready after apply: '
+                    . $forumref
+                );
+            }
+
+            foreach ($aggregate as $key => $value) {
+                $aggregate[$key] += (int) (
+                    $result['apply_counts'][$key]
+                    ?? 0
+                );
+            }
+
+            $writes = $writes
+                || !empty(
+                    $result['writes_performed']
+                );
+
+            $results[] = [
+                'forum_ref_id' => $forumref,
+                'target_forum' => $result[
+                    'target_forum'
+                ] ?? null,
+                'source_counts' => $result[
+                    'counts'
+                ] ?? null,
+                'apply_counts' => $result[
+                    'apply_counts'
+                ] ?? null,
+                'ready_for_apply' => $result[
+                    'ready_for_apply'
+                ] ?? null,
+            ];
+        }
+
+        return [
+            'phase' => '7.4',
+            'mode' => 'apply',
+            'writes_performed' => $writes,
+            'ready_for_apply' => true,
+            'forum_count' => count($forumrefs),
+            'apply_counts' => $aggregate,
+            'forum_results' => $results,
+        ];
+    }
+
     private function execute_glossaries(
         array $document,
         string $migrationjson,
@@ -525,6 +670,44 @@ final class operator_pipeline {
             return $result;
         } catch (\Throwable $exception) {
             $transaction->rollback($exception);
+        }
+    }
+
+    private function collect_source_refs_by_type(
+        array $items,
+        string $wantedtype,
+        array &$refs
+    ): void {
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            if ((string) ($item['type'] ?? '') === $wantedtype) {
+                $sourceid = trim(
+                    (string) (
+                        $item['source_id']
+                        ?? ''
+                    )
+                );
+
+                if ($sourceid !== '') {
+                    $refs[] = $sourceid;
+                }
+            }
+
+            $children = is_array(
+                $item['items']
+                ?? null
+            )
+                ? $item['items']
+                : [];
+
+            $this->collect_source_refs_by_type(
+                $children,
+                $wantedtype,
+                $refs
+            );
         }
     }
 
