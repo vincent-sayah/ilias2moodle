@@ -10,7 +10,10 @@ from typing import Any
 
 from ilias2moodle.ilias.blog import parse_blogs
 from ilias2moodle.model import MigrationDocument, MigrationItem
-from ilias2moodle.recovery_assets import load_mediaobject_recovery
+from ilias2moodle.recovery_assets import (
+    copy_recovered_file,
+    load_mediaobject_recovery,
+)
 
 
 def _walk(items: Iterable[MigrationItem]) -> Iterable[MigrationItem]:
@@ -223,7 +226,7 @@ def extract_blog_assets(
                                     parents=True,
                                     exist_ok=True,
                                 )
-                                shutil.copy2(recovery["path"], destination_path)
+                                copy_recovered_file(recovery["path"], destination_path)
                                 copied = True
                                 recovered = True
                                 size = int(recovery["size"])

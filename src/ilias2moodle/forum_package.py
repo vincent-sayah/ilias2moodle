@@ -9,7 +9,10 @@ from typing import Any
 
 from ilias2moodle.ilias.forum import parse_forums
 from ilias2moodle.model import MigrationDocument, MigrationItem
-from ilias2moodle.recovery_assets import load_forum_attachment_recovery
+from ilias2moodle.recovery_assets import (
+    copy_recovered_file,
+    load_forum_attachment_recovery,
+)
 
 
 def _walk(
@@ -268,7 +271,7 @@ def extract_forum_assets(
                                     parents=True,
                                     exist_ok=True,
                                 )
-                                shutil.copy2(
+                                copy_recovered_file(
                                     recovery["path"],
                                     destination_path,
                                 )

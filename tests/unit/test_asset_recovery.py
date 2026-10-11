@@ -9,6 +9,26 @@ from ilias2moodle.blog_package import extract_blog_assets
 from ilias2moodle.forum_package import extract_forum_assets
 from ilias2moodle.media_pool_package import extract_media_pool_assets
 from ilias2moodle.model import CourseExport, MigrationDocument, MigrationItem
+from ilias2moodle.recovery_assets import copy_recovered_file
+
+
+def test_recovery_copy_does_not_preserve_filesystem_metadata(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    source = tmp_path / "source.bin"
+    destination = tmp_path / "package" / "asset.bin"
+    source.write_bytes(b"recovered-content")
+
+    def fail_copystat(*args, **kwargs):
+        raise PermissionError("xattr metadata copy must not be attempted")
+
+    monkeypatch.setattr("shutil.copystat", fail_copystat)
+
+    copied = copy_recovered_file(source, destination)
+
+    assert copied == destination
+    assert destination.read_bytes() == b"recovered-content"
 
 
 def _sha256(data: bytes) -> str:

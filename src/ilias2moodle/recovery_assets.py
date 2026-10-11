@@ -2,8 +2,34 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path, PurePosixPath
 from typing import Any
+
+
+def copy_recovered_file(source: str | Path, destination: str | Path) -> Path:
+    """Copy recovered file contents without preserving filesystem metadata.
+
+    Recovery bundles may originate from a different SELinux/xattr context.
+    The normalized Moodle package only needs the file bytes; attempting to
+    preserve source metadata with shutil.copy2() can fail for the web-server
+    account when extended attributes cannot be written.
+    """
+
+    source_path = Path(source)
+    destination_path = Path(destination)
+
+    if source_path.is_symlink() or not source_path.is_file():
+        raise FileNotFoundError(
+            f"Fichier recovery introuvable ou non régulier : {source_path}"
+        )
+
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with source_path.open("rb") as src, destination_path.open("wb") as dst:
+        shutil.copyfileobj(src, dst, length=1024 * 1024)
+
+    return destination_path
 
 
 def _sha256_file(path: Path) -> str:
