@@ -82,8 +82,10 @@ final class operator_run_manager {
                         'detected_types' => $types,
                         'phase7_1_identities' =>
                             'integrated_operator_pipeline',
+                        'phase7_4_forum' =>
+                            'integrated_operator_pipeline',
                         'phase7_extensions' =>
-                            '7.3_7.4_7.5_7.6_not_yet_integrated',
+                            '7.3_7.5_7.6_not_yet_integrated',
                         'order_reconciliation_v2' =>
                             'guarded_cli_post_step',
                     ]),
@@ -512,8 +514,10 @@ final class operator_run_manager {
                 ),
                 'phase7_1_identities' =>
                     'integrated_operator_pipeline',
+                'phase7_4_forum' =>
+                    'integrated_operator_pipeline',
                 'phase7_extensions' =>
-                    '7.3_7.4_7.5_7.6_not_yet_integrated',
+                    '7.3_7.5_7.6_not_yet_integrated',
                 'order_reconciliation_v2' =>
                     'guarded_cli_post_step',
             ],
