@@ -28,6 +28,46 @@ ILIAS 10
       Moodle 4.5
 ```
 
+## Architecture opérateur courante — beta9.2
+
+Le workflow qualifié conserve la séparation entre ILIAS et Moodle, mais **n'utilise plus d'orchestration distante automatique par défaut**.
+
+```text
+Utilisateur / opérateur
+        │
+        ├── exporte le cours depuis ILIAS
+        │
+        ▼
+Console Moodle
+        │
+        ├── upload ZIP
+        ├── prepare-export Python
+        ├── package.json / migration.json
+        └── recovery-plan.json si nécessaire
+                │
+                ├── commandes affichées à l'opérateur
+                ▼
+          Serveur ILIAS
+                │
+                └── extraction read-only + bundle
+                         │
+                         ▼
+                  upload manuel Moodle
+                         │
+                         ▼
+                    package READY
+                         │
+                         ▼
+                 pipeline opérateur
+                         │
+                         ▼
+                  objets + mappings Moodle
+```
+
+Les composants de transport/worker développés pendant les beta5 à beta8 restent présents pour historique, tests et diagnostic, mais ils ne sont plus requis pour exploiter la console beta9.2.
+
+La Phase 3 possède également une réconciliation post-apply : après création des ressources simples, les WebResource internes sont réévalués contre les mappings nouvellement disponibles afin de pointer vers les cibles Moodle lorsque cela est déterministe.
+
 ## Composants
 
 ### `ilias/`
@@ -142,7 +182,7 @@ FAILED
 
 ### Isolation des erreurs
 
-La beta1 isole les erreurs à la granularité d'une **famille d'objet**. Chaque executor conserve sa transaction et ses garde-fous.
+Le pipeline opérateur isole les erreurs à la granularité d'une **famille d'objet**. Chaque executor conserve sa transaction et ses garde-fous.
 
 La granularité par `source_ref_id` est une évolution ultérieure afin de ne pas casser les invariants transactionnels déjà validés des executors existants.
 
