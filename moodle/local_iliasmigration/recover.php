@@ -26,62 +26,23 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 require_sesskey();
 
-$zipname = required_param(
-    'zipname',
-    PARAM_FILE
-);
+$zipname = required_param('zipname', PARAM_FILE);
 $outputname = required_param(
     'outputname',
     PARAM_RAW_TRIMMED
 );
 
-$serverbundle = optional_param(
-    'serverbundle',
-    '',
-    PARAM_FILE
-);
-
 $upload = isset($_FILES['recoverybundle'])
         && is_array($_FILES['recoverybundle'])
     ? $_FILES['recoverybundle']
-    : null;
+    : [];
 
-$uploaderror = is_array($upload)
-    ? (int) (
-        $upload['error']
-        ?? UPLOAD_ERR_NO_FILE
-    )
-    : UPLOAD_ERR_NO_FILE;
+$uploaderror = (int) (
+    $upload['error']
+    ?? UPLOAD_ERR_NO_FILE
+);
 
-$hasupload = $uploaderror === UPLOAD_ERR_OK;
-$hasserverbundle = $serverbundle !== '';
-
-if ($hasupload && $hasserverbundle) {
-    \core\notification::error(
-        get_string(
-            'recoverybundlechooseone',
-            'local_iliasmigration'
-        )
-    );
-    redirect(new moodle_url(
-        '/local/iliasmigration/index.php'
-    ));
-}
-
-if (!$hasupload && !$hasserverbundle) {
-    \core\notification::error(
-        get_string(
-            'recoverybundleuploadmissing',
-            'local_iliasmigration'
-        )
-    );
-    redirect(new moodle_url(
-        '/local/iliasmigration/index.php'
-    ));
-}
-
-if ($uploaderror !== UPLOAD_ERR_OK
-        && $uploaderror !== UPLOAD_ERR_NO_FILE) {
+if ($uploaderror !== UPLOAD_ERR_OK) {
     \core\notification::error(
         get_string(
             'recoverybundleuploaderror',
@@ -94,62 +55,30 @@ if ($uploaderror !== UPLOAD_ERR_OK
     ));
 }
 
+$tmpname = trim((string) (
+    $upload['tmp_name']
+    ?? ''
+));
+$originalname = trim((string) (
+    $upload['name']
+    ?? ''
+));
+
+if ($tmpname === ''
+        || !is_uploaded_file($tmpname)) {
+    \core\notification::error(
+        get_string(
+            'recoverybundleuploadmissing',
+            'local_iliasmigration'
+        )
+    );
+    redirect(new moodle_url(
+        '/local/iliasmigration/index.php'
+    ));
+}
+
 $preparer = new \local_iliasmigration\operator_package_preparer();
 $importer = new \local_iliasmigration\operator_recovery_bundle_importer();
-$recoveryqueue = new \local_iliasmigration\operator_recovery_queue();
-$identityqueue = new \local_iliasmigration\operator_phase7_identity_queue();
-$identitystatus = null;
-
-if ($hasupload) {
-    $tmpname = (string) (
-        $upload['tmp_name']
-        ?? ''
-    );
-    $originalname = (string) (
-        $upload['name']
-        ?? ''
-    );
-
-    if ($tmpname === ''
-            || !is_uploaded_file($tmpname)) {
-        \core\notification::error(
-            get_string(
-                'recoverybundleuploadmissing',
-                'local_iliasmigration'
-            )
-        );
-        redirect(new moodle_url(
-            '/local/iliasmigration/index.php'
-        ));
-    }
-} else {
-    try {
-        $serverbundles = $importer
-            ->available_server_bundles();
-
-        if (!array_key_exists(
-            $serverbundle,
-            $serverbundles
-        )) {
-            throw new \coding_exception(
-                'Selected server recovery bundle is not available.'
-            );
-        }
-
-        $tmpname = (string) (
-            $serverbundles[$serverbundle]['path']
-            ?? ''
-        );
-        $originalname = $serverbundle;
-    } catch (Throwable $exception) {
-        \core\notification::error(
-            $exception->getMessage()
-        );
-        redirect(new moodle_url(
-            '/local/iliasmigration/index.php'
-        ));
-    }
-}
 
 try {
     $imports = $preparer->available_imports();
@@ -166,22 +95,8 @@ try {
         $tmpname,
         $originalname
     );
-
-    $recoveryqueue->sync(
-        $outputname,
-        $zipname,
-        $result
-    );
-
-    $identitystatus = $identityqueue->sync(
-        $outputname,
-        $zipname,
-        $result
-    );
 } catch (Throwable $exception) {
-    \core\notification::error(
-        $exception->getMessage()
-    );
+    \core\notification::error($exception->getMessage());
     redirect(new moodle_url(
         '/local/iliasmigration/index.php'
     ));
@@ -224,16 +139,12 @@ $table->data = [
         s($zipname),
     ],
     [
+        get_string('packagename', 'local_iliasmigration'),
+        s($outputname),
+    ],
+    [
         get_string('coursetitle', 'local_iliasmigration'),
         s((string) ($result['title'] ?? '')),
-    ],
-    [
-        get_string('packagepath', 'local_iliasmigration'),
-        s((string) ($result['package_root'] ?? '')),
-    ],
-    [
-        get_string('sourcepath', 'local_iliasmigration'),
-        s((string) ($result['migration_json'] ?? '')),
     ],
     [
         get_string('missingcount', 'local_iliasmigration'),
@@ -243,8 +154,7 @@ $table->data = [
 echo html_writer::table($table);
 
 if (empty($result['recovery_required'])
-        && (int) ($result['missing_count'] ?? 0) === 0
-        && !empty($identitystatus['ready'])) {
+        && (int) ($result['missing_count'] ?? 0) === 0) {
     echo html_writer::div(
         get_string(
             'packagepreparedready',
@@ -256,10 +166,7 @@ if (empty($result['recovery_required'])
     echo html_writer::link(
         new moodle_url(
             '/local/iliasmigration/index.php',
-            [
-                'sourcepath' =>
-                    (string) $result['migration_json'],
-            ]
+            ['package' => $outputname]
         ),
         get_string(
             'usepreparedpackage',
@@ -267,6 +174,49 @@ if (empty($result['recovery_required'])
         ),
         ['class' => 'btn btn-primary mr-2']
     );
+} else {
+    echo html_writer::div(
+        get_string(
+            'recoveryremainingnotice',
+            'local_iliasmigration',
+            (int) ($result['missing_count'] ?? 0)
+        ),
+        'alert alert-warning'
+    );
+
+    echo html_writer::start_tag('form', [
+        'method' => 'post',
+        'action' => (new moodle_url(
+            '/local/iliasmigration/prepare.php'
+        ))->out(false),
+        'class' => 'd-inline mr-2',
+    ]);
+
+    foreach ([
+        'sesskey' => sesskey(),
+        'zipname' => $zipname,
+        'outputname' => $outputname,
+    ] as $name => $value) {
+        echo html_writer::empty_tag('input', [
+            'type' => 'hidden',
+            'name' => $name,
+            'value' => $value,
+        ]);
+    }
+
+    echo html_writer::tag(
+        'button',
+        get_string(
+            'showremainingcommands',
+            'local_iliasmigration'
+        ),
+        [
+            'type' => 'submit',
+            'class' => 'btn btn-primary',
+        ]
+    );
+
+    echo html_writer::end_tag('form');
 }
 
 echo html_writer::link(
