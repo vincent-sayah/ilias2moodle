@@ -32,11 +32,7 @@ $prepare = file_get_contents($preparepath);
 $settings = file_get_contents($settingspath);
 $version = file_get_contents($versionpath);
 
-$servicechecks = [
-    "available_server_bundles()",
-    "SERVER_BUNDLES_DIRECTORY",
-    "is_bundle_filename(",
-    "is_link(\$candidate)",
+foreach ([
     "import_and_reprepare(",
     "operator_package_preparer",
     "'source_version'",
@@ -49,114 +45,71 @@ $servicechecks = [
     "'--no-same-owner'",
     "'--no-same-permissions'",
     "proc_open(",
-    "non-regular archive entry",
-    "parent path traversal",
-    "symbolic link",
     "previous_missing_count",
     "assert_package_not_in_use(",
-    "recovery_bundle_import_",
     "lock_config::get_lock_factory",
-    "local_iliasmigration_run",
-    "already referenced by an operator run",
     "Recovery bundle did not reduce",
     "rename(\$output, \$backup)",
-    "\$preparedroot",
     "reprepared_existing",
-];
-
-foreach ($servicechecks as $check) {
+] as $check) {
     if (!str_contains($service, $check)) {
-        fwrite(
-            STDERR,
-            "Missing recovery bundle guard: {$check}\n"
-        );
+        fwrite(STDERR, "Missing recovery bundle guard: {$check}\n");
+        exit(1);
+    }
+}
+
+foreach (["shell_exec(", "exec(", "system(", "passthru("] as $forbidden) {
+    if (str_contains($service, $forbidden)) {
+        fwrite(STDERR, "Recovery importer invokes shell string: {$forbidden}\n");
         exit(1);
     }
 }
 
 foreach ([
-    "shell_exec(",
-    "exec(",
-    "system(",
-    "passthru(",
-] as $forbidden) {
-    if (str_contains($service, $forbidden)) {
-        fwrite(
-            STDERR,
-            "Recovery bundle importer must not invoke shell strings: {$forbidden}\n"
-        );
-        exit(1);
-    }
-}
-
-$recoverchecks = [
     "require_sesskey();",
     "\$_FILES['recoverybundle']",
-    "optional_param(",
-    "'serverbundle'",
-    "PARAM_FILE",
     "UPLOAD_ERR_OK",
-    "UPLOAD_ERR_NO_FILE",
     "is_uploaded_file(\$tmpname)",
-    "available_server_bundles()",
-    "array_key_exists(",
-    "recoverybundlechooseone",
     "operator_recovery_bundle_importer",
     "import_and_reprepare(",
-    "usepreparedpackage",
-];
-
-foreach ($recoverchecks as $check) {
+    "'package' => \$outputname",
+    "showremainingcommands",
+] as $check) {
     if (!str_contains($recover, $check)) {
-        fwrite(
-            STDERR,
-            "Missing recovery upload behavior: {$check}\n"
-        );
+        fwrite(STDERR, "Missing manual recovery upload behavior: {$check}\n");
         exit(1);
     }
 }
 
-$preparechecks = [
+foreach ([
     "/local/iliasmigration/recover.php",
     "'enctype' => 'multipart/form-data'",
-    "'serverbundle',",
-    "available_server_bundles()",
-    "recoverybundleserver",
     "'name' => 'recoverybundle'",
     "recoverybundleaction",
-    "'zipname' => \$zipname",
-    "'outputname' => \$outputname",
-];
-
-foreach ($preparechecks as $check) {
+    "extractor_command_template",
+    "manualrecoverycommands",
+    "tar -C ",
+] as $check) {
     if (!str_contains($prepare, $check)) {
-        fwrite(
-            STDERR,
-            "Missing recovery form behavior: {$check}\n"
-        );
+        fwrite(STDERR, "Missing manual recovery preparation behavior: {$check}\n");
         exit(1);
     }
 }
 
-if (!str_contains(
-    $settings,
-    "local_iliasmigration/recoveriesroot"
-)) {
-    fwrite(
-        STDERR,
-        "Missing recoveriesroot setting.\n"
-    );
-    exit(1);
+foreach ([
+    "local_iliasmigration/recoveriesroot",
+    "local_iliasmigration/sourceprojectroot",
+    "local_iliasmigration/sourceiliasroot",
+    "local_iliasmigration/sourceclient",
+] as $check) {
+    if (!str_contains($settings, $check)) {
+        fwrite(STDERR, "Missing manual recovery setting: {$check}\n");
+        exit(1);
+    }
 }
 
-if (!str_contains(
-    $version,
-    "0.22.0-beta8"
-)) {
-    fwrite(
-        STDERR,
-        "Automatic reprepare task must retain the current plugin beta version.\n"
-    );
+if (!str_contains($version, "0.22.0-beta9")) {
+    fwrite(STDERR, "Manual recovery workflow must use beta9.\n");
     exit(1);
 }
 

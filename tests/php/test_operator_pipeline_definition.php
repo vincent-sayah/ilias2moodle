@@ -15,7 +15,6 @@ $steps = \local_iliasmigration\operator_pipeline::step_definitions();
 
 $expected = [
     'structure',
-    'phase7_identities',
     'resources',
     'scorm',
     'learning_modules',
@@ -25,7 +24,6 @@ $expected = [
     'wikis',
     'exercises',
     'forums',
-    'phase7_forum_contributions',
     'mediacasts',
     'blogs',
     'media_pools',
@@ -33,8 +31,15 @@ $expected = [
 ];
 
 if (array_keys($steps) !== $expected) {
-    fwrite(STDERR, "Operator pipeline order regression failed.\n");
+    fwrite(STDERR, "Operator manual pipeline order regression failed.\n");
     exit(1);
+}
+
+foreach (['phase7_identities', 'phase7_forum_contributions'] as $forbidden) {
+    if (array_key_exists($forbidden, $steps)) {
+        fwrite(STDERR, "Automatic Phase 7 step still enabled: {$forbidden}\n");
+        exit(1);
+    }
 }
 
 foreach ($steps as $key => $definition) {

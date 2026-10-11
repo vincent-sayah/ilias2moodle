@@ -1,5 +1,61 @@
 # Console opérateur ILIAS2Moodle — guide d'utilisation
 
+> **Workflow courant : 0.22.0-beta9 — pilotage manuel.**
+>
+> Les automatisations beta5 à beta8 (queue recovery ILIAS, worker source, re-préparation cron Moodle, Phase 7.1 et Phase 7.4 automatiques) sont conservées dans l'historique du projet mais **ne sont plus branchées sur le workflow opérateur par défaut**.
+
+## Workflow opérateur beta9
+
+Le workflow retenu privilégie la simplicité et le contrôle humain :
+
+1. l'opérateur exporte le cours depuis ILIAS ;
+2. il envoie le ZIP directement dans la console Moodle ;
+3. la console analyse l'export et crée un package sous `packagesroot` ;
+4. si des ressources ne sont pas présentes dans le ZIP, la console affiche les commandes exactes à exécuter sur le serveur ILIAS ;
+5. ces commandes extraient les ressources en lecture seule puis construisent un bundle `.tar.gz` ;
+6. l'opérateur récupère ce bundle et l'envoie dans la console Moodle ;
+7. Moodle valide le bundle et re-prépare atomiquement le package ;
+8. quand `missing_count=0`, le package passe à l'état `READY` ;
+9. l'opérateur sélectionne le package READY dans la console et lance la migration.
+
+La console gère deux inventaires visibles :
+
+- **Exports ILIAS** : upload, sélection pour préparation, suppression ;
+- **Packages préparés** : statut, taille, dépendances restantes, sélection pour migration, suppression.
+
+Un package déjà référencé par un run opérateur ne peut pas être supprimé depuis la console.
+
+### Gestion manuelle des dépendances
+
+Le `recovery-plan.json` reste la source de vérité. Pour chaque dépendance supportée, la page de préparation affiche la commande issue de `extractor_command_template` avec les valeurs configurées :
+
+```text
+local_iliasmigration/sourceprojectroot
+local_iliasmigration/sourceiliasroot
+local_iliasmigration/sourceclient
+```
+
+Valeurs usuelles du laboratoire :
+
+```text
+sourceprojectroot = /opt/ilias2moodle
+sourceiliasroot   = /var/www/ilias
+sourceclient      = ilias10
+```
+
+Toutes les extractions sont regroupées dans un répertoire temporaire puis archivées. L'opérateur transfère ensuite le bundle depuis ILIAS vers son poste et l'upload dans Moodle.
+
+### Phase 7
+
+Les extensions Phase 7.1 (identités) et 7.4 (contributions historiques Forum) restent disponibles dans le code et par les outils spécialisés, mais elles ne font plus partie du pipeline opérateur standard beta9. Elles ne bloquent donc plus une migration de contenu standard.
+
+### Tâches automatiques
+
+`db/tasks.php` ne planifie plus de tâche de re-préparation recovery. Aucune queue recovery ou identité n'est créée par `prepare.php` ou `recover.php`.
+
+Les sections beta5 à beta8 plus bas dans ce document sont conservées à titre historique.
+
+
 ## Objectif
 
 La console opérateur introduite en `0.21.0-beta1` et renforcée en `0.21.0-beta2` permet de piloter une migration ILIAS → Moodle depuis l'interface Moodle sans lancer manuellement chaque commande CLI.

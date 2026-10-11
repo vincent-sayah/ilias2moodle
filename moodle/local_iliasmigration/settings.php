@@ -51,6 +51,30 @@ if ($hassiteconfig) {
     ));
 
     $settings->add(new admin_setting_configtext(
+        'local_iliasmigration/sourceprojectroot',
+        get_string('sourceprojectroot', 'local_iliasmigration'),
+        get_string('sourceprojectroot_desc', 'local_iliasmigration'),
+        '/opt/ilias2moodle',
+        PARAM_RAW_TRIMMED
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_iliasmigration/sourceiliasroot',
+        get_string('sourceiliasroot', 'local_iliasmigration'),
+        get_string('sourceiliasroot_desc', 'local_iliasmigration'),
+        '/var/www/ilias',
+        PARAM_RAW_TRIMMED
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_iliasmigration/sourceclient',
+        get_string('sourceclient', 'local_iliasmigration'),
+        get_string('sourceclient_desc', 'local_iliasmigration'),
+        'ilias10',
+        PARAM_RAW_TRIMMED
+    ));
+
+    $settings->add(new admin_setting_configtext(
         'local_iliasmigration/iliasversion',
         get_string('iliasversion', 'local_iliasmigration'),
         get_string('iliasversion_desc', 'local_iliasmigration'),

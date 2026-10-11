@@ -11,12 +11,7 @@ $recoverpath = $root
 $versionpath = $root
     . '/moodle/local_iliasmigration/version.php';
 
-foreach ([
-    $queuepath,
-    $preparepath,
-    $recoverpath,
-    $versionpath,
-] as $path) {
+foreach ([$queuepath, $preparepath, $recoverpath, $versionpath] as $path) {
     if (!is_file($path)) {
         fwrite(STDERR, "Missing file: {$path}\n");
         exit(1);
@@ -28,62 +23,22 @@ $prepare = file_get_contents($preparepath);
 $recover = file_get_contents($recoverpath);
 $version = file_get_contents($versionpath);
 
-foreach ([
-    "final class operator_recovery_queue",
-    "REQUESTS_DIRECTORY",
-    "public function sync(",
-    "public function remove(",
-    "plan_sha256",
-    "hash_file(",
-    "JSON_THROW_ON_ERROR",
-    "rename(\$tmp, \$requestpath)",
-    "unresolved_count",
-] as $check) {
-    if (!str_contains($queue, $check)) {
-        fwrite(
-            STDERR,
-            "Missing recovery queue guard: {$check}\n"
-        );
-        exit(1);
-    }
-}
-
-foreach ([
-    "operator_recovery_queue",
-    "->sync(",
-    "recoveryqueued",
-] as $check) {
-    if (!str_contains($prepare, $check)) {
-        fwrite(
-            STDERR,
-            "Missing prepare recovery queue behavior: {$check}\n"
-        );
-        exit(1);
-    }
-}
-
-foreach ([
-    "operator_recovery_queue",
-    "->sync(",
-] as $check) {
-    if (!str_contains($recover, $check)) {
-        fwrite(
-            STDERR,
-            "Missing recovery queue cleanup behavior: {$check}\n"
-        );
-        exit(1);
-    }
-}
-
-if (!str_contains(
-    $version,
-    "0.22.0-beta8"
-)) {
-    fwrite(
-        STDERR,
-        "Automatic recovery queue must track the current beta version.\n"
-    );
+if (!str_contains($queue, 'final class operator_recovery_queue')) {
+    fwrite(STDERR, "Historical recovery queue implementation must remain available.\n");
     exit(1);
 }
 
-echo "OPERATOR_RECOVERY_QUEUE_OK\n";
+foreach (['operator_recovery_queue', 'recoveryqueued'] as $forbidden) {
+    if (str_contains($prepare, $forbidden)
+            || str_contains($recover, $forbidden)) {
+        fwrite(STDERR, "Automatic recovery queue still wired into manual UI.\n");
+        exit(1);
+    }
+}
+
+if (!str_contains($version, '0.22.0-beta9')) {
+    fwrite(STDERR, "Manual operator workflow must use beta9.\n");
+    exit(1);
+}
+
+echo "OPERATOR_RECOVERY_QUEUE_DISABLED_OK\n";

@@ -2,14 +2,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$tasks = [
-    [
-        'classname' => '\\local_iliasmigration\\task\\recovery_reprepare_task',
-        'blocking' => 0,
-        'minute' => '*',
-        'hour' => '*',
-        'day' => '*',
-        'month' => '*',
-        'dayofweek' => '*',
-    ],
-];
+// The operator workflow is intentionally manual.
+// No automatic source recovery or package re-preparation task is scheduled.
+$tasks = [];
