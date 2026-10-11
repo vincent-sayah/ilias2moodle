@@ -106,6 +106,28 @@ Le dry-run ajoute :
 
 Cette stratégie préserve le fonctionnement du lien sans inventer une destination Moodle. Une phase ultérieure de réécriture des liens pourra remplacer ce lien vers ILIAS par l'URL Moodle cible lorsque l'objet référencé a lui-même été migré.
 
+## Réécriture des liens internes vers Moodle
+
+Depuis `0.22.0-beta9.2`, la Phase 3 effectue deux résolutions des WebResource
+internes ILIAS :
+
+1. une première résolution pendant la validation du package ;
+2. une seconde résolution après la création de toutes les ressources Phase 3,
+   juste avant le commit de la transaction.
+
+La seconde passe corrige le cas où un objet Web Link apparaît avant sa cible
+dans l'ordre ILIAS. Par exemple, si `lien` référence un module HTML `chiimie`
+créé plus tard dans la même Phase 3, le premier passage conserve temporairement
+le lien permanent ILIAS. Une fois le module HTML créé et son mapping enregistré,
+la seconde passe met à jour `mod_url.externalurl` vers :
+
+```text
+/mod/resource/view.php?id=<CMID Moodle de chiimie>
+```
+
+La décision reste protégée par `phase3_internal_link_policy` : une cible absente
+ou ambiguë n'est jamais devinée et conserve le fallback ILIAS.
+
 ## Instance ILIAS source
 
 Les mappings sont séparés par instance ILIAS avec `sourceinstance`, dérivé en priorité de `course.metadata.installation_url` dans `migration.json`.
