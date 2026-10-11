@@ -1,5 +1,12 @@
 # Transfert sécurisé des bundles de recovery ILIAS vers Moodle
 
+> **Statut depuis 0.22.0-beta9 : historique / optionnel.**
+>
+> Le workflow opérateur qualifié beta9.2 n'utilise plus de worker périodique ILIAS, de queue recovery ni de publication automatique par défaut. L'opérateur exécute les commandes de récupération affichées par Moodle puis charge manuellement le bundle dans la console.
+>
+> Les mécanismes décrits ci-dessous restent conservés pour historique, diagnostic ou expérimentation. Ils ne sont pas requis pour exploiter la beta9.2.
+
+
 ## Objectif
 
 Automatiser le dernier maillon manuel du workflow recovery sans stocker de secret dans Moodle.
