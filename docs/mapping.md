@@ -46,8 +46,8 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Blog | automatique | mod_data ; auteur historique Phase 7 séparé |
 | Media Pool | automatique | mod_data |
 | Item Group | automatique | après création des activités |
-| Utilisateurs / inscriptions / rôles | assisté hors console beta1 | inventaire auxiliaire Phase 7 |
-| Contributions Forum | assisté hors console beta1 | inventaire auxiliaire |
+| Utilisateurs / inscriptions / rôles | automatique | Phase 7.1 intégrée et qualifiée en beta7 |
+| Contributions Forum | automatique | Phase 7.4 intégrée en beta8 ; qualification console à réaliser sur POC Forum |
 | Auteur/date Wiki | assisté hors console beta1 | inventaire auxiliaire |
 | Progression / résultats | rapport historique | pas d'apply |
 | Groupe ILIAS | non supporté | #22 |

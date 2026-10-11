@@ -97,4 +97,37 @@ if (($phase7['created_user_count'] ?? null) !== 3
     exit(1);
 }
 
+$phase74 = $pipeline->summarize_result(
+    'phase7_forum_contributions',
+    [
+        'mode' => 'apply',
+        'phase' => '7.4',
+        'writes_performed' => true,
+        'forum_count' => 1,
+        'ready_for_apply' => true,
+        'apply_counts' => [
+            'discussions_created' => 2,
+            'discussions_kept' => 0,
+            'posts_created' => 7,
+            'posts_kept' => 0,
+            'attachments_created' => 3,
+            'mappings_created' => 9,
+            'root_mappings_repaired' => 0,
+        ],
+        'forum_results' => [
+            [
+                'forum_ref_id' => '275',
+                'ready_for_apply' => true,
+            ],
+        ],
+    ]
+);
+
+if (($phase74['forum_count'] ?? null) !== 1
+        || ($phase74['apply_counts']['posts_created'] ?? null) !== 7
+        || empty($phase74['ready_for_apply'])) {
+    fwrite(STDERR, "Phase 7.4 operator summary is incomplete.\n");
+    exit(1);
+}
+
 echo "OPERATOR_STEP_SUMMARY_OK\n";
