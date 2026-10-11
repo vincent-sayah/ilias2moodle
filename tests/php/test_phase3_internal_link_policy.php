@@ -62,4 +62,41 @@ assert_internal_link_same(
     'Ambiguous targets must expose an explicit reason.'
 );
 
+
+
+$root = dirname(__DIR__, 2);
+$validator = file_get_contents(
+    $root
+    . '/moodle/local_iliasmigration/classes/phase3_package_validator.php'
+);
+$executor = file_get_contents(
+    $root
+    . '/moodle/local_iliasmigration/classes/resource_executor.php'
+);
+
+foreach ([
+    'public function reconcile_internal_link',
+    'return $this->rewrite_internal_url($operation);',
+] as $check) {
+    if (!str_contains($validator, $check)) {
+        fail_internal_link_test(
+            'Missing Phase 3 post-apply resolver behavior: ' . $check
+        );
+    }
+}
+
+foreach ([
+    'internal_links_reconciled_after_apply',
+    'reconcile_internal_link(',
+    'update_existing_url_target(',
+    "get_coursemodule_from_id(\n            'url'",
+    '$moduleinfo->externalurl = $resolvedurl;',
+] as $check) {
+    if (!str_contains($executor, $check)) {
+        fail_internal_link_test(
+            'Missing Phase 3 post-apply reconciliation behavior: ' . $check
+        );
+    }
+}
+
 fwrite(STDOUT, "OK: Phase 3 internal link policy\n");
