@@ -97,6 +97,8 @@ if ($uploaderror !== UPLOAD_ERR_OK
 $preparer = new \local_iliasmigration\operator_package_preparer();
 $importer = new \local_iliasmigration\operator_recovery_bundle_importer();
 $recoveryqueue = new \local_iliasmigration\operator_recovery_queue();
+$identityqueue = new \local_iliasmigration\operator_phase7_identity_queue();
+$identitystatus = null;
 
 if ($hasupload) {
     $tmpname = (string) (
@@ -170,6 +172,12 @@ try {
         $zipname,
         $result
     );
+
+    $identitystatus = $identityqueue->sync(
+        $outputname,
+        $zipname,
+        $result
+    );
 } catch (Throwable $exception) {
     \core\notification::error(
         $exception->getMessage()
@@ -235,7 +243,8 @@ $table->data = [
 echo html_writer::table($table);
 
 if (empty($result['recovery_required'])
-        && (int) ($result['missing_count'] ?? 0) === 0) {
+        && (int) ($result['missing_count'] ?? 0) === 0
+        && !empty($identitystatus['ready'])) {
     echo html_writer::div(
         get_string(
             'packagepreparedready',

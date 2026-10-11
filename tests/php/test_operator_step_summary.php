@@ -61,4 +61,40 @@ if (($structure['operation_count'] ?? null) !== 3) {
     exit(1);
 }
 
+$phase7 = $pipeline->summarize_result(
+    'phase7_identities',
+    [
+        'mode' => 'apply',
+        'phase' => '7.1',
+        'writes_performed' => true,
+        'identity_counts' => [
+            'matched' => 2,
+            'not_in_target' => 3,
+        ],
+        'account_creation_counts' => [
+            'create_candidate' => 3,
+            'blocked' => 0,
+        ],
+        'membership_counts' => [
+            'enrol' => 5,
+            'update' => 0,
+            'defer' => 0,
+            'blocked' => 0,
+        ],
+        'created_user_count' => 3,
+        'reused_user_count' => 2,
+        'enrolled_membership_count' => 5,
+        'updated_membership_count' => 0,
+        'ready_for_apply' => true,
+    ]
+);
+
+if (($phase7['created_user_count'] ?? null) !== 3
+        || ($phase7['reused_user_count'] ?? null) !== 2
+        || ($phase7['enrolled_membership_count'] ?? null) !== 5
+        || empty($phase7['ready_for_apply'])) {
+    fwrite(STDERR, "Phase 7.1 operator summary is incomplete.\n");
+    exit(1);
+}
+
 echo "OPERATOR_STEP_SUMMARY_OK\n";

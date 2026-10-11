@@ -104,6 +104,7 @@ final class operator_recovery_reprepare_worker {
         $preparer = new operator_package_preparer();
         $importer = new operator_recovery_bundle_importer();
         $queue = new operator_recovery_queue();
+        $identityqueue = new operator_phase7_identity_queue();
 
         $imports = $preparer->available_imports();
         $serverbundles = $importer->available_server_bundles();
@@ -269,6 +270,12 @@ final class operator_recovery_reprepare_worker {
                     $result
                 );
 
+                $identitystatus = $identityqueue->sync(
+                    $package,
+                    $zipname,
+                    $result
+                );
+
                 $archivepath = $this->archive_bundle(
                     $bundlepath,
                     $processedroot,
@@ -304,6 +311,12 @@ final class operator_recovery_reprepare_worker {
                         'next_request_queued' => (
                             $nextrequest !== null
                         ),
+                        'phase7_identity_ready' => !empty(
+                            $identitystatus['ready']
+                        ),
+                        'phase7_identity_queued' => !empty(
+                            $identitystatus['queued']
+                        ),
                         'finished_at' => gmdate('c'),
                     ]
                 );
@@ -332,6 +345,12 @@ final class operator_recovery_reprepare_worker {
                     ),
                     'next_request_queued' => (
                         $nextrequest !== null
+                    ),
+                    'phase7_identity_ready' => !empty(
+                        $identitystatus['ready']
+                    ),
+                    'phase7_identity_queued' => !empty(
+                        $identitystatus['queued']
                     ),
                 ];
             } catch (\Throwable $exception) {

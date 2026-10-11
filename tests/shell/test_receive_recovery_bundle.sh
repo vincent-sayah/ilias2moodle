@@ -10,7 +10,14 @@ trap 'rm -rf "$tmp"' EXIT
 bundles="${tmp}/bundles"
 packages="${tmp}/packages"
 requests="${tmp}/requests"
-mkdir -p "$bundles" "$packages" "$requests"
+identity_requests="${tmp}/identity-requests"
+identities="${tmp}/identities"
+mkdir -p \
+    "$bundles" \
+    "$packages" \
+    "$requests" \
+    "$identity_requests" \
+    "$identities"
 
 grep -q 'command -v python3.11' "$RECEIVER"
 grep -q 'sys.version_info >= (3, 11)' "$RECEIVER"
@@ -116,6 +123,68 @@ data = json.load(open(sys.argv[1], encoding="utf-8"))
 assert data["job_count"] == 0
 assert any(
     item.get("reason") == "bundle_already_present"
+    for item in data["skipped"]
+)
+PY
+
+identity_package="course827_identity"
+mkdir -p "${packages}/${identity_package}"
+
+identity_migration="${packages}/${identity_package}/migration.json"
+printf '%s' '{"schema_version":"1.0","source":{"lms":"ILIAS","version":"10.8.0"},"course":{"source_id":"282"}}' > "$identity_migration"
+
+identity_migration_sha="$(sha256sum "$identity_migration" | awk '{print $1}')"
+
+cat > "${identity_requests}/${identity_package}.json" <<EOF
+{"schema_version":"1.0","kind":"phase7_identity","package_name":"${identity_package}","zip_name":"course.zip","course_ref":"282","course_obj":"827","source_version":"10.8.0","migration_sha256":"${identity_migration_sha}"}
+EOF
+
+SSH_ORIGINAL_COMMAND="list-identities" \
+    bash "$RECEIVER" "$bundles" "$packages" \
+    > "${tmp}/identity-pending.json"
+
+python3 - "${tmp}/identity-pending.json" <<'PY'
+import json
+import sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["job_count"] == 1
+job = data["jobs"][0]
+assert job["package_name"] == "course827_identity"
+assert job["course_ref"] == "282"
+assert len(job["request_sha256"]) == 64
+PY
+
+identity_payload="${tmp}/identity.json"
+printf '%s' '{"schema_version":"1.0","phase":"7.1","source":{"lms":"ILIAS","client_id":"ilias10"},"course":{"ref_id":"282","roles":{"member":[]}},"users":{}}' > "$identity_payload"
+
+identity_sha="$(sha256sum "$identity_payload" | awk '{print $1}')"
+identity_size="$(stat -c '%s' "$identity_payload")"
+
+SSH_ORIGINAL_COMMAND="publish-identity ${identity_package} ${identity_sha} ${identity_size}" \
+    bash "$RECEIVER" "$bundles" "$packages" \
+    < "$identity_payload" \
+    > "${tmp}/identity-publish.out"
+
+grep -q '^IDENTITY_PUBLISHED course827_identity ' \
+    "${tmp}/identity-publish.out"
+
+cmp -s \
+    "$identity_payload" \
+    "${identities}/${identity_package}.json"
+
+SSH_ORIGINAL_COMMAND="list-identities" \
+    bash "$RECEIVER" "$bundles" "$packages" \
+    > "${tmp}/identity-after.json"
+
+python3 - "${tmp}/identity-after.json" <<'PY'
+import json
+import sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["job_count"] == 0
+assert any(
+    item.get("reason") == "identity_already_present"
     for item in data["skipped"]
 )
 PY

@@ -115,3 +115,8 @@ $string['recoverybundlechooseone'] = 'Choose only one mode: server bundle or wor
 $string['recoverybundleuploaderror'] = 'Recovery bundle upload failed with PHP error code {$a}.';
 $string['recoveryqueued'] = 'Package {$a} was queued for automatic source recovery. The ILIAS worker can fetch the plan and publish the bundle without manual transfer.';
 $string['task_recovery_reprepare'] = 'Automatically re-prepare packages after ILIAS recovery';
+
+$string['step_phase7_identities'] = 'Users, enrolments and roles';
+$string['phase7identityqueued'] = 'Phase 7.1 extraction for package {$a} was queued on the ILIAS source worker.';
+$string['phase7identityready'] = 'Phase 7.1 identities are available and validated for this package.';
+$string['phase7identitywaitmigration'] = 'The learning package is complete, but the operator migration is still waiting for the automatic users, enrolments and roles extraction from ILIAS. Reload this preparation after the ILIAS worker has run.';

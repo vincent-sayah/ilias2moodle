@@ -19,6 +19,7 @@ _PACKAGE_NAME_RE = re.compile(
     r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
 )
 _MAX_PLAN_BYTES = 2_097_152
+_MAX_IDENTITY_BYTES = 4_194_304
 
 
 def _validate_bundle_name(value: str) -> str:
@@ -606,3 +607,303 @@ def list_pending_recovery_jobs(
     data["receiver_stderr"] = stderr
     data["command"] = command
     return data
+
+
+
+def list_pending_identity_jobs(
+    *,
+    host: str,
+    user: str,
+    identity_file: Path,
+    known_hosts_file: Path,
+    port: int = 22,
+    ssh_executable: str | None = None,
+) -> dict[str, Any]:
+    """List queued Phase 7.1 identity extraction jobs."""
+
+    host = host.strip()
+    user = user.strip()
+
+    if not _HOST_RE.fullmatch(host):
+        raise ValueError("Hôte SSH invalide.")
+    if not _USER_RE.fullmatch(user):
+        raise ValueError("Utilisateur SSH invalide.")
+    if port < 1 or port > 65535:
+        raise ValueError("Port SSH invalide.")
+
+    identity_file = identity_file.expanduser().resolve()
+    known_hosts_file = known_hosts_file.expanduser().resolve()
+
+    if not identity_file.is_file():
+        raise FileNotFoundError(
+            f"Clé privée SSH introuvable : {identity_file}"
+        )
+    if not known_hosts_file.is_file():
+        raise FileNotFoundError(
+            f"known_hosts SSH introuvable : {known_hosts_file}"
+        )
+    if known_hosts_file.stat().st_size <= 0:
+        raise ValueError("known_hosts SSH est vide.")
+
+    ssh = ssh_executable or shutil.which("ssh")
+    if not ssh:
+        raise FileNotFoundError(
+            "Exécutable ssh introuvable dans PATH."
+        )
+
+    command = [
+        ssh,
+        "-T",
+        "-p",
+        str(port),
+        "-i",
+        str(identity_file),
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "IdentitiesOnly=yes",
+        "-o",
+        "StrictHostKeyChecking=yes",
+        "-o",
+        f"UserKnownHostsFile={known_hosts_file}",
+        f"{user}@{host}",
+        "list-identities",
+    ]
+
+    completed = subprocess.run(
+        command,
+        capture_output=True,
+        check=False,
+    )
+
+    stdout = completed.stdout.decode(
+        "utf-8",
+        errors="replace",
+    ).strip()
+    stderr = completed.stderr.decode(
+        "utf-8",
+        errors="replace",
+    ).strip()
+
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "Liste SSH des identités Phase 7.1 en attente en échec "
+            f"(exit={completed.returncode}) : "
+            f"{stderr or stdout}"
+        )
+
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "Réponse list-identities invalide."
+        ) from exc
+
+    if not isinstance(data, dict):
+        raise ValueError(
+            "Réponse list-identities doit être un objet JSON."
+        )
+    if str(data.get("schema_version", "")) != "1.0":
+        raise ValueError(
+            "Schéma list-identities non supporté."
+        )
+
+    jobs = data.get("jobs")
+    if not isinstance(jobs, list):
+        raise ValueError(
+            "Réponse list-identities jobs invalide."
+        )
+
+    validated: list[dict[str, Any]] = []
+
+    for index, job in enumerate(jobs, start=1):
+        if not isinstance(job, dict):
+            raise ValueError(
+                f"Job identité #{index} invalide."
+            )
+
+        package_name = _validate_package_name(
+            str(job.get("package_name", ""))
+        )
+        course_ref = str(
+            job.get("course_ref", "")
+        ).strip()
+        request_sha256 = str(
+            job.get("request_sha256", "")
+        ).lower()
+
+        if not course_ref.isdigit() or int(course_ref) <= 0:
+            raise ValueError(
+                f"course_ref identité #{index} invalide."
+            )
+        if not re.fullmatch(
+            r"[0-9a-f]{64}",
+            request_sha256,
+        ):
+            raise ValueError(
+                f"request_sha256 identité #{index} invalide."
+            )
+
+        validated.append({
+            "package_name": package_name,
+            "course_ref": course_ref,
+            "request_sha256": request_sha256,
+        })
+
+    data["jobs"] = validated
+    data["job_count"] = len(validated)
+    data["receiver_stderr"] = stderr
+    data["command"] = command
+    return data
+
+
+def publish_identity_document(
+    document: Path,
+    *,
+    package_name: str,
+    host: str,
+    user: str,
+    identity_file: Path,
+    known_hosts_file: Path,
+    port: int = 22,
+    ssh_executable: str | None = None,
+) -> dict[str, Any]:
+    """Publish one validated Phase 7.1 identity JSON document."""
+
+    package_name = _validate_package_name(
+        package_name
+    )
+    document = document.expanduser().resolve()
+
+    if not document.is_file() or document.is_symlink():
+        raise FileNotFoundError(
+            f"Document identité introuvable : {document}"
+        )
+
+    payload = document.read_bytes()
+    size = len(payload)
+
+    if size <= 0 or size > _MAX_IDENTITY_BYTES:
+        raise ValueError(
+            "Document identité vide ou supérieur à 4 MiB."
+        )
+
+    try:
+        parsed = json.loads(
+            payload.decode("utf-8")
+        )
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+    ) as exc:
+        raise ValueError(
+            "Document identité Phase 7.1 invalide."
+        ) from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError(
+            "Document identité Phase 7.1 doit être un objet JSON."
+        )
+    if str(parsed.get("schema_version", "")) != "1.0":
+        raise ValueError(
+            "Schéma identité Phase 7.1 non supporté."
+        )
+    if str(parsed.get("phase", "")) != "7.1":
+        raise ValueError(
+            "Document identité n'est pas une extraction Phase 7.1."
+        )
+    if str(
+        parsed.get("source", {}).get("lms", "")
+    ) != "ILIAS":
+        raise ValueError(
+            "Document identité Phase 7.1 n'est pas issu d'ILIAS."
+        )
+
+    host = host.strip()
+    user = user.strip()
+
+    if not _HOST_RE.fullmatch(host):
+        raise ValueError("Hôte SSH invalide.")
+    if not _USER_RE.fullmatch(user):
+        raise ValueError("Utilisateur SSH invalide.")
+    if port < 1 or port > 65535:
+        raise ValueError("Port SSH invalide.")
+
+    identity_file = identity_file.expanduser().resolve()
+    known_hosts_file = known_hosts_file.expanduser().resolve()
+
+    if not identity_file.is_file():
+        raise FileNotFoundError(
+            f"Clé privée SSH introuvable : {identity_file}"
+        )
+    if not known_hosts_file.is_file():
+        raise FileNotFoundError(
+            f"known_hosts SSH introuvable : {known_hosts_file}"
+        )
+
+    ssh = ssh_executable or shutil.which("ssh")
+    if not ssh:
+        raise FileNotFoundError(
+            "Exécutable ssh introuvable dans PATH."
+        )
+
+    digest = hashlib.sha256(payload).hexdigest()
+    original_command = (
+        f"publish-identity {package_name} {digest} {size}"
+    )
+
+    command = [
+        ssh,
+        "-T",
+        "-p",
+        str(port),
+        "-i",
+        str(identity_file),
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "IdentitiesOnly=yes",
+        "-o",
+        "StrictHostKeyChecking=yes",
+        "-o",
+        f"UserKnownHostsFile={known_hosts_file}",
+        f"{user}@{host}",
+        original_command,
+    ]
+
+    completed = subprocess.run(
+        command,
+        input=payload,
+        capture_output=True,
+        check=False,
+    )
+
+    stdout = completed.stdout.decode(
+        "utf-8",
+        errors="replace",
+    ).strip()
+    stderr = completed.stderr.decode(
+        "utf-8",
+        errors="replace",
+    ).strip()
+
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "Publication SSH des identités Phase 7.1 en échec "
+            f"(exit={completed.returncode}) : "
+            f"{stderr or stdout}"
+        )
+
+    return {
+        "published": True,
+        "package_name": package_name,
+        "document": str(document),
+        "size": size,
+        "sha256": digest,
+        "host": host,
+        "user": user,
+        "port": port,
+        "receiver_stdout": stdout,
+        "receiver_stderr": stderr,
+        "command": command,
+    }
