@@ -10,6 +10,7 @@ from typing import Any
 
 from ilias2moodle.ilias.mediacast import parse_mediacasts
 from ilias2moodle.model import MigrationDocument, MigrationItem
+from ilias2moodle.recovery_assets import copy_recovered_file
 
 
 def _walk(
@@ -461,7 +462,7 @@ def extract_mediacast_assets(
                         str(entry.get("recovery_path", ""))
                     )
                     if recovery_path.is_file():
-                        shutil.copy2(
+                        copy_recovered_file(
                             recovery_path,
                             destination_path,
                         )
