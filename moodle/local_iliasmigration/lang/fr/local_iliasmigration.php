@@ -120,3 +120,4 @@ $string['step_phase7_identities'] = 'Utilisateurs, inscriptions et rôles';
 $string['phase7identityqueued'] = 'L’extraction Phase 7.1 du package {$a} a été placée dans la file source ILIAS.';
 $string['phase7identityready'] = 'Les identités Phase 7.1 sont disponibles et validées pour ce package.';
 $string['phase7identitywaitmigration'] = 'Le package pédagogique est complet, mais la migration opérateur attend encore l’extraction automatique des utilisateurs, inscriptions et rôles depuis ILIAS. Rechargez cette préparation après le passage du worker ILIAS.';
+$string['step_phase7_forum_contributions'] = 'Forum — auteurs et contributions historiques';
