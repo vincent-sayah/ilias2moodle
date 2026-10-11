@@ -50,7 +50,7 @@ foreach ([
     "<RECOVERY_ROOT>",
     "/local/iliasmigration/recover.php",
     "recoverybundle",
-    "'package' => $outputname",
+    "'package' => \$outputname",
 ] as $check) {
     if (!str_contains($prepare, $check)) {
         fwrite(STDERR, "Missing manual recovery UI behavior: {$check}\n");
