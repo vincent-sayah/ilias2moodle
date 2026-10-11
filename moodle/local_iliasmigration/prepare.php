@@ -38,7 +38,9 @@ $outputname = required_param(
 $preparer = new \local_iliasmigration\operator_package_preparer();
 $recoveryimporter = new \local_iliasmigration\operator_recovery_bundle_importer();
 $recoveryqueue = new \local_iliasmigration\operator_recovery_queue();
+$identityqueue = new \local_iliasmigration\operator_phase7_identity_queue();
 $queuerequest = null;
+$identitystatus = null;
 
 try {
     $imports = $preparer->available_imports();
@@ -55,6 +57,12 @@ try {
     );
 
     $queuerequest = $recoveryqueue->sync(
+        $outputname,
+        $zipname,
+        $result
+    );
+
+    $identitystatus = $identityqueue->sync(
         $outputname,
         $zipname,
         $result
@@ -113,6 +121,25 @@ echo html_writer::table($table);
 $recoveryrequired = !empty(
     $result['recovery_required']
 );
+
+if (!empty($identitystatus['ready'])) {
+    echo html_writer::div(
+        get_string(
+            'phase7identityready',
+            'local_iliasmigration'
+        ),
+        'alert alert-success'
+    );
+} else {
+    echo html_writer::div(
+        get_string(
+            'phase7identityqueued',
+            'local_iliasmigration',
+            $outputname
+        ),
+        'alert alert-info'
+    );
+}
 
 if ($recoveryrequired) {
     echo html_writer::div(
@@ -369,20 +396,30 @@ if ($recoveryrequired) {
         'alert alert-success'
     );
 
-    echo html_writer::link(
-        new moodle_url(
-            '/local/iliasmigration/index.php',
-            [
-                'sourcepath' =>
-                    (string) $result['migration_json'],
-            ]
-        ),
-        get_string(
-            'usepreparedpackage',
-            'local_iliasmigration'
-        ),
-        ['class' => 'btn btn-primary mr-2']
-    );
+    if (!empty($identitystatus['ready'])) {
+        echo html_writer::link(
+            new moodle_url(
+                '/local/iliasmigration/index.php',
+                [
+                    'sourcepath' =>
+                        (string) $result['migration_json'],
+                ]
+            ),
+            get_string(
+                'usepreparedpackage',
+                'local_iliasmigration'
+            ),
+            ['class' => 'btn btn-primary mr-2']
+        );
+    } else {
+        echo html_writer::div(
+            get_string(
+                'phase7identitywaitmigration',
+                'local_iliasmigration'
+            ),
+            'alert alert-warning'
+        );
+    }
 }
 
 echo html_writer::link(
