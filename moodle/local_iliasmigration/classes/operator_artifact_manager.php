@@ -125,6 +125,17 @@ final class operator_artifact_manager {
             throw new \coding_exception('Selected ILIAS export does not exist.');
         }
 
+        foreach ($this->available_packages() as $packagename => $metadata) {
+            if ((string) ($metadata['source_archive'] ?? '') === $name
+                    && empty($metadata['ready'])) {
+                throw new \coding_exception(
+                    'This export is still required by incomplete package '
+                    . $packagename
+                    . '. Complete or delete that package first.'
+                );
+            }
+        }
+
         if (!unlink($resolved)) {
             throw new \coding_exception('Unable to delete the selected ILIAS export.');
         }
@@ -273,14 +284,24 @@ final class operator_artifact_manager {
         }
 
         $migrationjson = $resolved . DIRECTORY_SEPARATOR . 'migration.json';
-        if (is_file($migrationjson)
-                && $DB->record_exists(
+        if (is_file($migrationjson)) {
+            foreach ([
+                operator_run_manager::RUN_READY,
+                operator_run_manager::RUN_RUNNING,
+                operator_run_manager::RUN_WAITING,
+            ] as $status) {
+                if ($DB->record_exists(
                     'local_iliasmigration_run',
-                    ['sourcepath' => $migrationjson]
+                    [
+                        'sourcepath' => $migrationjson,
+                        'status' => $status,
+                    ]
                 )) {
-            throw new \coding_exception(
-                'This package is referenced by an operator run and cannot be deleted.'
-            );
+                    throw new \coding_exception(
+                        'This package is referenced by an active operator run and cannot be deleted.'
+                    );
+                }
+            }
         }
 
         $this->remove_tree($resolved);
