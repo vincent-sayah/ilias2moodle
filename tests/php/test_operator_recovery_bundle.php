@@ -49,7 +49,7 @@ foreach ([
     "assert_package_not_in_use(",
     "lock_config::get_lock_factory",
     "Recovery bundle did not reduce",
-    "rename($output, $backup)",
+    "rename(\$output, \$backup)",
     "reprepared_existing",
 ] as $check) {
     if (!str_contains($service, $check)) {
@@ -67,12 +67,12 @@ foreach (["shell_exec(", "exec(", "system(", "passthru("] as $forbidden) {
 
 foreach ([
     "require_sesskey();",
-    "$_FILES['recoverybundle']",
+    "\$_FILES['recoverybundle']",
     "UPLOAD_ERR_OK",
-    "is_uploaded_file($tmpname)",
+    "is_uploaded_file(\$tmpname)",
     "operator_recovery_bundle_importer",
     "import_and_reprepare(",
-    "'package' => $outputname",
+    "'package' => \$outputname",
     "showremainingcommands",
 ] as $check) {
     if (!str_contains($recover, $check)) {
