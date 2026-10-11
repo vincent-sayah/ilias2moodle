@@ -115,3 +115,8 @@ $string['recoverybundlechooseone'] = 'Choisissez un seul mode : bundle serveur o
 $string['recoverybundleuploaderror'] = 'Le transfert du bundle a échoué avec le code PHP {$a}.';
 $string['recoveryqueued'] = 'Le package {$a} a été placé dans la file de récupération automatique. Le worker ILIAS peut récupérer le plan et déposer le bundle sans transfert manuel.';
 $string['task_recovery_reprepare'] = 'Re-préparation automatique des packages après recovery ILIAS';
+
+$string['step_phase7_identities'] = 'Utilisateurs, inscriptions et rôles';
+$string['phase7identityqueued'] = 'L’extraction Phase 7.1 du package {$a} a été placée dans la file source ILIAS.';
+$string['phase7identityready'] = 'Les identités Phase 7.1 sont disponibles et validées pour ce package.';
+$string['phase7identitywaitmigration'] = 'Le package pédagogique est complet, mais la migration opérateur attend encore l’extraction automatique des utilisateurs, inscriptions et rôles depuis ILIAS. Rechargez cette préparation après le passage du worker ILIAS.';
