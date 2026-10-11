@@ -11,7 +11,9 @@ import pytest
 from ilias2moodle.recovery_transport import (
     build_recovery_bundle,
     fetch_recovery_plan,
+    list_pending_identity_jobs,
     list_pending_recovery_jobs,
+    publish_identity_document,
     publish_recovery_bundle,
 )
 
@@ -345,3 +347,142 @@ def test_list_pending_recovery_jobs_validates_response(
         "course827_worker"
     )
     assert result["jobs"][0]["plan_sha256"] == digest
+
+
+
+def test_list_pending_identity_jobs_validates_response(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    identity = tmp_path / "id_ed25519"
+    identity.write_text("private", encoding="utf-8")
+    known_hosts = tmp_path / "known_hosts"
+    known_hosts.write_text("host key\n", encoding="utf-8")
+
+    digest = "b" * 64
+    response = json.dumps({
+        "schema_version": "1.0",
+        "job_count": 1,
+        "jobs": [
+            {
+                "package_name": "course827_phase71",
+                "course_ref": "282",
+                "request_sha256": digest,
+            }
+        ],
+        "skipped_count": 0,
+        "skipped": [],
+    }).encode("utf-8")
+
+    def fake_run(
+        command: list[str],
+        *,
+        capture_output: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[bytes]:
+        assert command[-1] == "list-identities"
+        assert capture_output is True
+        assert check is False
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=response,
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(
+        "ilias2moodle.recovery_transport.subprocess.run",
+        fake_run,
+    )
+
+    result = list_pending_identity_jobs(
+        host="moodle.local",
+        user="ilias2moodlepush",
+        identity_file=identity,
+        known_hosts_file=known_hosts,
+        ssh_executable="/usr/bin/ssh",
+    )
+
+    assert result["job_count"] == 1
+    assert result["jobs"][0] == {
+        "package_name": "course827_phase71",
+        "course_ref": "282",
+        "request_sha256": digest,
+    }
+
+
+def test_publish_identity_document_uses_restricted_action(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = tmp_path / "identity.json"
+    payload = {
+        "schema_version": "1.0",
+        "phase": "7.1",
+        "source": {
+            "lms": "ILIAS",
+            "client_id": "ilias10",
+        },
+        "course": {
+            "ref_id": "282",
+            "roles": {
+                "member": [],
+            },
+        },
+        "users": {},
+    }
+    document.write_text(
+        json.dumps(payload),
+        encoding="utf-8",
+    )
+
+    identity = tmp_path / "id_ed25519"
+    identity.write_text("private", encoding="utf-8")
+    known_hosts = tmp_path / "known_hosts"
+    known_hosts.write_text("host key\n", encoding="utf-8")
+
+    captured: dict[str, object] = {}
+
+    def fake_run(
+        command: list[str],
+        *,
+        input: bytes,
+        capture_output: bool,
+        check: bool,
+    ) -> subprocess.CompletedProcess[bytes]:
+        captured["command"] = command
+        captured["payload"] = input
+        assert capture_output is True
+        assert check is False
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=b"IDENTITY_PUBLISHED ok\n",
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(
+        "ilias2moodle.recovery_transport.subprocess.run",
+        fake_run,
+    )
+
+    result = publish_identity_document(
+        document,
+        package_name="course827_phase71",
+        host="moodle.local",
+        user="ilias2moodlepush",
+        identity_file=identity,
+        known_hosts_file=known_hosts,
+        ssh_executable="/usr/bin/ssh",
+    )
+
+    raw = document.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+
+    assert captured["payload"] == raw
+    assert captured["command"][-1] == (
+        "publish-identity course827_phase71 "
+        f"{digest} {len(raw)}"
+    )
+    assert result["published"] is True
+    assert result["sha256"] == digest
