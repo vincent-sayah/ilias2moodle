@@ -52,6 +52,10 @@ $preparechecks = [
     "recovery_plan",
     "usepreparedpackage",
     "'sourcepath' =>",
+    "operator_phase7_identity_queue",
+    "phase7identityqueued",
+    "phase7identityready",
+    "phase7identitywaitmigration",
 ];
 
 foreach ($preparechecks as $check) {
