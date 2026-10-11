@@ -100,6 +100,31 @@ final class phase3_package_validator {
     }
 
     /**
+     * Re-evaluate one already validated internal URL after Phase 3 mappings
+     * have been created.
+     *
+     * The first validation pass can legitimately preserve an ILIAS fallback
+     * when its Moodle target is another resource created later in the same
+     * Phase 3 transaction. This method performs the same guarded resolution
+     * against the now-complete mapping set.
+     *
+     * @param array $operation Previously validated URL operation/result.
+     * @return array Rewrite decision.
+     */
+    public function reconcile_internal_link(array &$operation): array {
+        if ((string) ($operation['kind'] ?? '') !== 'url'
+                || !is_array($operation['ilias_internal_target'] ?? null)) {
+            return [
+                'action' => 'PRESERVE',
+                'reason' => 'NOT_INTERNAL_LINK',
+                'candidate' => null,
+            ];
+        }
+
+        return $this->rewrite_internal_url($operation);
+    }
+
+    /**
      * Validate one URL resource.
      *
      * ILIAS exports two relevant Web Link forms:

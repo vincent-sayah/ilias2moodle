@@ -106,6 +106,53 @@ final class resource_executor {
                     $results[] = $operation;
                 }
 
+                // A first-pass internal URL may have been preserved
+                // because its target resource had not yet been created. Now
+                // that every Phase 3 resource mapping exists, re-evaluate and
+                // update such links before committing the transaction.
+                $reconciledlinks = 0;
+                foreach ($results as &$result) {
+                    if ((string) ($result['kind'] ?? '') !== 'url'
+                            || !is_array(
+                                $result['ilias_internal_target'] ?? null
+                            )) {
+                        continue;
+                    }
+
+                    $before = (string) (
+                        $result['external_url']
+                        ?? $result['resolved_url']
+                        ?? ''
+                    );
+
+                    $decision = $validator->reconcile_internal_link(
+                        $result
+                    );
+
+                    if (($decision['action'] ?? '') !== 'REWRITE') {
+                        continue;
+                    }
+
+                    $resolved = trim(
+                        (string) ($result['resolved_url'] ?? '')
+                    );
+
+                    if ($resolved === '' || $resolved === $before) {
+                        continue;
+                    }
+
+                    $this->update_existing_url_target(
+                        $course,
+                        $result,
+                        $resolved
+                    );
+
+                    $result['external_url'] = $resolved;
+                    $result['internal_link_post_reconciled'] = true;
+                    $reconciledlinks++;
+                }
+                unset($result);
+
                 rebuild_course_cache($course->id, true);
                 $transaction->allow_commit();
             } catch (\Throwable $exception) {
@@ -122,6 +169,8 @@ final class resource_executor {
         $plan['course']['target_id'] = (int) $course->id;
         $plan['operations'] = $results;
         $plan['phase3_package']['ready'] = true;
+        $plan['phase3_package']['internal_links_reconciled_after_apply'] =
+            $reconciledlinks;
         $plan['warnings'][] = [
             'code' => 'COURSE_REMAINS_HIDDEN',
             'message' => 'The imported course remains hidden until later migration phases are validated.',
@@ -248,6 +297,37 @@ final class resource_executor {
         $result['external_url'] = $externalurl;
 
         return $result;
+    }
+
+    /**
+     * Update only the final target of an already-created Moodle URL activity.
+     *
+     * This is used by the Phase 3 post-pass and deliberately preserves every
+     * other activity setting created by apply_url().
+     */
+    private function update_existing_url_target(
+        \stdClass $course,
+        array $operation,
+        string $resolvedurl
+    ): void {
+        $cmid = (int) ($operation['target_id'] ?? 0);
+        if ($cmid <= 0) {
+            throw new \coding_exception(
+                'Internal-link reconciliation has no Moodle URL CMID.'
+            );
+        }
+
+        $cm = get_coursemodule_from_id(
+            'url',
+            $cmid,
+            (int) $course->id,
+            false,
+            MUST_EXIST
+        );
+
+        [, , , $moduleinfo] = get_moduleinfo_data($cm, $course);
+        $moduleinfo->externalurl = $resolvedurl;
+        update_module($moduleinfo);
     }
 
     /**
