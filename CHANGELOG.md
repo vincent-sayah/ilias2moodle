@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.22.0-beta9.2 — 2026-10-11
+
+- Retour à un workflow opérateur **manuel et contrôlé** : export réalisé par l'utilisateur dans ILIAS, upload dans Moodle, préparation/analyse, récupération manuelle uniquement si nécessaire, upload du bundle, puis migration d'un package `READY`.
+- Gestion depuis la console Moodle des exports ILIAS : upload, sélection et suppression.
+- Gestion depuis la console Moodle des packages préparés : statut, sélection et suppression contrôlée.
+- Suppression du workflow par défaut des queues recovery/identité et de la tâche Moodle de re-préparation automatique ; les outils historiques restent disponibles mais dormants.
+- Sortie des extensions Phase 7.1/7.4 du pipeline opérateur standard beta9.
+- Correction du recovery des médias : copie du contenu sans conservation des xattrs/SELinux, couvrant Wiki, MediaCast, Forum, Blog et Media Pool (#85).
+- Correction Phase 6 des Quiz liés à une Question Pool : réutilisation du `mapping_ref` persistant exact de la banque au lieu de reconstruire la clé depuis `external_id` (#86).
+- Correction Phase 3 des liens internes ILIAS vers des ressources créées plus tard dans la même phase : seconde passe de réconciliation et mise à jour de `mod_url.externalurl` (#87).
+- Qualification end-to-end du run opérateur Moodle **#17** : état `COMPLETED`, toutes les familles présentes en `SUCCESS`, Item Groups `SKIPPED` car absent du package.
+- Validation fonctionnelle finale du cours migré, y compris le lien interne `lien` vers le module HTML Moodle `chiimie`.
+- Build Moodle : `2026101105`.
+
+## 0.22.0-beta9.1 — 2026-10-11
+
+- Correction des identités de mapping pour les questions de Quiz réutilisées depuis une Question Pool liée.
+- Build Moodle : `2026101104`.
+
+## 0.22.0-beta9 — 2026-10-11
+
+- Simplification de la console opérateur vers le workflow manuel retenu.
+- Désactivation des automatismes beta5→beta8 dans le workflow par défaut.
+- Upload/suppression des exports et packages depuis l'interface.
+- Commandes de récupération ILIAS affichées à l'opérateur lorsqu'un package contient des dépendances manquantes.
+- Build Moodle : `2026101103`.
+
 ## 0.20.0-rc2 — 2026-09-26
 
 - Correction bloquante de l'installation neuve Moodle 5.0.2 MySQL/MariaDB détectée pendant la validation sur VM vierge (#50).

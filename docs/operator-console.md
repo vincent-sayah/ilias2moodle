@@ -1,10 +1,10 @@
 # Console opérateur ILIAS2Moodle — guide d'utilisation
 
-> **Workflow courant : 0.22.0-beta9 — pilotage manuel.**
+> **Workflow courant : 0.22.0-beta9.2 — pilotage manuel qualifié.**
 >
 > Les automatisations beta5 à beta8 (queue recovery ILIAS, worker source, re-préparation cron Moodle, Phase 7.1 et Phase 7.4 automatiques) sont conservées dans l'historique du projet mais **ne sont plus branchées sur le workflow opérateur par défaut**.
 
-## Workflow opérateur beta9
+## Workflow opérateur beta9.2
 
 Le workflow retenu privilégie la simplicité et le contrôle humain :
 
@@ -23,7 +23,7 @@ La console gère deux inventaires visibles :
 - **Exports ILIAS** : upload, sélection pour préparation, suppression ;
 - **Packages préparés** : statut, taille, dépendances restantes, sélection pour migration, suppression.
 
-Un package déjà référencé par un run opérateur ne peut pas être supprimé depuis la console.
+Un package utilisé par un run opérateur actif ne peut pas être supprimé depuis la console. Un package historique dont le run est terminé peut être supprimé selon la politique de rétention choisie.
 
 ### Gestion manuelle des dépendances
 
@@ -47,13 +47,68 @@ Toutes les extractions sont regroupées dans un répertoire temporaire puis arch
 
 ### Phase 7
 
-Les extensions Phase 7.1 (identités) et 7.4 (contributions historiques Forum) restent disponibles dans le code et par les outils spécialisés, mais elles ne font plus partie du pipeline opérateur standard beta9. Elles ne bloquent donc plus une migration de contenu standard.
+Les extensions Phase 7.1 (identités) et 7.4 (contributions historiques Forum) restent disponibles dans le code et par les outils spécialisés, mais elles ne font plus partie du pipeline opérateur standard beta9.2. Elles ne bloquent donc plus une migration de contenu standard.
 
 ### Tâches automatiques
 
 `db/tasks.php` ne planifie plus de tâche de re-préparation recovery. Aucune queue recovery ou identité n'est créée par `prepare.php` ou `recover.php`.
 
 Les sections beta5 à beta8 plus bas dans ce document sont conservées à titre historique.
+
+
+## Qualification de référence beta9.2 — run #17
+
+La qualification courante a été réalisée le 11 octobre 2026 avec :
+
+- ILIAS 10.8.0 ;
+- Moodle 5.0.2 ;
+- plugin `0.22.0-beta9.2`, build `2026101105` ;
+- package `pac1` ;
+- run opérateur Moodle **#17**.
+
+Le workflow validé est :
+
+```text
+export ZIP ILIAS
+→ upload dans Moodle
+→ préparation/analyse
+→ commandes recovery affichées si nécessaire
+→ recovery manuel sur ILIAS
+→ upload du bundle
+→ package READY
+→ migration
+→ contrôle fonctionnel
+```
+
+Résultat du run :
+
+| Étape | Statut |
+|---|---|
+| Structure | SUCCESS |
+| Ressources simples | SUCCESS |
+| SCORM | SUCCESS |
+| Learning Modules / Book | SUCCESS |
+| Banques de questions / Quiz | SUCCESS |
+| Content Pages | SUCCESS |
+| Glossaires | SUCCESS |
+| Wikis | SUCCESS |
+| Exercices | SUCCESS |
+| Forums | SUCCESS |
+| MediaCasts | SUCCESS |
+| Blogs | SUCCESS |
+| Media Pools | SUCCESS |
+| Item Groups | SKIPPED — absent du package |
+
+État final : `COMPLETED`.
+
+Trois correctifs ont été qualifiés pendant ce scénario :
+
+1. recovery de fichiers sans copie des xattrs/SELinux ;
+2. mapping exact des questions réutilisées depuis une Question Pool liée ;
+3. seconde passe Phase 3 pour réécrire les liens internes vers leur cible Moodle lorsque celle-ci vient d'être créée.
+
+Le contrôle fonctionnel navigateur final a confirmé que l'objet ILIAS `lien` ouvre désormais le module HTML Moodle `chiimie`, et non plus le lien permanent vers l'instance ILIAS.
+
 
 
 ## Objectif

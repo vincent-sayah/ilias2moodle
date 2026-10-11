@@ -156,3 +156,21 @@ Avec le mapping actuel :
 Une ressource Moodle de section 0 s'affiche avant les sections régulières. L'ordre ILIAS `... → quizz → PDF` ne peut donc pas être reproduit exactement sans une politique complémentaire, par exemple une section synthétique ou un changement de stratégie de représentation des dossiers racine.
 
 Le plan émet `ROOT_RESOURCE_ORDER_APPROXIMATION` afin que ce cas ne soit jamais silencieux.
+
+## Validation beta9.2 — lien interne du run #17
+
+Le contrôle fonctionnel final du run opérateur #17 a détecté un cas d'ordre réel :
+
+- objet ILIAS : WebResource `lien` ;
+- cible ILIAS : module HTML `chiimie` ;
+- les deux objets sont migrés en Phase 3 ;
+- le lien apparaît avant que le mapping Moodle de `chiimie` soit disponible pendant le premier passage.
+
+Avant le correctif, l'activité Moodle `lien` conservait donc le fallback permanent vers ILIAS.
+
+Depuis `0.22.0-beta9.2`, l'exécuteur Phase 3 effectue une seconde passe après création de toutes les ressources simples. Il réévalue les liens internes contre les mappings désormais complets et met à jour uniquement `mod_url.externalurl` lorsqu'une cible unique existe.
+
+Un replay idempotent Phase 3 sur le package `pac1` a corrigé le cours déjà migré. Le contrôle navigateur confirme que `lien` ouvre désormais directement `chiimie` dans Moodle.
+
+Référence : PR #87.
+

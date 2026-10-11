@@ -470,3 +470,43 @@ Ce scénario valide l'idempotence de la Phase 6 sur des données Moodle déjà u
 un replay ne recrée ni qbank, ni quiz, ni question, ni slot et ne détruit pas les
 attempts utilisateur existants.
 
+## Correction beta9.1 — Quiz lié à une Question Pool
+
+Le run opérateur #17 a révélé une régression sur un Quiz réutilisant les questions d'une Question Pool exportée.
+
+Erreur observée :
+
+```text
+Linked Question Pool question mapping is missing: il_0_qst_19
+```
+
+La règle persistante déjà validée est :
+
+```text
+<container_ref>:<source_ident>
+```
+
+Le `external_id` est conservé comme métadonnée et sert à rapprocher une même question entre un export de pool et un export de test, mais il n'est pas une clé persistante sûre : des exports ILIAS réels peuvent le réutiliser pour plusieurs questions distinctes.
+
+Le correctif conserve donc, pendant la résolution Test ↔ Pool :
+
+```text
+shared_pool_mapping_ref = mapping_ref exact du descripteur du pool
+```
+
+Puis le Quiz retrouve la question Moodle avec cette clé exacte. Le mapping propre au test reste distinct et pointe vers la même question Moodle.
+
+Après déploiement du correctif et retry de l'étape 5 du run #17 :
+
+```text
+Banques de questions et Quiz
+SUCCESS
+Tentatives = 2
+operations = 2
+CREATED = 2
+```
+
+Le run s'est ensuite terminé en `COMPLETED`.
+
+Référence : PR #86.
+

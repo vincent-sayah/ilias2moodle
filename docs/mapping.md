@@ -28,12 +28,12 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 
 \* Les codes encore marqués d’un astérisque restent indicatifs tant qu’ils n’ont pas été confirmés sur leur POC réel.
 
-## Disponibilité dans la console opérateur beta1
+## Disponibilité dans la console opérateur beta9.2
 
-| Famille | Console beta1 | Remarque |
+| Famille | Console beta9.2 | Remarque |
 |---|---|---|
-| Structure | automatique | cours, sections, sous-sections |
-| Fichier / URL / HTML | automatique | Phase 3 |
+| Structure | automatique après lancement du package | cours, sections, sous-sections |
+| Fichier / URL / HTML | automatique | Phase 3 + seconde passe liens internes |
 | SCORM | automatique | Phase 4 |
 | Learning Module / Book | automatique | Phase 5 |
 | Question Pool / Test | automatique | Phase 6 |
@@ -41,16 +41,17 @@ Cette matrice constitue le contrat fonctionnel de la migration. Les mappings son
 | Glossaire | automatique | famille transactionnelle |
 | Wiki | automatique | famille transactionnelle |
 | Exercice | automatique | structure Assign ; données utilisateur non incluses |
-| Forum | automatique | conteneur ; contributions historiques en extension Phase 7 |
+| Forum | automatique | conteneur uniquement dans le pipeline standard |
 | MediaCast | automatique | mod_data |
-| Blog | automatique | mod_data ; auteur historique Phase 7 séparé |
+| Blog | automatique | mod_data |
 | Media Pool | automatique | mod_data |
-| Item Group | automatique | après création des activités |
-| Utilisateurs / inscriptions / rôles | automatique | Phase 7.1 intégrée et qualifiée en beta7 |
-| Contributions Forum | automatique | Phase 7.4 intégrée en beta8 ; qualification console à réaliser sur POC Forum |
-| Auteur/date Wiki | assisté hors console beta1 | inventaire auxiliaire |
-| Progression / résultats | rapport historique | pas d'apply |
+| Item Group | automatique si présent | après création des activités |
+| Utilisateurs / inscriptions / rôles | hors pipeline standard | Phase 7.1 validée séparément |
+| Contributions Forum | hors pipeline standard | Phase 7.4 validée séparément |
+| Auteur/date Wiki | hors pipeline standard | Phase 7.6 validée séparément |
+| Progression / résultats | rapport historique spécialisé | pas d'apply |
 | Groupe ILIAS | non supporté | #22 |
+
 
 Une famille absente du package est marquée `SKIPPED_NOT_APPLICABLE`.
 
@@ -76,7 +77,7 @@ mapping persistant
 Moodle component + course_module id
 ```
 
-Si aucune cible Moodle n’existe encore, ou si plusieurs cibles distinctes sont possibles, le lien permanent ILIAS est conservé comme fallback au lieu de produire une réécriture approximative.
+Si aucune cible Moodle n’existe encore, ou si plusieurs cibles distinctes sont possibles, le lien permanent ILIAS est conservé comme fallback au lieu de produire une réécriture approximative. Depuis la beta9.2, une seconde passe est exécutée après création des ressources Phase 3 : elle permet de réécrire un lien dont la cible Moodle vient d'être créée plus tard dans la même phase.
 
 ## Phase 6.5 — extension des objets pédagogiques
 

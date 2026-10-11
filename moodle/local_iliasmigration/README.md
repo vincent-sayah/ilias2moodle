@@ -23,7 +23,7 @@ Le plugin sait maintenant :
 - rejouer la migration sans créer de doublons ;
 - refuser l'écriture si un dossier de profondeur supérieure à 2 exige un aplatissement ;
 - valider et importer les ressources simples Phase 3 : URL, fichiers et modules HTML exportés ;
-- conserver provisoirement les WebResource internes ILIAS sous forme de liens permanents vers l'instance source ;
+- réécrire les WebResource internes ILIAS vers leur cible Moodle lorsqu'un mapping unique existe, avec seconde passe après création des ressources et fallback ILIAS si la cible reste absente ou ambiguë ;
 - valider les packages SCORM Phase 4 sans les extraire pendant le dry-run ;
 - créer ou mettre à jour les activités `mod_scorm`, stocker le ZIP par File API et laisser Moodle parser les SCO ;
 - valider les Learning Modules natifs ILIAS et produire une prévisualisation Moodle Book ;
@@ -37,15 +37,46 @@ Le plugin sait maintenant :
 
 Le cours reste masqué tant que les phases de migration suivantes n'ont pas été validées.
 
-## Console opérateur — 0.21.0-beta1
+## Console opérateur — 0.22.0-beta9.2
 
-La première version exploitable de la console est accessible depuis l'administration Moodle ou directement via :
+La console est accessible depuis l'administration Moodle ou directement via :
 
 ```text
 /local/iliasmigration/index.php
 ```
 
-Elle automatise le pipeline principal de la structure jusqu'aux Item Groups. Chaque famille est persistée comme une étape indépendante.
+Le workflow qualifié est manuel et piloté par l'opérateur :
+
+1. export du cours depuis ILIAS ;
+2. upload du ZIP dans Moodle ;
+3. préparation/analyse du package ;
+4. si nécessaire, exécution sur ILIAS des commandes de récupération affichées par la console ;
+5. upload du bundle recovery ;
+6. package `READY` ;
+7. sélection du package et lancement de la migration.
+
+La console gère directement les listes d'exports et de packages, leur sélection et leur suppression contrôlée.
+
+Le pipeline standard comprend :
+
+```text
+Structure
+→ Ressources
+→ SCORM
+→ Book
+→ Questions / Quiz
+→ Content Pages
+→ Glossaires
+→ Wikis
+→ Exercices
+→ Forums
+→ MediaCasts
+→ Blogs
+→ Media Pools
+→ Item Groups
+```
+
+Les extensions Phase 7 sont conservées hors du pipeline standard beta9.2.
 
 En cas d'erreur :
 
@@ -65,7 +96,14 @@ local_iliasmigration_step
 local_iliasmigration_log
 ```
 
-Un rapport HTML et un export JSON sont disponibles à la fin du run. Un run contenant une erreur explicitement ignorée termine en `COMPLETED_WITH_SKIPS`.
+La qualification de référence est le run Moodle **#17**, terminé en `COMPLETED` le 11 octobre 2026. Le contrôle fonctionnel du cours a été validé, y compris un WebResource interne ILIAS `lien` réécrit vers le module HTML Moodle `chiimie`.
+
+Version :
+
+```text
+0.22.0-beta9.2
+2026101105
+```
 
 Guide complet : `docs/operator-console.md`.
 
