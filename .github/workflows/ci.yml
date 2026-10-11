@@ -117,6 +117,9 @@ jobs:
       - name: Operator automatic recovery reprepare
         run: php tests/php/test_operator_recovery_reprepare_task.php
 
+      - name: Operator Phase 7.1 identity pipeline
+        run: php tests/php/test_operator_phase7_identity_pipeline.php
+
       - name: Recovery bundle forced-command receiver
         run: |
           bash -n tools/receive-recovery-bundle.sh
