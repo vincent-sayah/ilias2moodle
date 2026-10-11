@@ -21,13 +21,6 @@ final class operator_pipeline {
                 'label' => get_string('step_structure', 'local_iliasmigration'),
                 'types' => [],
             ],
-            'phase7_identities' => [
-                'label' => get_string(
-                    'step_phase7_identities',
-                    'local_iliasmigration'
-                ),
-                'types' => [],
-            ],
             'resources' => [
                 'label' => get_string('step_resources', 'local_iliasmigration'),
                 'types' => ['file', 'url', 'html_module'],
@@ -62,13 +55,6 @@ final class operator_pipeline {
             ],
             'forums' => [
                 'label' => get_string('step_forums', 'local_iliasmigration'),
-                'types' => ['forum'],
-            ],
-            'phase7_forum_contributions' => [
-                'label' => get_string(
-                    'step_phase7_forum_contributions',
-                    'local_iliasmigration'
-                ),
                 'types' => ['forum'],
             ],
             'mediacasts' => [
@@ -167,10 +153,6 @@ final class operator_pipeline {
                 2,
                 $categoryid > 0 ? '' : $categorypath
             ),
-            'phase7_identities' => $this->execute_phase7_identities(
-                $document,
-                $migrationjson
-            ),
             'resources' => $importer->import(
                 $migrationjson,
                 $categoryid,
@@ -215,12 +197,6 @@ final class operator_pipeline {
             'forums' => (
                 new phase65_forum_executor($migrationjson)
             )->execute($document, $categoryid),
-            'phase7_forum_contributions' =>
-                $this->execute_phase7_forum_contributions(
-                    $document,
-                    $migrationjson,
-                    $categoryid
-                ),
             'mediacasts' => (
                 new phase65_mediacast_executor($migrationjson)
             )->execute($document, $categoryid),
@@ -358,10 +334,6 @@ final class operator_pipeline {
             throw new \coding_exception(
                 'Unknown operator pipeline step: ' . $stepkey
             );
-        }
-
-        if ($stepkey === 'phase7_forum_contributions') {
-            return [];
         }
 
         $allowedkinds = $stepkey === 'structure'
