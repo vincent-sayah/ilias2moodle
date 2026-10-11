@@ -21,6 +21,13 @@ final class operator_pipeline {
                 'label' => get_string('step_structure', 'local_iliasmigration'),
                 'types' => [],
             ],
+            'phase7_identities' => [
+                'label' => get_string(
+                    'step_phase7_identities',
+                    'local_iliasmigration'
+                ),
+                'types' => [],
+            ],
             'resources' => [
                 'label' => get_string('step_resources', 'local_iliasmigration'),
                 'types' => ['file', 'url', 'html_module'],
@@ -153,6 +160,10 @@ final class operator_pipeline {
                 2,
                 $categoryid > 0 ? '' : $categorypath
             ),
+            'phase7_identities' => $this->execute_phase7_identities(
+                $document,
+                $migrationjson
+            ),
             'resources' => $importer->import(
                 $migrationjson,
                 $categoryid,
@@ -246,6 +257,39 @@ final class operator_pipeline {
             }
         }
 
+        $phase7summary = [];
+        if ($stepkey === 'phase7_identities') {
+            $phase7summary = [
+                'identity_counts' => $result['identity_counts']
+                    ?? null,
+                'account_creation_counts' => $result[
+                    'account_creation_counts'
+                ] ?? null,
+                'membership_counts' => $result[
+                    'membership_counts'
+                ] ?? null,
+                'created_user_count' => (int) (
+                    $result['created_user_count']
+                    ?? 0
+                ),
+                'reused_user_count' => (int) (
+                    $result['reused_user_count']
+                    ?? 0
+                ),
+                'enrolled_membership_count' => (int) (
+                    $result['enrolled_membership_count']
+                    ?? 0
+                ),
+                'updated_membership_count' => (int) (
+                    $result['updated_membership_count']
+                    ?? 0
+                ),
+                'ready_for_apply' => $result[
+                    'ready_for_apply'
+                ] ?? null,
+            ];
+        }
+
         return [
             'mode' => $result['mode'] ?? null,
             'phase' => $result['phase'] ?? null,
@@ -261,7 +305,7 @@ final class operator_pipeline {
             'warning_count' => count($warningcodes),
             'warning_codes' => array_values(array_unique($warningcodes)),
             'reason' => $result['reason'] ?? null,
-        ];
+        ] + $phase7summary;
     }
 
     /**
@@ -338,6 +382,127 @@ final class operator_pipeline {
         }
 
         return 0;
+    }
+
+    private function execute_phase7_identities(
+        array $document,
+        string $migrationjson
+    ): array {
+        global $DB;
+
+        $sourcecourse = trim(
+            (string) (
+                $document['course']['source_id']
+                ?? ''
+            )
+        );
+
+        if ($sourcecourse === '') {
+            throw new \coding_exception(
+                'Phase 7.1 cannot resolve the source course ref_id.'
+            );
+        }
+
+        $mapping = $DB->get_record(
+            'local_iliasmigration_map',
+            [
+                'sourcelms' => 'ILIAS',
+                'sourceinstance' => '',
+                'sourcecourse' => $sourcecourse,
+                'sourceref' => $sourcecourse,
+                'targettype' => 'course',
+            ],
+            'id,targetid,status'
+        );
+
+        if (!$mapping
+                || (int) $mapping->targetid <= 0
+                || (string) $mapping->status !== 'READY') {
+            throw new \coding_exception(
+                'Phase 7.1 requires the successful Structure step and a READY course mapping.'
+            );
+        }
+
+        $courseid = (int) $mapping->targetid;
+
+        if (!$DB->record_exists(
+            'course',
+            ['id' => $courseid]
+        )) {
+            throw new \coding_exception(
+                'Phase 7.1 mapped Moodle course no longer exists.'
+            );
+        }
+
+        $identityjson = (
+            new operator_phase7_identity_queue()
+        )->require_identity_for_migration(
+            $migrationjson
+        );
+
+        $overridejson = $this->phase7_override_path(
+            $migrationjson
+        );
+
+        return (
+            new phase7_identity_executor()
+        )->execute(
+            $identityjson,
+            $courseid,
+            $overridejson
+        );
+    }
+
+    private function phase7_override_path(
+        string $migrationjson
+    ): ?string {
+        $config = get_config(
+            'local_iliasmigration'
+        );
+
+        $recoveriesroot = realpath(
+            trim(
+                (string) (
+                    $config->recoveriesroot
+                    ?? '/var/moodledata/ilias2moodle/recovery'
+                )
+            )
+        );
+
+        if ($recoveriesroot === false
+                || !is_dir($recoveriesroot)) {
+            return null;
+        }
+
+        $package = basename(
+            dirname(
+                realpath($migrationjson)
+                    ?: $migrationjson
+            )
+        );
+
+        if (!preg_match(
+            '/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/',
+            $package
+        )
+                || str_contains($package, '..')) {
+            return null;
+        }
+
+        $candidate = $recoveriesroot
+            . DIRECTORY_SEPARATOR
+            . 'identity-overrides'
+            . DIRECTORY_SEPARATOR
+            . $package
+            . '.json';
+
+        if (!is_file($candidate)
+                || is_link($candidate)
+                || !is_readable($candidate)) {
+            return null;
+        }
+
+        return $candidate;
     }
 
     private function execute_glossaries(
