@@ -3,6 +3,7 @@ set -euo pipefail
 
 MAX_BUNDLE_BYTES=536870912
 MAX_PLAN_BYTES=2097152
+MAX_IDENTITY_BYTES=4194304
 
 die() {
     printf 'ERROR: %s\n' "$*" >&2
@@ -86,6 +87,111 @@ if [[ "$action" == "publish" ]]; then
         "$actual_size"
 
     exit 0
+fi
+
+if [[ "$action" == "publish-identity" ]]; then
+    package_name="${arg1:-}"
+    expected_sha="${arg2:-}"
+    expected_size="${arg3:-}"
+
+    [[ "$package_name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] \
+        || die "unsafe identity package name"
+    [[ "$expected_sha" =~ ^[0-9a-fA-F]{64}$ ]] \
+        || die "invalid identity sha256"
+    [[ "$expected_size" =~ ^[0-9]+$ ]] \
+        || die "invalid identity size"
+    [[ -z "${extra:-}" ]] \
+        || die "unexpected publish-identity arguments"
+
+    declared_size=$((10#$expected_size))
+    (( declared_size > 0 )) \
+        || die "identity size must be positive"
+    (( declared_size <= MAX_IDENTITY_BYTES )) \
+        || die "identity document exceeds 4 MiB safety limit"
+
+    recovery_root="$(dirname "$bundles_root")"
+    identities_root="${recovery_root}/identities"
+
+    [[ -d "$identities_root" ]] \
+        || die "identity target root does not exist"
+    [[ ! -L "$identities_root" ]] \
+        || die "identity target root must not be a symlink"
+    [[ -w "$identities_root" ]] \
+        || die "identity target root is not writable"
+
+    umask 0027
+
+    tmp="$(mktemp "${identities_root}/.incoming.${package_name}.XXXXXX")"
+    cleanup_identity() {
+        rm -f -- "$tmp"
+    }
+    trap cleanup_identity EXIT HUP INT TERM
+
+    head -c "$((declared_size + 1))" > "$tmp"
+
+    actual_size="$(stat -c '%s' "$tmp")"
+    [[ "$actual_size" == "$declared_size" ]] \
+        || die "received identity size does not match declaration"
+
+    actual_sha="$(sha256sum "$tmp" | awk '{print $1}')"
+    [[ "${actual_sha,,}" == "${expected_sha,,}" ]] \
+        || die "received identity sha256 does not match declaration"
+
+    chmod 0640 "$tmp"
+    target="${identities_root}/${package_name}.json"
+    mv -fT -- "$tmp" "$target"
+
+    trap - EXIT HUP INT TERM
+
+    printf 'IDENTITY_PUBLISHED %s %s %s\n' \
+        "$package_name" \
+        "${actual_sha,,}" \
+        "$actual_size"
+
+    exit 0
+fi
+
+if [[ "$action" == "list-identities" ]]; then
+    [[ -n "$packages_root" ]] \
+        || die "packages root is required for list-identities"
+    [[ -z "${arg1:-}" && -z "${arg2:-}" && -z "${arg3:-}" && -z "${extra:-}" ]] \
+        || die "unexpected list-identities arguments"
+
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    recovery_root="$(dirname "$bundles_root")"
+    requests_root="${recovery_root}/identity-requests"
+    identities_root="${recovery_root}/identities"
+
+    [[ -d "$requests_root" ]] \
+        || die "identity requests root does not exist"
+    [[ ! -L "$requests_root" ]] \
+        || die "identity requests root must not be a symlink"
+    [[ -d "$identities_root" ]] \
+        || die "identity target root does not exist"
+    [[ ! -L "$identities_root" ]] \
+        || die "identity target root must not be a symlink"
+
+    python_bin="$(command -v python3.11 || true)"
+
+    if [[ -z "$python_bin" ]]; then
+        candidate="$(command -v python3 || true)"
+
+        if [[ -n "$candidate" ]] \
+                && "$candidate" -c \
+                    'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' \
+                    >/dev/null 2>&1; then
+            python_bin="$candidate"
+        fi
+    fi
+
+    [[ -n "$python_bin" ]] \
+        || die "Python >= 3.11 is required for list-identities"
+
+    exec "$python_bin" \
+        "${script_dir}/list-phase7-identity-queue.py" \
+        --packages-root "$packages_root" \
+        --requests-root "$requests_root" \
+        --identities-root "$identities_root"
 fi
 
 if [[ "$action" == "list-pending" ]]; then
