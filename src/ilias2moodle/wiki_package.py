@@ -22,6 +22,7 @@ from ilias2moodle.ilias.wiki import (
 )
 from ilias2moodle.model import MigrationDocument, MigrationItem
 from ilias2moodle.recovery_assets import (
+    copy_recovered_file,
     load_mediaobject_recovery,
     load_mediaobject_recovery_by_id,
 )
@@ -656,7 +657,7 @@ def extract_wiki_assets(
                                     parents=True,
                                     exist_ok=True,
                                 )
-                                shutil.copy2(recovery["path"], destination_path)
+                                copy_recovered_file(recovery["path"], destination_path)
                                 copied = True
                                 recovered = True
 
