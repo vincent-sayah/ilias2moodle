@@ -26,21 +26,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 require_sesskey();
 
-$zipname = required_param(
-    'zipname',
-    PARAM_FILE
-);
+$zipname = required_param('zipname', PARAM_FILE);
 $outputname = required_param(
     'outputname',
     PARAM_RAW_TRIMMED
 );
 
 $preparer = new \local_iliasmigration\operator_package_preparer();
-$recoveryimporter = new \local_iliasmigration\operator_recovery_bundle_importer();
-$recoveryqueue = new \local_iliasmigration\operator_recovery_queue();
-$identityqueue = new \local_iliasmigration\operator_phase7_identity_queue();
-$queuerequest = null;
-$identitystatus = null;
 
 try {
     $imports = $preparer->available_imports();
@@ -55,22 +47,8 @@ try {
         (string) $imports[$zipname]['path'],
         $outputname
     );
-
-    $queuerequest = $recoveryqueue->sync(
-        $outputname,
-        $zipname,
-        $result
-    );
-
-    $identitystatus = $identityqueue->sync(
-        $outputname,
-        $zipname,
-        $result
-    );
 } catch (Throwable $exception) {
-    \core\notification::error(
-        $exception->getMessage()
-    );
+    \core\notification::error($exception->getMessage());
     redirect(new moodle_url(
         '/local/iliasmigration/index.php'
     ));
@@ -100,12 +78,8 @@ $table->data = [
         s((string) ($result['title'] ?? '')),
     ],
     [
-        get_string('packagepath', 'local_iliasmigration'),
-        s((string) ($result['package_root'] ?? '')),
-    ],
-    [
-        get_string('sourcepath', 'local_iliasmigration'),
-        s((string) ($result['migration_json'] ?? '')),
+        get_string('packagename', 'local_iliasmigration'),
+        s($outputname),
     ],
     [
         get_string('packageitems', 'local_iliasmigration'),
@@ -118,28 +92,7 @@ $table->data = [
 ];
 echo html_writer::table($table);
 
-$recoveryrequired = !empty(
-    $result['recovery_required']
-);
-
-if (!empty($identitystatus['ready'])) {
-    echo html_writer::div(
-        get_string(
-            'phase7identityready',
-            'local_iliasmigration'
-        ),
-        'alert alert-success'
-    );
-} else {
-    echo html_writer::div(
-        get_string(
-            'phase7identityqueued',
-            'local_iliasmigration',
-            $outputname
-        ),
-        'alert alert-info'
-    );
-}
+$recoveryrequired = !empty($result['recovery_required']);
 
 if ($recoveryrequired) {
     echo html_writer::div(
@@ -151,24 +104,17 @@ if ($recoveryrequired) {
         'alert alert-warning'
     );
 
-    $plan = is_array(
-        $result['recovery_plan'] ?? null
-    )
+    $plan = is_array($result['recovery_plan'] ?? null)
         ? $result['recovery_plan']
         : [];
 
-    $requests = is_array(
-        $plan['requests'] ?? null
-    )
+    $requests = is_array($plan['requests'] ?? null)
         ? $plan['requests']
         : [];
 
     if ($requests) {
         echo $OUTPUT->heading(
-            get_string(
-                'recoveryrequests',
-                'local_iliasmigration'
-            ),
+            get_string('recoveryrequests', 'local_iliasmigration'),
             4
         );
 
@@ -178,7 +124,6 @@ if ($recoveryrequired) {
             get_string('sourceobject', 'local_iliasmigration'),
             get_string('assignmentid', 'local_iliasmigration'),
             get_string('recoveryresource', 'local_iliasmigration'),
-            get_string('recoverytarget', 'local_iliasmigration'),
             get_string('readonly', 'local_iliasmigration'),
         ];
 
@@ -189,6 +134,8 @@ if ($recoveryrequired) {
 
             $resource = (string) (
                 $request['collection_uuid']
+                ?? $request['filename']
+                ?? $request['location']
                 ?? $request['source_path']
                 ?? ''
             );
@@ -198,10 +145,6 @@ if ($recoveryrequired) {
                 s((string) ($request['source_ref_id'] ?? '')),
                 s((string) ($request['assignment_id'] ?? '')),
                 s($resource),
-                s((string) (
-                    $request['execution_target']
-                    ?? ''
-                )),
                 !empty($request['read_only'])
                     ? get_string('yes')
                     : get_string('no'),
@@ -211,9 +154,7 @@ if ($recoveryrequired) {
         echo html_writer::table($requesttable);
     }
 
-    $unresolved = (int) (
-        $plan['unresolved_count'] ?? 0
-    );
+    $unresolved = (int) ($plan['unresolved_count'] ?? 0);
 
     if ($unresolved > 0) {
         echo html_writer::div(
@@ -226,34 +167,100 @@ if ($recoveryrequired) {
         );
     }
 
-    echo html_writer::tag(
-        'p',
-        get_string(
-            'recoveryplanpath',
-            'local_iliasmigration',
-            (string) (
-                $result['recovery_plan_path']
-                ?? ''
-            )
-        ),
-        ['class' => 'text-muted']
-    );
+    if ($requests && $unresolved === 0) {
+        $config = get_config('local_iliasmigration');
+        $sourceprojectroot = trim((string) (
+            $config->sourceprojectroot
+            ?? '/opt/ilias2moodle'
+        ));
+        $sourceiliasroot = trim((string) (
+            $config->sourceiliasroot
+            ?? '/var/www/ilias'
+        ));
+        $sourceclient = trim((string) (
+            $config->sourceclient
+            ?? 'ilias10'
+        ));
 
-    if ($queuerequest !== null) {
+        $recoveryroot =
+            '/var/tmp/ilias2moodle-recovery-' . $outputname;
+        $bundlepath =
+            '/var/tmp/' . $outputname . '_recovery.tar.gz';
+
+        $commands = [
+            'mkdir -p ' . escapeshellarg($recoveryroot),
+            'cd ' . escapeshellarg($sourceprojectroot),
+        ];
+
+        foreach ($requests as $request) {
+            if (!is_array($request)) {
+                continue;
+            }
+
+            $template = trim((string) (
+                $request['extractor_command_template']
+                ?? ''
+            ));
+
+            if ($template === '') {
+                continue;
+            }
+
+            $commands[] = str_replace(
+                [
+                    '<ILIAS_ROOT>',
+                    '<ILIAS_CLIENT_ID>',
+                    '<RECOVERY_ROOT>',
+                ],
+                [
+                    escapeshellarg($sourceiliasroot),
+                    escapeshellarg($sourceclient),
+                    escapeshellarg($recoveryroot),
+                ],
+                $template
+            );
+        }
+
+        $commands[] =
+            'tar -C '
+            . escapeshellarg(dirname($recoveryroot))
+            . ' -czf '
+            . escapeshellarg($bundlepath)
+            . ' '
+            . escapeshellarg(basename($recoveryroot));
+
+        echo $OUTPUT->heading(
+            get_string(
+                'manualrecoverycommands',
+                'local_iliasmigration'
+            ),
+            4
+        );
+
         echo html_writer::div(
             get_string(
-                'recoveryqueued',
-                'local_iliasmigration',
-                (string) (
-                    $queuerequest['package_name']
-                    ?? $outputname
-                )
+                'manualrecoveryintro',
+                'local_iliasmigration'
             ),
             'alert alert-info'
         );
-    }
 
-    if ($requests && $unresolved === 0) {
+        echo html_writer::tag(
+            'pre',
+            s(implode(PHP_EOL, $commands)),
+            ['class' => 'p-3 border rounded bg-light']
+        );
+
+        echo html_writer::tag(
+            'p',
+            get_string(
+                'manualrecoverybundlepath',
+                'local_iliasmigration',
+                $bundlepath
+            ),
+            ['class' => 'text-muted']
+        );
+
         echo $OUTPUT->heading(
             get_string(
                 'importrecoverybundle',
@@ -265,21 +272,11 @@ if ($recoveryrequired) {
         echo html_writer::tag(
             'p',
             get_string(
-                'recoverybundleintro',
+                'recoverybundleintro_manual',
                 'local_iliasmigration'
             ),
-            ['class' => 'alert alert-info']
+            ['class' => 'text-muted']
         );
-
-        $serverbundles = [];
-        try {
-            $serverbundles = $recoveryimporter
-                ->available_server_bundles();
-        } catch (Throwable $exception) {
-            \core\notification::warning(
-                $exception->getMessage()
-            );
-        }
 
         echo html_writer::start_tag('form', [
             'method' => 'post',
@@ -302,60 +299,6 @@ if ($recoveryrequired) {
             ]);
         }
 
-        if ($serverbundles) {
-            $serveroptions = [];
-            foreach (
-                $serverbundles
-                as $name => $metadata
-            ) {
-                $serveroptions[$name] =
-                    $name
-                    . ' — '
-                    . display_size(
-                        (int) (
-                            $metadata['size']
-                            ?? 0
-                        )
-                    );
-            }
-
-            echo html_writer::start_div(
-                'form-group'
-            );
-            echo html_writer::label(
-                get_string(
-                    'recoverybundleserver',
-                    'local_iliasmigration'
-                ),
-                'id_serverbundle'
-            );
-            echo html_writer::select(
-                $serveroptions,
-                'serverbundle',
-                '',
-                [
-                    '' => get_string(
-                        'recoverybundleservernone',
-                        'local_iliasmigration'
-                    ),
-                ],
-                [
-                    'id' => 'id_serverbundle',
-                    'class' => 'form-control',
-                ]
-            );
-            echo html_writer::end_div();
-
-            echo html_writer::tag(
-                'p',
-                get_string(
-                    'recoverybundleorupload',
-                    'local_iliasmigration'
-                ),
-                ['class' => 'text-muted']
-            );
-        }
-
         echo html_writer::start_div('form-group');
         echo html_writer::label(
             get_string(
@@ -370,6 +313,7 @@ if ($recoveryrequired) {
             'id' => 'id_recoverybundle',
             'class' => 'form-control-file',
             'accept' => '.tar.gz,.tgz,application/gzip',
+            'required' => 'required',
         ]);
         echo html_writer::end_div();
 
@@ -396,30 +340,17 @@ if ($recoveryrequired) {
         'alert alert-success'
     );
 
-    if (!empty($identitystatus['ready'])) {
-        echo html_writer::link(
-            new moodle_url(
-                '/local/iliasmigration/index.php',
-                [
-                    'sourcepath' =>
-                        (string) $result['migration_json'],
-                ]
-            ),
-            get_string(
-                'usepreparedpackage',
-                'local_iliasmigration'
-            ),
-            ['class' => 'btn btn-primary mr-2']
-        );
-    } else {
-        echo html_writer::div(
-            get_string(
-                'phase7identitywaitmigration',
-                'local_iliasmigration'
-            ),
-            'alert alert-warning'
-        );
-    }
+    echo html_writer::link(
+        new moodle_url(
+            '/local/iliasmigration/index.php',
+            ['package' => $outputname]
+        ),
+        get_string(
+            'usepreparedpackage',
+            'local_iliasmigration'
+        ),
+        ['class' => 'btn btn-primary mr-2']
+    );
 }
 
 echo html_writer::link(
