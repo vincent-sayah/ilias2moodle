@@ -325,3 +325,31 @@ fc1d8073abb9bdd43d36f5020aaa3e2c1898ed1d4af99630cf8ada739d97a9fb
 ~~~
 
 La chaîne recovery ne nécessite donc plus de transfert manuel ni de déclenchement manuel dans le scénario nominal.
+
+
+## Réutilisation du canal pour Phase 7.1 — beta7
+
+Le même compte SSH restreint transporte désormais aussi l'extraction read-only des identités de cours.
+
+Deux actions supplémentaires sont autorisées par la commande forcée :
+
+~~~text
+list-identities
+publish-identity <package> <sha256> <size>
+~~~
+
+Les demandes sont lues dans :
+
+~~~text
+recoveriesroot/identity-requests/
+~~~
+
+et les documents reçus sont écrits dans :
+
+~~~text
+recoveriesroot/identities/<package>.json
+~~~
+
+La taille maximale d'un document d'identités est limitée à 4 MiB. Le SHA-256 et la taille sont vérifiés avant renommage atomique. Le worker ILIAS valide également le schéma, le `client_id` et le `course.ref_id` avant publication.
+
+Aucune nouvelle clé ni aucun nouveau timer n'est nécessaire : `ilias2moodle-recovery-worker.service` reste un service oneshot et exécute successivement le worker recovery puis le worker Phase 7.1.
