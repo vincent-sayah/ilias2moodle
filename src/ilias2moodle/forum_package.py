@@ -268,7 +268,7 @@ def extract_forum_assets(
                                     parents=True,
                                     exist_ok=True,
                                 )
-                                shutil.copy2(
+                                copy_recovered_file(
                                     recovery["path"],
                                     destination_path,
                                 )
