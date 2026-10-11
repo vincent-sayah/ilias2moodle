@@ -81,11 +81,11 @@ final class operator_run_manager {
                     'summaryjson' => $this->encode([
                         'detected_types' => $types,
                         'phase7_1_identities' =>
-                            'integrated_operator_pipeline',
+                            'outside_manual_default_pipeline',
                         'phase7_4_forum' =>
-                            'integrated_operator_pipeline',
+                            'outside_manual_default_pipeline',
                         'phase7_extensions' =>
-                            '7.3_7.5_7.6_not_yet_integrated',
+                            '7.1_7.3_7.4_7.5_7.6_outside_manual_default_pipeline',
                         'order_reconciliation_v2' =>
                             'guarded_cli_post_step',
                     ]),
@@ -513,11 +513,11 @@ final class operator_run_manager {
                     false
                 ),
                 'phase7_1_identities' =>
-                    'integrated_operator_pipeline',
+                    'outside_manual_default_pipeline',
                 'phase7_4_forum' =>
-                    'integrated_operator_pipeline',
+                    'outside_manual_default_pipeline',
                 'phase7_extensions' =>
-                    '7.3_7.5_7.6_not_yet_integrated',
+                    '7.1_7.3_7.4_7.5_7.6_outside_manual_default_pipeline',
                 'order_reconciliation_v2' =>
                     'guarded_cli_post_step',
             ],
@@ -744,7 +744,7 @@ final class operator_run_manager {
             'counts' => $counts,
             'has_ignored_failures' => $hasignored,
             'phase7_extensions' =>
-                'assisted_outside_operator_console_beta1',
+                'outside_manual_default_pipeline',
             'order_reconciliation_v2' =>
                 'guarded_cli_post_step',
         ]);
