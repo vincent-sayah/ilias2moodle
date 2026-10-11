@@ -779,7 +779,7 @@ Restent à valider ultérieurement avant promotion RC :
 
 - un scénario contrôlé `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` ;
 - le contrôle fonctionnel final du rapport après amélioration des compteurs par étape ;
-- la Phase 7.1 est intégrée à partir de la beta7 ; les extensions 7.3/7.4/7.5/7.6 et la réconciliation d'ordre V2 restent encore hors pipeline.
+- la Phase 7.1 est intégrée et qualifiée à partir de la beta7 ; la Phase 7.4 Forum est intégrée en beta8 ; les extensions 7.3/7.5/7.6 et la réconciliation d'ordre V2 restent encore hors pipeline.
 
 
 ### Re-préparation automatique côté Moodle — 0.22.0-beta5
@@ -926,3 +926,39 @@ L'étape Phase 7.1 réutilise directement `phase7_identity_executor`. Elle conse
 - mappings utilisateurs globaux persistants ;
 - mappings d'inscription persistants ;
 - transaction Moodle et idempotence.
+
+
+### Phase 7.4 Forum intégrée — 0.22.0-beta8
+
+La beta8 ajoute l'étape opérateur `phase7_forum_contributions` immédiatement après `forums`.
+
+Ordre :
+
+~~~text
+Forum — conteneur
+  -> Forum — auteurs et contributions historiques
+~~~
+
+L'étape collecte tous les objets `forum` présents dans le `migration.json` puis exécute `phase7_forum_contribution_executor` pour chaque `ref_id`.
+
+Elle réutilise les garanties déjà validées du POC Phase 7.4 :
+- auteurs résolus uniquement par mappings utilisateurs persistants Phase 7.1 ;
+- aucun fallback par login, email ou nom ;
+- conservation de l'arbre discussion/post ;
+- conservation des dates source ;
+- pièces jointes via Moodle Files API ;
+- création via les API Forum Moodle ;
+- notifications bloquées si le Forum possède des abonnés ou un abonnement forcé ;
+- mappings persistants `forumdiscussion` et `forumpost` ;
+- second apply idempotent.
+
+Le résumé opérateur expose le nombre de Forums traités ainsi que les compteurs agrégés :
+- discussions créées/conservées ;
+- posts créés/conservés ;
+- pièces jointes créées ;
+- mappings créés ;
+- mappings racine réparés.
+
+Si aucun objet Forum n'existe dans le package, l'étape est automatiquement `SKIPPED_NOT_APPLICABLE`.
+
+Le POC réel de qualification reste `Forum ILIAS obj_id=807 / ref_id=275`, déjà validé hors console avec 2 discussions, 7 posts et 3 pièces jointes. La beta8 doit être qualifiée sur un package contenant ce Forum avant fermeture de la case #66.
