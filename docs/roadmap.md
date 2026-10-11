@@ -1,6 +1,6 @@
 # Roadmap
 
-## POC de référence — état au 4 octobre 2026
+## POC de référence — état au 11 octobre 2026
 
 Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS `ref_id=128 / obj_id=504` vers la cible fraîche Moodle `course id=2 / ILIAS-128`.
 
@@ -81,29 +81,34 @@ Le POC ILIAS 10 -> Moodle est validé sur les phases 1 à 7 pour le cours ILIAS 
 - [x] Phase 7.6 — deux Wikis : auteur courant et dates réconciliés ;
 - [x] seconds passages idempotents / sans écriture.
 
-## Phase 8 — Console opérateur et exploitation `[BETA1]`
+## Phase 8 — Console opérateur et exploitation `[BETA9.2 QUALIFIÉE]`
 
-- [x] interface Moodle pour créer/lancer un run ;
-- [x] détection des familles présentes dans `migration.json` ;
-- [x] pipeline automatique Structure → Item Groups ;
+- [x] interface Moodle pour uploader un export ILIAS natif ;
+- [x] liste/sélection/suppression des exports depuis la console ;
+- [x] préparation et analyse d'un export depuis l'interface ;
+- [x] affichage des commandes ILIAS lorsque des ressources manquent ;
+- [x] upload manuel et validation d'un bundle recovery ;
+- [x] liste/statut/sélection/suppression des packages ;
+- [x] package `READY` requis avant migration ;
+- [x] pipeline Structure → Item Groups depuis un package sélectionné ;
 - [x] journal persistant des runs, étapes et événements ;
-- [x] état `WAITING_DECISION` sur erreur ;
-- [x] action `Réessayer` ;
-- [x] action `Ignorer et continuer` ;
-- [x] statut final `COMPLETED_WITH_SKIPS` ;
-- [x] rapport HTML ;
-- [x] export JSON du compte rendu ;
-- [x] capabilities Moodle dédiées ;
-- [x] guide opérateur ;
-- [ ] intégrer les extensions Phase 7 utilisant des inventaires auxiliaires ;
-- [ ] refactoriser/raccorder la réconciliation d'ordre V2 à la console ;
-- [ ] granularité d'ignorance par `source_ref_id` à l'intérieur d'une même famille ;
-- [x] validation end-to-end nominale de la beta1 sur VM Moodle 5.0.2 : run #2 `COMPLETED`, cours Moodle `id=4 / ILIAS-282`, 621 mappings ;
-- [x] validation du scénario `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` : run #4 puis revalidation run #6.
+- [x] état `WAITING_DECISION`, retry et ignore explicite ;
+- [x] reset audité des mappings orphelins ;
+- [x] rapport HTML et export JSON ;
+- [x] lien interne ILIAS → cible Moodle réconcilié après création des ressources ;
+- [x] validation end-to-end beta9.2 : run #17 `COMPLETED` ;
+- [x] contrôle fonctionnel navigateur du cours migré ;
+- [x] correction recovery sans copie d'xattrs/SELinux ;
+- [x] correction des mappings Quiz ↔ Question Pool liés ;
+- [x] aucune queue recovery/identité ni re-préparation automatique dans le workflow standard.
 
-## Suite Phase 8 — ordre de traitement
+Décision de périmètre : l'objectif n'est plus une automatisation complète ILIAS→Moodle. L'opérateur conserve la maîtrise des exports, des récupérations complémentaires et du lancement de la migration.
 
-Avant d'étendre la console, terminer les issues déjà ouvertes dans cet ordre :
+Les extensions Phase 7 restent techniquement disponibles et validées sur leurs POC, mais elles sont volontairement hors du pipeline opérateur standard beta9.2.
+
+## Suite Phase 8 — décisions de périmètre
+
+Le workflow manuel beta9.2 est la référence courante. Les anciennes issues d'automatisation complète sont conservées pour historique ou reclassées selon cette décision.
 
 1. **#68 — Console opérateur beta1** — **TERMINÉE**
    - test volontaire d'échec Wiki validé ;
