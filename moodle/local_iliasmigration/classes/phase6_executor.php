@@ -393,19 +393,23 @@ final class phase6_executor {
                 $category = $sharedpoolcategory;
 
                 foreach ($descriptors as $descriptor) {
-                    $stable = trim(
-                        (string) ($descriptor['external_id'] ?? '')
+                    $poolmappingref = trim(
+                        (string) (
+                            $descriptor['shared_pool_mapping_ref']
+                            ?? ''
+                        )
                     );
 
-                    if ($stable === '') {
-                        $stable = trim(
-                            (string) ($descriptor['source_ident'] ?? '')
+                    if ($poolmappingref === '') {
+                        throw new \coding_exception(
+                            'Linked Question Pool mapping identity '
+                            . 'is missing from the resolved descriptor.'
                         );
                     }
 
                     $poolmapping = $this->find_mapping(
                         $sourcecourseid,
-                        $sharedpoolref . ':' . $stable,
+                        $poolmappingref,
                         'question'
                     );
 
@@ -415,7 +419,7 @@ final class phase6_executor {
                     ) {
                         throw new \coding_exception(
                             'Linked Question Pool question mapping '
-                            . 'is missing: ' . $stable
+                            . 'is missing: ' . $poolmappingref
                         );
                     }
 
@@ -749,7 +753,14 @@ final class phase6_executor {
 
             $descriptor = $pooldescriptor;
 
-            // Preserve test-side identity for order and persistent mapping.
+            // Preserve the exact persistent identity of the question as it
+            // was imported into the shared Question Pool. The Quiz/test may
+            // expose a different source_ident for the same external question.
+            $descriptor['shared_pool_mapping_ref'] =
+                (string) $pooldescriptor['mapping_ref'];
+
+            // Preserve test-side identity for order and the Quiz-side
+            // persistent mapping while reusing the pool's Moodle question.
             $descriptor['source_ident'] =
                 (string) $testdescriptor['source_ident'];
             $descriptor['external_id'] =
