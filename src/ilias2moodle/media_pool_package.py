@@ -258,7 +258,7 @@ def extract_media_pool_assets(
                                     parents=True,
                                     exist_ok=True,
                                 )
-                                shutil.copy2(recovery["path"], destination_path)
+                                copy_recovered_file(recovery["path"], destination_path)
                                 copied = True
                                 recovered = True
                                 size = int(recovery["size"])
