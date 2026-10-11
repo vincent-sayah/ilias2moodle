@@ -10,7 +10,10 @@ from typing import Any
 
 from ilias2moodle.ilias.blog import parse_blogs
 from ilias2moodle.model import MigrationDocument, MigrationItem
-from ilias2moodle.recovery_assets import load_mediaobject_recovery
+from ilias2moodle.recovery_assets import (
+    copy_recovered_file,
+    load_mediaobject_recovery,
+)
 
 
 def _walk(items: Iterable[MigrationItem]) -> Iterable[MigrationItem]:
