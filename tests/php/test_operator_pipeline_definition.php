@@ -15,6 +15,7 @@ $steps = \local_iliasmigration\operator_pipeline::step_definitions();
 
 $expected = [
     'structure',
+    'phase7_identities',
     'resources',
     'scorm',
     'learning_modules',
