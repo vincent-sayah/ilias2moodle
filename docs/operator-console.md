@@ -779,7 +779,7 @@ Restent à valider ultérieurement avant promotion RC :
 
 - un scénario contrôlé `FAILED -> Ignorer et continuer -> COMPLETED_WITH_SKIPS` ;
 - le contrôle fonctionnel final du rapport après amélioration des compteurs par étape ;
-- les extensions Phase 7 et la réconciliation d'ordre V2 ne sont toujours pas automatisées par cette beta.
+- la Phase 7.1 est intégrée à partir de la beta7 ; les extensions 7.3/7.4/7.5/7.6 et la réconciliation d'ordre V2 restent encore hors pipeline.
 
 
 ### Re-préparation automatique côté Moodle — 0.22.0-beta5
@@ -883,3 +883,46 @@ Console Moodle
 ~~~
 
 Aucune copie manuelle de plan ou de bundle et aucun clic d'import/re-préparation ne sont nécessaires dans ce scénario.
+
+
+### Phase 7.1 intégrée — 0.22.0-beta7
+
+La beta7 ajoute l'étape opérateur `phase7_identities` immédiatement après `structure`.
+
+La préparation du package crée en parallèle un marqueur :
+
+~~~text
+recoveriesroot/identity-requests/<package>.json
+~~~
+
+Ce marqueur contient le package, le ZIP source, le `course_ref`, la version source et le SHA-256 du `migration.json`. Le même service systemd ILIAS utilisé pour les recoveries lance ensuite `tools/phase7-identity-worker.py`.
+
+Le worker :
+
+1. demande `list-identities` via la clé SSH forced-command existante ;
+2. exécute en lecture seule `tools/ilias_course_identity_extract.php` sur le bon `course_ref` ;
+3. valide `schema_version=1.0`, `phase=7.1`, `client_id` et `course.ref_id` ;
+4. publie le document avec `publish-identity` ;
+5. Moodle l'enregistre dans `recoveriesroot/identities/<package>.json`.
+
+La console n'affiche le bouton de lancement complet que lorsque cet artefact est présent et cohérent avec le cours source.
+
+Pendant le run opérateur :
+
+~~~text
+Structure du cours
+  -> Utilisateurs, inscriptions et rôles
+  -> Ressources simples
+  -> ...
+~~~
+
+L'étape Phase 7.1 réutilise directement `phase7_identity_executor`. Elle conserve donc les politiques déjà validées :
+- aucun matching sur le nom affiché ;
+- override explicite > username unique > email unique ;
+- création des comptes manquants en auth `manual` ;
+- mot de passe aléatoire jamais journalisé ;
+- changement de mot de passe forcé ;
+- rôles `admin -> editingteacher`, `tutor -> teacher`, `member -> student` ;
+- mappings utilisateurs globaux persistants ;
+- mappings d'inscription persistants ;
+- transaction Moodle et idempotence.
