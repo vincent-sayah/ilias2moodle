@@ -41,6 +41,9 @@ foreach ([
     "hash_equals(",
     "operator_recovery_bundle_importer",
     "operator_recovery_queue",
+    "operator_phase7_identity_queue",
+    "phase7_identity_ready",
+    "phase7_identity_queued",
 ] as $check) {
     if (!str_contains($worker, $check)) {
         fwrite(
