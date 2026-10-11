@@ -80,8 +80,10 @@ final class operator_run_manager {
                     'currentstep' => null,
                     'summaryjson' => $this->encode([
                         'detected_types' => $types,
+                        'phase7_1_identities' =>
+                            'integrated_operator_pipeline',
                         'phase7_extensions' =>
-                            'assisted_outside_operator_console_beta1',
+                            '7.3_7.4_7.5_7.6_not_yet_integrated',
                         'order_reconciliation_v2' =>
                             'guarded_cli_post_step',
                     ]),
@@ -508,8 +510,10 @@ final class operator_run_manager {
                     ): bool => $carry || !empty($step->ignored),
                     false
                 ),
+                'phase7_1_identities' =>
+                    'integrated_operator_pipeline',
                 'phase7_extensions' =>
-                    'not_automated_in_operator_console_beta1',
+                    '7.3_7.4_7.5_7.6_not_yet_integrated',
                 'order_reconciliation_v2' =>
                     'guarded_cli_post_step',
             ],
