@@ -223,7 +223,7 @@ def extract_blog_assets(
                                     parents=True,
                                     exist_ok=True,
                                 )
-                                shutil.copy2(recovery["path"], destination_path)
+                                copy_recovered_file(recovery["path"], destination_path)
                                 copied = True
                                 recovered = True
                                 size = int(recovery["size"])
