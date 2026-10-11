@@ -144,18 +144,18 @@ La version opérateur courante `0.22.0-beta7` fournit une **console opérateur M
 1. structure : cours, sections, sous-sections ;
 2. Phase 7.1 : utilisateurs, inscriptions et rôles ;
 3. ressources simples : fichiers, URL, modules HTML ;
-3. SCORM ;
-4. Learning Modules ILIAS vers Moodle Book ;
-5. banques de questions et Quiz ;
-6. Content Pages ;
-7. Glossaires ;
-8. Wikis ;
-9. Exercices ;
-10. Forums (conteneur) ;
-11. MediaCasts ;
-12. Blogs ;
-13. Media Pools ;
-14. Item Groups.
+4. SCORM ;
+5. Learning Modules ILIAS vers Moodle Book ;
+6. banques de questions et Quiz ;
+7. Content Pages ;
+8. Glossaires ;
+9. Wikis ;
+10. Exercices ;
+11. Forums (conteneur) ;
+12. MediaCasts ;
+13. Blogs ;
+14. Media Pools ;
+15. Item Groups.
 
 Les étapes qui ne correspondent à aucun objet dans le package sont marquées `SKIPPED` automatiquement.
 
