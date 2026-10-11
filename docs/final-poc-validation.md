@@ -384,3 +384,103 @@ Le contrôle fonctionnel final dans Moodle a été validé après la migration.
 Le workflow `export ZIP ILIAS -> préparation -> récupération IRSS -> validation -> reset audité si nécessaire -> migration opérateur -> contrôle fonctionnel Moodle` est validé de bout en bout sur ILIAS 10.8.0 et Moodle 5.0.2 pour le cours `827/282`.
 
 Cette qualification constitue la référence fonctionnelle de la branche opérateur intégrée à `main`.
+
+## Validation complémentaire — workflow opérateur manuel beta9.2 — 11 octobre 2026
+
+Cette validation complète remplace les chaînes beta5→beta8 comme workflow opérateur courant. Les anciennes automatisations restent conservées dans l'historique du dépôt mais ne sont plus activées par défaut.
+
+### Périmètre
+
+- source : ILIAS 10.8.0 ;
+- cible : Moodle 5.0.2 ;
+- plugin : `local_iliasmigration 0.22.0-beta9.2` ;
+- build : `2026101105` ;
+- package opérateur : `/var/moodledata/ilias2moodle/packages/pac1/migration.json` ;
+- SHA-256 source du run : `bbd8394d76750a7f9c32eaf90234ebe74ba3a2fca22bfb3b11884208270687a8` ;
+- run Moodle : **#17**.
+
+### Workflow validé
+
+1. export natif effectué manuellement depuis ILIAS ;
+2. upload du ZIP dans l'interface opérateur Moodle ;
+3. analyse et préparation du package ;
+4. détection des ressources absentes ;
+5. affichage des commandes de récupération à exécuter sur ILIAS ;
+6. exécution manuelle côté ILIAS ;
+7. upload du bundle recovery dans Moodle ;
+8. re-préparation jusqu'à `missing_count=0` / package `READY` ;
+9. sélection du package depuis l'interface ;
+10. reset audité de 84 mappings orphelins ;
+11. migration opérateur ;
+12. contrôle fonctionnel du cours Moodle.
+
+### Résultat du run #17
+
+| Étape | Résultat |
+|---|---|
+| Structure du cours | SUCCESS — 6 CREATED |
+| Ressources simples | SUCCESS — 14 CREATED |
+| SCORM | SUCCESS — 2 CREATED |
+| Learning Modules vers Book | SUCCESS — 1 CREATED |
+| Banques de questions et Quiz | SUCCESS — 2 CREATED, après retry Phase 6 |
+| Content Pages | SUCCESS — 1 CREATED |
+| Glossaires | SUCCESS — 1 CREATED |
+| Wikis | SUCCESS — 2 CREATED |
+| Exercices | SUCCESS — 1 APPLIED |
+| Forums | SUCCESS — 2 CREATED |
+| MediaCasts | SUCCESS — 2 CREATED |
+| Blogs | SUCCESS — 2 CREATED |
+| Media Pools | SUCCESS — 1 CREATED |
+| Item Groups | SKIPPED — aucun objet source |
+
+État final : **`COMPLETED`**.
+
+### Correctifs qualifiés pendant ce run
+
+#### Recovery de fichiers et xattrs
+
+Le premier import d'un bundle recovery a révélé qu'un `shutil.copy2()` pouvait échouer sur les xattrs/labels SELinux lors de la copie vers le package Moodle. Le helper de recovery copie désormais uniquement le contenu binaire vérifié, sans tenter de conserver les métadonnées filesystem source.
+
+Périmètre couvert : Wiki, MediaCast, Forum, Blog et Media Pool.
+
+Référence : PR #85.
+
+#### Phase 6 — Question Pool liée
+
+Le run a révélé une divergence entre :
+
+- la clé persistante validée `<container_ref>:<source_ident>` ;
+- une recherche historique reconstruite depuis `external_id`.
+
+La résolution Quiz ↔ Question Pool conserve désormais explicitement le `mapping_ref` exact de la question du pool et le réutilise pour retrouver la question Moodle.
+
+Référence : PR #86.
+
+#### Phase 3 — lien interne ILIAS vers une ressource Moodle
+
+Le contrôle fonctionnel a détecté l'objet ILIAS `lien`, dont la cible interne est le module HTML `chiimie`. Le premier passage conservait le lien permanent ILIAS car la cible Moodle n'était pas encore mappée au moment de la validation.
+
+La Phase 3 effectue désormais une seconde passe après création de toutes les ressources simples. Lorsque la cible unique existe, `mod_url.externalurl` est mis à jour vers la ressource Moodle.
+
+Le replay idempotent de la Phase 3 a corrigé le cours déjà migré et le contrôle navigateur a validé que `lien` ouvre désormais `chiimie` dans Moodle.
+
+Référence : PR #87.
+
+### Conclusion beta9.2
+
+Le workflow manuel retenu est validé de bout en bout sur le POC réel :
+
+```text
+ILIAS export
+  -> upload Moodle
+  -> préparation
+  -> recovery manuel si nécessaire
+  -> package READY
+  -> migration
+  -> contrôle fonctionnel
+```
+
+Les workers automatiques ILIAS et les queues recovery/identité ne font plus partie du fonctionnement opérateur standard.
+
+Les extensions Phase 7 restent disponibles comme fonctionnalités/outils spécialisés, mais ne sont pas intégrées au pipeline beta9.2 par défaut.
+
