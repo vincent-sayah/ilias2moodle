@@ -151,7 +151,7 @@ if (!str_contains(
 
 if (!str_contains(
     $version,
-    "0.22.0-beta7"
+    "0.22.0-beta8"
 )) {
     fwrite(
         STDERR,
